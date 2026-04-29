@@ -24,6 +24,7 @@ import { StatusBadge } from '@/components/status-badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -284,6 +285,27 @@ export default function ProjectsPage() {
   const [cancelReason, setCancelReason] = useState('')
   const [clientNote, setClientNote] = useState('')
   
+  // PROJ-012: Duplicate Project dialog
+  const [duplicateDialog, setDuplicateDialog] = useState<{ 
+    open: boolean
+    projectId: string
+    originalName: string
+    client: string
+    services: string[]
+    priority: string
+    pm: string
+  }>({
+    open: false,
+    projectId: '',
+    originalName: '',
+    client: '',
+    services: [],
+    priority: '',
+    pm: '',
+  })
+  const [duplicateName, setDuplicateName] = useState('')
+  const [isDuplicating, setIsDuplicating] = useState(false)
+  
   const pms = mockUsers.filter(u => u.role === 'admin' || u.role === 'pm')
   
   // Use seed projects
@@ -413,12 +435,53 @@ export default function ProjectsPage() {
     setClientNote('')
   }
   
-  const handleDuplicateProject = (projectId: string, projectName: string) => {
-    toast({
-      title: 'Duplicate Project',
-      description: `Opening duplicate dialog for "${projectName}"...`,
+  // PROJ-012: Duplicate Project
+  const handleDuplicateProject = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId)
+    if (!project) return
+    
+    setDuplicateDialog({
+      open: true,
+      projectId: project.id,
+      originalName: project.name,
+      client: project.client,
+      services: project.services,
+      priority: project.priority,
+      pm: project.pm,
     })
-    // In real implementation, would open PROJ-012 modal
+    setDuplicateName(`${project.name} (Copy)`)
+  }
+  
+  const handleConfirmDuplicate = () => {
+    if (!duplicateName.trim()) return
+    
+    setIsDuplicating(true)
+    
+    // Simulate API call
+    setTimeout(() => {
+      // In real app, POST to API to create duplicate project
+      const newProjectId = `dup-${Date.now()}`
+      
+      setIsDuplicating(false)
+      setDuplicateDialog({
+        open: false,
+        projectId: '',
+        originalName: '',
+        client: '',
+        services: [],
+        priority: '',
+        pm: '',
+      })
+      setDuplicateName('')
+      
+      toast({
+        title: 'Project duplicated. Upload your source files to continue.',
+        description: `"${duplicateName}" created in Draft status.`,
+      })
+      
+      // Redirect to new project detail with highlight flag
+      router.push(`/projects/${newProjectId}?duplicated=true`)
+    }, 1000)
   }
   
   const handleSplitProject = (projectId: string, projectName: string) => {
@@ -792,8 +855,8 @@ export default function ProjectsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          {/* Duplicate Project - available on any status */}
-                          <DropdownMenuItem onClick={() => handleDuplicateProject(project.id, project.name)}>
+                          {/* Duplicate Project - available on any status (PROJ-012) */}
+                          <DropdownMenuItem onClick={() => handleDuplicateProject(project.id)}>
                             <Copy className="mr-2 h-4 w-4" />
                             Duplicate Project
                           </DropdownMenuItem>
@@ -1009,6 +1072,108 @@ export default function ProjectsPage() {
               disabled={!cancelReason.trim()}
             >
               Cancel Project
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* PROJ-012: Duplicate Project Dialog */}
+      <Dialog open={duplicateDialog.open} onOpenChange={(open) => { 
+        setDuplicateDialog(prev => ({ ...prev, open }))
+        if (!open) {
+          setDuplicateName('')
+          setIsDuplicating(false)
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Duplicate &quot;{duplicateDialog.originalName}&quot;?</DialogTitle>
+            <DialogDescription>
+              Create a new project with the same settings. Source files are not duplicated — you&apos;ll upload a new video after creation.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* New Project Name */}
+            <div className="space-y-2">
+              <Label htmlFor="duplicate-name" className="text-sm font-medium">
+                New project name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="duplicate-name"
+                value={duplicateName}
+                onChange={(e) => setDuplicateName(e.target.value)}
+                placeholder="Enter project name..."
+                autoFocus
+              />
+              {!duplicateName.trim() && (
+                <p className="text-xs text-destructive">Project name is required.</p>
+              )}
+            </div>
+            
+            {/* What will be copied - Read-only summary */}
+            <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+              <p className="text-sm font-medium">What will be copied:</p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Client</span>
+                  <span className="font-medium">{duplicateDialog.client}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Priority</span>
+                  <span className={cn(
+                    'rounded-full px-2 py-0.5 text-xs font-medium',
+                    getPriorityColor(duplicateDialog.priority)
+                  )}>
+                    {duplicateDialog.priority ? duplicateDialog.priority.charAt(0).toUpperCase() + duplicateDialog.priority.slice(1) : '-'}
+                  </span>
+                </div>
+                <div className="flex justify-between col-span-2">
+                  <span className="text-muted-foreground">PM</span>
+                  <span className="font-medium">{duplicateDialog.pm || '-'}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-muted-foreground block mb-1">Services + Language Pairs</span>
+                  <div className="flex flex-wrap gap-1">
+                    {duplicateDialog.services.map((service, idx) => (
+                      <span key={idx} className="text-xs px-2 py-0.5 bg-background rounded border border-border">
+                        {service}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Also copied: reference files, internal notes
+              </p>
+            </div>
+            
+            {/* What is NOT copied */}
+            <p className="text-xs text-muted-foreground">
+              <strong>Not copied:</strong> source files, vendor assignments, billable volume, quotes/billing, delivered files, deadlines, status history
+            </p>
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setDuplicateDialog(prev => ({ ...prev, open: false }))}
+              disabled={isDuplicating}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleConfirmDuplicate}
+              disabled={!duplicateName.trim() || isDuplicating}
+            >
+              {isDuplicating ? (
+                <>
+                  <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Duplicating project...
+                </>
+              ) : (
+                'Duplicate Project'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -2,7 +2,7 @@
 
 import { use, useState, useRef } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import {
   Calendar,
   Building2,
@@ -26,6 +26,7 @@ import {
   Volume2,
   Captions,
   Eye,
+  Copy,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -60,7 +61,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { mockProjects, mockTasks, mockQuotes, formatCurrency, formatDate, getPriorityColor, PROJECT_STATUSES } from '@/lib/mock-data'
+import { mockProjects, mockTasks, mockQuotes, formatCurrency, formatDate, getPriorityColor, PROJECT_STATUSES, SERVICES_LIST } from '@/lib/mock-data'
 import { useRole } from '@/app/(app)/layout'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
@@ -98,9 +99,13 @@ function getTaskIcon(service: string) {
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const searchParams = useSearchParams()
+  const router = useRouter()
   const initialTab = searchParams.get('tab') || 'overview'
   const { currentRole } = useRole()
   const { toast } = useToast()
+  
+  // Check if this is a newly duplicated project
+  const isDuplicated = searchParams.get('duplicated') === 'true'
   
   const project = mockProjects.find((p) => p.id === id) || mockProjects[0]
   const projectTasks = mockTasks.filter((t) => t.projectId === project.id)
@@ -112,6 +117,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [showArchiveDialog, setShowArchiveDialog] = useState(false)
+  
+  // PROJ-012: Duplicate Project dialog
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
+  const [duplicateName, setDuplicateName] = useState(`${project.name} (Copy)`)
+  const [isDuplicating, setIsDuplicating] = useState(false)
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false)
   const [newTaskService, setNewTaskService] = useState('')
   const [newTaskLanguage, setNewTaskLanguage] = useState('')
@@ -338,6 +348,30 @@ const handleCancelEdit = () => {
       description: `"${project.name}" has been moved to the archive.`,
     })
     setShowArchiveDialog(false)
+  }
+
+  // PROJ-012: Duplicate Project handler
+  const handleDuplicateProject = () => {
+    if (!duplicateName.trim()) return
+    
+    setIsDuplicating(true)
+    
+    // Simulate API call
+    setTimeout(() => {
+      const newProjectId = `dup-${Date.now()}`
+      
+      setIsDuplicating(false)
+      setShowDuplicateDialog(false)
+      setDuplicateName(`${project.name} (Copy)`)
+      
+      toast({
+        title: 'Project duplicated. Upload your source files to continue.',
+        description: `"${duplicateName}" created in Draft status.`,
+      })
+      
+// Redirect to new project detail with highlight flag
+      router.push(`/projects/${newProjectId}?duplicated=true`)
+    }, 1000)
   }
 
   const handleAddTask = () => {
