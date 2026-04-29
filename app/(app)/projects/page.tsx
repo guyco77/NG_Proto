@@ -63,6 +63,16 @@ import {
 import { mockUsers, formatDate, getPriorityColor, PROJECT_STATUSES, SERVICES_LIST } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
+import { useRole } from '../layout'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+
+// Client team members for Assignee filter (PROJ-005-Client)
+const CLIENT_TEAM_MEMBERS = [
+  { id: 'ct-1', name: 'Maya Cohen', initials: 'MC', role: 'task_owner' },
+  { id: 'ct-2', name: 'Yossi Levy', initials: 'YL', role: 'reviewer' },
+  { id: 'ct-3', name: 'Dana Roth', initials: 'DR', role: 'task_owner' },
+]
 
 // Services from the Services Catalog (SERV-001) - exact list per PRD
 const CATALOG_SERVICES = [
@@ -103,6 +113,162 @@ const TASK_STEP_TYPES = [
   'Upload Rough Cut',
   'New Cut',
   'Project Creation',
+]
+
+// PROJ-005-Client: Client-specific seed projects (single client view)
+const clientSeedProjects = [
+  {
+    id: 'client-1',
+    name: 'Spring Campaign Promo',
+    client: 'My Company', // Implicit - not shown in client view
+    clientId: 'c-mycompany',
+    status: 'approved',
+    services: ['Translation from Audio + Template'],
+    pm: 'Sarah L.',
+    pmId: '1',
+    priority: 'medium',
+    deadline: '2026-05-18',
+    progress: 0,
+    createdAt: '2026-04-29T10:00:00Z',
+    isUnassigned: false,
+    isClientCreated: true, // PROJ-010 project
+    needsTeamAssignment: true, // Show "Assign your team" prompt
+    assignees: [
+      { id: 'ct-1', name: 'Maya Cohen', initials: 'MC', type: 'client' },
+      { id: 'ct-2', name: 'Yossi Levy', initials: 'YL', type: 'client' },
+    ],
+  },
+  {
+    id: 'client-2',
+    name: 'Investor Update Q1',
+    client: 'My Company',
+    clientId: 'c-mycompany',
+    status: 'in_progress',
+    services: ['Subtitles Transcription AI', 'Extra QC'],
+    pm: 'David M.',
+    pmId: '2',
+    priority: 'high',
+    deadline: '2026-05-05',
+    progress: 35,
+    createdAt: '2026-04-25T09:00:00Z',
+    isUnassigned: false,
+    isClientCreated: false, // NG-led project
+    assignees: [
+      { id: 'ng-1', name: 'NG', initials: 'NG', type: 'ng' },
+    ],
+  },
+  {
+    id: 'client-3',
+    name: 'Internal Training Series',
+    client: 'My Company',
+    clientId: 'c-mycompany',
+    status: 'in_progress',
+    services: ['Translation from Template AI'],
+    pm: 'Sarah L.',
+    pmId: '1',
+    priority: 'low',
+    deadline: '2026-06-02',
+    progress: 60,
+    createdAt: '2026-04-20T14:00:00Z',
+    isUnassigned: false,
+    isClientCreated: true,
+    assignees: [
+      { id: 'ct-1', name: 'Maya Cohen', initials: 'MC', type: 'client' },
+    ],
+  },
+  {
+    id: 'client-4',
+    name: 'Conference Highlights Reel',
+    client: 'My Company',
+    clientId: 'c-mycompany',
+    status: 'in_review',
+    services: ['Subtitles Transcription'],
+    pm: 'David M.',
+    pmId: '2',
+    priority: 'urgent',
+    deadline: '2026-04-30',
+    progress: 85,
+    createdAt: '2026-04-15T11:00:00Z',
+    isUnassigned: false,
+    isClientCreated: false,
+    assignees: [
+      { id: 'ng-1', name: 'NG', initials: 'NG', type: 'ng' },
+    ],
+  },
+  {
+    id: 'client-5',
+    name: 'Brand Refresh Promo',
+    client: 'My Company',
+    clientId: 'c-mycompany',
+    status: 'delivered',
+    services: ['Translation from Audio'],
+    pm: 'Sarah L.',
+    pmId: '1',
+    priority: 'medium',
+    deadline: '2026-04-22',
+    progress: 100,
+    createdAt: '2026-04-10T08:00:00Z',
+    isUnassigned: false,
+    isClientCreated: false,
+    assignees: [
+      { id: 'ng-1', name: 'NG', initials: 'NG', type: 'ng' },
+    ],
+  },
+  {
+    id: 'client-6',
+    name: 'Annual Report Voiceover',
+    client: 'My Company',
+    clientId: 'c-mycompany',
+    status: 'invoiced',
+    services: ['Text Translation'],
+    pm: 'David M.',
+    pmId: '2',
+    priority: 'low',
+    deadline: '2026-04-12',
+    progress: 100,
+    createdAt: '2026-04-01T10:00:00Z',
+    isUnassigned: false,
+    isClientCreated: false,
+    assignees: [
+      { id: 'ng-1', name: 'NG', initials: 'NG', type: 'ng' },
+    ],
+  },
+  {
+    id: 'client-7',
+    name: 'Onboarding Module 1',
+    client: 'My Company',
+    clientId: 'c-mycompany',
+    status: 'closed',
+    services: ['Proofread'],
+    pm: 'Sarah L.',
+    pmId: '1',
+    priority: 'low',
+    deadline: '2026-03-28',
+    progress: 100,
+    createdAt: '2026-03-15T09:00:00Z',
+    isUnassigned: false,
+    isClientCreated: true,
+    assignees: [
+      { id: 'ct-2', name: 'Yossi Levy', initials: 'YL', type: 'client' },
+    ],
+  },
+  {
+    id: 'client-8',
+    name: 'Cancelled Pilot',
+    client: 'My Company',
+    clientId: 'c-mycompany',
+    status: 'cancelled',
+    services: ['Translation from Audio'],
+    pm: 'David M.',
+    pmId: '2',
+    priority: 'high',
+    deadline: '2026-04-18',
+    progress: 0,
+    createdAt: '2026-03-10T16:00:00Z',
+    isUnassigned: true,
+    isClientCreated: false,
+    assignees: [],
+  },
 ]
 
 // Seed data covering every status per PRD Update PROJ-005
@@ -246,7 +412,7 @@ const seedProjects = [
 
 const ITEMS_PER_PAGE = 25
 
-type SortOption = 'date_created' | 'deadline' | 'priority' | 'client_name'
+type SortOption = 'date_created' | 'deadline' | 'priority' | 'client_name' | 'project_name'
 
 // Statuses that can be cancelled
 const CANCELLABLE_STATUSES = ['draft', 'quoted', 'approved', 'in_progress', 'in_review', 'delivered', 'invoiced']
@@ -254,6 +420,11 @@ const CANCELLABLE_STATUSES = ['draft', 'quoted', 'approved', 'in_progress', 'in_
 export default function ProjectsPage() {
   const { toast } = useToast()
   const router = useRouter()
+  const { currentRole } = useRole()
+  
+  // Role-based flags
+  const isClient = currentRole === 'client_admin' || currentRole === 'task_owner' || currentRole === 'reviewer' || currentRole === 'viewer'
+  const isClientAdmin = currentRole === 'client_admin'
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
@@ -261,6 +432,7 @@ export default function ProjectsPage() {
   const [serviceFilters, setServiceFilters] = useState<string[]>([])
   const [taskTypeFilters, setTaskTypeFilters] = useState<string[]>([])
   const [pmFilters, setPmFilters] = useState<string[]>([])
+  const [assigneeFilters, setAssigneeFilters] = useState<string[]>([]) // PROJ-005-Client: Assignee filter for clients
   const [deadlineRange, setDeadlineRange] = useState<{ from: string; to: string }>({ from: '', to: '' })
   const [includeArchived, setIncludeArchived] = useState(false)
   const [sortBy, setSortBy] = useState<SortOption>('date_created')
@@ -308,16 +480,16 @@ export default function ProjectsPage() {
   
   const pms = mockUsers.filter(u => u.role === 'admin' || u.role === 'pm')
   
-  // Use seed projects
-  const projects = seedProjects
+  // Use seed projects - client sees client-specific projects, admin/PM sees all projects
+  const projects = isClient ? clientSeedProjects : seedProjects
   
   // Filter projects
   const filteredProjects = useMemo(() => {
-    let result = projects.filter((project) => {
-      // Search
+    let result = projects.filter((project: typeof seedProjects[0] | typeof clientSeedProjects[0]) => {
+      // Search - PROJ-005-Client: clients search project name only, admin/PM searches name + client
       const matchesSearch = !searchQuery || 
         project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        project.client.toLowerCase().includes(searchQuery.toLowerCase())
+        (!isClient && project.client.toLowerCase().includes(searchQuery.toLowerCase()))
       
       // Status filter
       const matchesStatus = statusFilters.length === 0 || statusFilters.includes(project.status)
@@ -329,18 +501,34 @@ export default function ProjectsPage() {
       // Task Type filter - for now, match based on service mapping (in real app, would check actual tasks)
       const matchesTaskType = taskTypeFilters.length === 0 // Simplified - would need task data
       
-      // PM filter
-      const matchesPM = pmFilters.length === 0 || pmFilters.includes(project.pmId)
+      // PM filter (admin/PM only)
+      const matchesPM = isClient || pmFilters.length === 0 || pmFilters.includes(project.pmId)
+      
+      // Assignee filter (clients only) - PROJ-005-Client
+      let matchesAssignee = true
+      if (isClient && assigneeFilters.length > 0 && 'assignees' in project) {
+        const projectAssignees = project.assignees || []
+        matchesAssignee = assigneeFilters.some(filter => {
+          if (filter === 'ng-assigned') {
+            return projectAssignees.some(a => a.type === 'ng')
+          }
+          if (filter === 'unassigned') {
+            return projectAssignees.length === 0 || project.isUnassigned
+          }
+          // Client team member filter
+          return projectAssignees.some(a => a.id === filter)
+        })
+      }
       
       // Deadline range
       const matchesDeadline = (!deadlineRange.from || project.deadline >= deadlineRange.from) &&
         (!deadlineRange.to || project.deadline <= deadlineRange.to)
       
       // Archived
-      const isArchived = project.status === 'closed'
-      const matchesArchived = includeArchived || !isArchived
+      const isArchivedProject = project.status === 'closed'
+      const matchesArchived = includeArchived || !isArchivedProject
       
-      return matchesSearch && matchesStatus && matchesService && matchesTaskType && matchesPM && matchesDeadline && matchesArchived
+      return matchesSearch && matchesStatus && matchesService && matchesTaskType && matchesPM && matchesAssignee && matchesDeadline && matchesArchived
     })
     
     // Sort - default is date_created (newest first) per PRD
@@ -351,8 +539,11 @@ export default function ProjectsPage() {
         case 'priority':
           const priorityOrder: Record<string, number> = { urgent: 0, high: 1, medium: 2, low: 3 }
           return priorityOrder[a.priority] - priorityOrder[b.priority]
+        case 'project_name':
+          return a.name.localeCompare(b.name)
         case 'client_name':
-          return a.client.localeCompare(b.client)
+          // PROJ-005-Client: clients don't have this sort option, but handle gracefully
+          return isClient ? 0 : a.client.localeCompare(b.client)
         case 'date_created':
         default:
           // Newest first
@@ -361,7 +552,7 @@ export default function ProjectsPage() {
     })
     
     return result
-  }, [searchQuery, statusFilters, serviceFilters, taskTypeFilters, pmFilters, deadlineRange, includeArchived, sortBy, projects])
+  }, [searchQuery, statusFilters, serviceFilters, taskTypeFilters, pmFilters, assigneeFilters, deadlineRange, includeArchived, sortBy, projects, isClient])
   
   // Pagination
   const totalPages = Math.ceil(filteredProjects.length / ITEMS_PER_PAGE)
@@ -371,7 +562,8 @@ export default function ProjectsPage() {
   )
   
   // Active filter count
-  const activeFilterCount = statusFilters.length + serviceFilters.length + taskTypeFilters.length + pmFilters.length + 
+  const activeFilterCount = statusFilters.length + serviceFilters.length + taskTypeFilters.length + 
+    (isClient ? assigneeFilters.length : pmFilters.length) + 
     (deadlineRange.from ? 1 : 0) + (deadlineRange.to ? 1 : 0)
   
   const toggleStatusFilter = (status: string) => {
@@ -402,11 +594,20 @@ export default function ProjectsPage() {
     setCurrentPage(1)
   }
   
+  // PROJ-005-Client: Assignee filter toggle for clients
+  const toggleAssigneeFilter = (assigneeId: string) => {
+    setAssigneeFilters(prev => 
+      prev.includes(assigneeId) ? prev.filter(a => a !== assigneeId) : [...prev, assigneeId]
+    )
+    setCurrentPage(1)
+  }
+  
   const clearAllFilters = () => {
     setStatusFilters([])
     setServiceFilters([])
     setTaskTypeFilters([])
     setPmFilters([])
+    setAssigneeFilters([])
     setDeadlineRange({ from: '', to: '' })
     setSearchQuery('')
     setCurrentPage(1)
@@ -497,19 +698,23 @@ export default function ProjectsPage() {
       {/* Page Header */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-foreground">Projects</h1>
+          {/* PROJ-005-Client: "My Projects" for clients, "Projects" for admin/PM */}
+          <h1 className="text-2xl font-semibold text-foreground">{isClient ? 'My Projects' : 'Projects'}</h1>
           <p className="text-sm text-muted-foreground mt-1">
             {filteredProjects.length} of {projects.length} projects
           </p>
         </div>
-        <div className="flex items-center gap-2 mt-4 sm:mt-0">
-          <Link href="/projects/new" prefetch={true}>
-            <Button className="gap-1.5">
-              <Plus className="h-4 w-4" />
-              New Project
-            </Button>
-          </Link>
-        </div>
+        {/* PROJ-005-Client: + New Project only visible to Client Admin (or admin/PM) */}
+        {(!isClient || isClientAdmin) && (
+          <div className="flex items-center gap-2 mt-4 sm:mt-0">
+            <Link href="/projects/new" prefetch={true}>
+              <Button className="gap-1.5">
+                <Plus className="h-4 w-4" />
+                New Project
+              </Button>
+            </Link>
+          </div>
+        )}
       </div>
       
       {/* Filters Row - Order: Status · Service · Task Type · PM · Deadline per PRD */}
@@ -613,34 +818,101 @@ export default function ProjectsPage() {
           </PopoverContent>
         </Popover>
         
-        {/* PM Filter */}
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="gap-1.5">
-              PM
-              {pmFilters.length > 0 && (
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
-                  {pmFilters.length}
-                </span>
-              )}
-              <ChevronDown className="h-3 w-3" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-48 p-2" align="start">
-            {pms.map((pm) => (
-              <div key={pm.id} className="flex items-center gap-2 py-1.5 px-2 hover:bg-muted rounded">
+        {/* PM Filter (Admin/PM) or Assignee Filter (Clients) - PROJ-005-Client */}
+        {isClient ? (
+          // ASSIGNEE FILTER FOR CLIENTS
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                Assignee
+                {assigneeFilters.length > 0 && (
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                    {assigneeFilters.length}
+                  </span>
+                )}
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" align="start">
+              {/* Client team members */}
+              <div className="text-xs font-medium text-muted-foreground px-2 py-1">Your Team</div>
+              {CLIENT_TEAM_MEMBERS.map((member) => (
+                <div key={member.id} className="flex items-center gap-2 py-1.5 px-2 hover:bg-muted rounded">
+                  <Checkbox
+                    id={`assignee-${member.id}`}
+                    checked={assigneeFilters.includes(member.id)}
+                    onCheckedChange={() => toggleAssigneeFilter(member.id)}
+                  />
+                  <Avatar className="h-5 w-5">
+                    <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                      {member.initials}
+                    </AvatarFallback>
+                  </Avatar>
+                  <Label htmlFor={`assignee-${member.id}`} className="text-sm cursor-pointer flex-1">
+                    {member.name}
+                  </Label>
+                </div>
+              ))}
+              <div className="border-t border-border my-2" />
+              {/* Special options */}
+              <div key="ng-assigned" className="flex items-center gap-2 py-1.5 px-2 hover:bg-muted rounded">
                 <Checkbox
-                  id={`pm-${pm.id}`}
-                  checked={pmFilters.includes(pm.id)}
-                  onCheckedChange={() => togglePMFilter(pm.id)}
+                  id="assignee-ng"
+                  checked={assigneeFilters.includes('ng-assigned')}
+                  onCheckedChange={() => toggleAssigneeFilter('ng-assigned')}
                 />
-                <Label htmlFor={`pm-${pm.id}`} className="text-sm cursor-pointer flex-1">
-                  {pm.name}
+                <div className="h-5 w-5 flex items-center justify-center rounded-full bg-blue-100 text-[10px] font-medium text-blue-700">
+                  NG
+                </div>
+                <Label htmlFor="assignee-ng" className="text-sm cursor-pointer flex-1">
+                  NG-assigned
                 </Label>
               </div>
-            ))}
-          </PopoverContent>
-        </Popover>
+              <div key="unassigned" className="flex items-center gap-2 py-1.5 px-2 hover:bg-muted rounded">
+                <Checkbox
+                  id="assignee-unassigned"
+                  checked={assigneeFilters.includes('unassigned')}
+                  onCheckedChange={() => toggleAssigneeFilter('unassigned')}
+                />
+                <div className="h-5 w-5 flex items-center justify-center rounded-full bg-gray-100 text-[10px] font-medium text-gray-500">
+                  ?
+                </div>
+                <Label htmlFor="assignee-unassigned" className="text-sm cursor-pointer flex-1">
+                  Unassigned
+                </Label>
+              </div>
+            </PopoverContent>
+          </Popover>
+        ) : (
+          // PM FILTER FOR ADMIN/PM
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                PM
+                {pmFilters.length > 0 && (
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+                    {pmFilters.length}
+                  </span>
+                )}
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-2" align="start">
+              {pms.map((pm) => (
+                <div key={pm.id} className="flex items-center gap-2 py-1.5 px-2 hover:bg-muted rounded">
+                  <Checkbox
+                    id={`pm-${pm.id}`}
+                    checked={pmFilters.includes(pm.id)}
+                    onCheckedChange={() => togglePMFilter(pm.id)}
+                  />
+                  <Label htmlFor={`pm-${pm.id}`} className="text-sm cursor-pointer flex-1">
+                    {pm.name}
+                  </Label>
+                </div>
+              ))}
+            </PopoverContent>
+          </Popover>
+        )}
         
         {/* Deadline Range */}
         <Popover>
@@ -679,7 +951,7 @@ export default function ProjectsPage() {
           </PopoverContent>
         </Popover>
         
-        {/* Sort */}
+        {/* Sort - PROJ-005-Client: no Client Name sort for clients, add Project Name A-Z */}
         <Select value={sortBy} onValueChange={(v: SortOption) => setSortBy(v)}>
           <SelectTrigger className="w-40 h-9">
             <ArrowUpDown className="h-3 w-3 mr-2" />
@@ -689,7 +961,8 @@ export default function ProjectsPage() {
             <SelectItem value="date_created">Date Created</SelectItem>
             <SelectItem value="deadline">Deadline</SelectItem>
             <SelectItem value="priority">Priority</SelectItem>
-            <SelectItem value="client_name">Client Name</SelectItem>
+            <SelectItem value="project_name">Project Name (A-Z)</SelectItem>
+            {!isClient && <SelectItem value="client_name">Client Name</SelectItem>}
           </SelectContent>
         </Select>
         
@@ -740,14 +1013,34 @@ export default function ProjectsPage() {
               </button>
             </span>
           ))}
-          {pmFilters.map((pmId) => (
-            <span key={pmId} className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-700">
-              {pms.find(p => p.id === pmId)?.name}
-              <button onClick={() => togglePMFilter(pmId)} className="hover:bg-purple-200 rounded-full p-0.5">
-                <X className="h-3 w-3" />
-              </button>
-            </span>
-          ))}
+          {/* PM filter pills (admin/PM) or Assignee filter pills (clients) */}
+          {isClient ? (
+            // Assignee filter pills for clients
+            assigneeFilters.map((assigneeId) => {
+              const member = CLIENT_TEAM_MEMBERS.find(m => m.id === assigneeId)
+              const label = assigneeId === 'ng-assigned' ? 'NG-assigned' : 
+                            assigneeId === 'unassigned' ? 'Unassigned' : 
+                            member?.name || assigneeId
+              return (
+                <span key={assigneeId} className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-700">
+                  {label}
+                  <button onClick={() => toggleAssigneeFilter(assigneeId)} className="hover:bg-purple-200 rounded-full p-0.5">
+                    <X className="h-3 w-3" />
+                  </button>
+                </span>
+              )
+            })
+          ) : (
+            // PM filter pills for admin/PM
+            pmFilters.map((pmId) => (
+              <span key={pmId} className="inline-flex items-center gap-1 rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-700">
+                {pms.find(p => p.id === pmId)?.name}
+                <button onClick={() => togglePMFilter(pmId)} className="hover:bg-purple-200 rounded-full p-0.5">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            ))
+          )}
           {deadlineRange.from && (
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
               From: {deadlineRange.from}
@@ -772,14 +1065,20 @@ export default function ProjectsPage() {
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent bg-muted/50">
-              <TableHead className="w-[280px]">Project</TableHead>
-              <TableHead className="w-[140px]">Client</TableHead>
+              {/* PROJ-005-Client: Different columns for clients vs admin/PM */}
+              <TableHead className={isClient ? "w-[300px]" : "w-[280px]"}>Project</TableHead>
+              {!isClient && <TableHead className="w-[140px]">Client</TableHead>}
               <TableHead className="w-[160px]">Status</TableHead>
-              <TableHead className="w-[100px]">PM</TableHead>
+              {isClient ? (
+                <TableHead className="w-[140px]">Assignee</TableHead>
+              ) : (
+                <TableHead className="w-[100px]">PM</TableHead>
+              )}
               <TableHead className="w-[110px]">Deadline</TableHead>
               <TableHead className="w-[90px]">Priority</TableHead>
               <TableHead className="w-[80px] text-right">Progress</TableHead>
-              <TableHead className="w-[50px]"></TableHead>
+              {/* PROJ-005-Client: No actions menu for clients */}
+              {!isClient && <TableHead className="w-[50px]"></TableHead>}
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -806,16 +1105,25 @@ export default function ProjectsPage() {
                     </div>
                   </TableCell>
                   
-                  {/* Client */}
-                  <TableCell>
-                    <span className="text-sm">{project.client}</span>
-                  </TableCell>
+                  {/* Client - only for admin/PM */}
+                  {!isClient && (
+                    <TableCell>
+                      <span className="text-sm">{project.client}</span>
+                    </TableCell>
+                  )}
                   
-                  {/* Status + Unassigned badge */}
+                  {/* Status + badges */}
                   <TableCell>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <StatusBadge status={project.status} />
-                      {project.isUnassigned && (
+                      {/* PROJ-005-Client: "Assign your team" prompt for client-created projects */}
+                      {isClient && 'needsTeamAssignment' in project && project.needsTeamAssignment && (
+                        <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-700">
+                          Assign your team
+                        </span>
+                      )}
+                      {/* Unassigned badge for NG-led projects */}
+                      {project.isUnassigned && !('needsTeamAssignment' in project && project.needsTeamAssignment) && (
                         <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
                           Unassigned
                         </span>
@@ -823,10 +1131,51 @@ export default function ProjectsPage() {
                     </div>
                   </TableCell>
                   
-                  {/* PM */}
-                  <TableCell>
-                    <span className="text-sm">{project.pm}</span>
-                  </TableCell>
+                  {/* PM (admin/PM) or Assignee summary (clients) */}
+                  {isClient ? (
+                    <TableCell>
+                      {/* PROJ-005-Client: Assignee summary with avatars */}
+                      {'assignees' in project && project.assignees && project.assignees.length > 0 ? (
+                        <div className="flex items-center gap-1">
+                          <TooltipProvider>
+                            {project.assignees.slice(0, 3).map((assignee) => (
+                              <Tooltip key={assignee.id}>
+                                <TooltipTrigger asChild>
+                                  {assignee.type === 'ng' ? (
+                                    <div className="h-6 w-6 flex items-center justify-center rounded-full bg-blue-100 text-[10px] font-medium text-blue-700">
+                                      NG
+                                    </div>
+                                  ) : (
+                                    <Avatar className="h-6 w-6">
+                                      <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                                        {assignee.initials}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                  )}
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  {assignee.type === 'ng' ? 'Handled by NG' : assignee.name}
+                                </TooltipContent>
+                              </Tooltip>
+                            ))}
+                            {project.assignees.length > 3 && (
+                              <span className="text-xs text-muted-foreground ml-1">
+                                +{project.assignees.length - 3}
+                              </span>
+                            )}
+                          </TooltipProvider>
+                        </div>
+                      ) : (
+                        <div className="h-6 w-6 flex items-center justify-center rounded-full bg-gray-100 text-[10px] font-medium text-gray-500">
+                          ?
+                        </div>
+                      )}
+                    </TableCell>
+                  ) : (
+                    <TableCell>
+                      <span className="text-sm">{project.pm}</span>
+                    </TableCell>
+                  )}
                   
                   {/* Deadline */}
                   <TableCell>
@@ -845,70 +1194,72 @@ export default function ProjectsPage() {
                     <span className="text-sm font-medium">{project.progress}%</span>
                   </TableCell>
                   
-                  {/* Actions Menu */}
-                  <TableCell>
-                    <div onClick={(e) => e.stopPropagation()}>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreHorizontal className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          {/* Duplicate Project - available on any status (PROJ-012) */}
-                          <DropdownMenuItem onClick={() => handleDuplicateProject(project.id)}>
-                            <Copy className="mr-2 h-4 w-4" />
-                            Duplicate Project
-                          </DropdownMenuItem>
-                          
-                          {/* Split Project - available on any status */}
-                          <DropdownMenuItem onClick={() => handleSplitProject(project.id, project.name)}>
-                            <Split className="mr-2 h-4 w-4" />
-                            Split Project
-                          </DropdownMenuItem>
-                          
-                          <DropdownMenuSeparator />
-                          
-                          {/* Archive/Unarchive */}
-                          <DropdownMenuItem 
-                            onClick={() => setArchiveDialog({ 
-                              open: true, 
-                              projectId: project.id, 
-                              projectName: project.name,
-                              isArchived 
-                            })}
-                          >
-                            {isArchived ? (
-                              <>
-                                <ArchiveRestore className="mr-2 h-4 w-4" />
-                                Unarchive Project
-                              </>
-                            ) : (
-                              <>
-                                <Archive className="mr-2 h-4 w-4" />
-                                Archive Project
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                          
-                          {/* Cancel Project - only for cancellable statuses */}
-                          {canCancel && (
+                  {/* Actions Menu - PROJ-005-Client: Hidden for clients */}
+                  {!isClient && (
+                    <TableCell>
+                      <div onClick={(e) => e.stopPropagation()}>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {/* Duplicate Project - available on any status (PROJ-012) */}
+                            <DropdownMenuItem onClick={() => handleDuplicateProject(project.id)}>
+                              <Copy className="mr-2 h-4 w-4" />
+                              Duplicate Project
+                            </DropdownMenuItem>
+                            
+                            {/* Split Project - available on any status */}
+                            <DropdownMenuItem onClick={() => handleSplitProject(project.id, project.name)}>
+                              <Split className="mr-2 h-4 w-4" />
+                              Split Project
+                            </DropdownMenuItem>
+                            
+                            <DropdownMenuSeparator />
+                            
+                            {/* Archive/Unarchive */}
                             <DropdownMenuItem 
-                              className="text-destructive"
-                              onClick={() => setCancelDialog({ 
+                              onClick={() => setArchiveDialog({ 
                                 open: true, 
                                 projectId: project.id, 
-                                projectName: project.name 
+                                projectName: project.name,
+                                isArchived 
                               })}
                             >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Cancel Project
+                              {isArchived ? (
+                                <>
+                                  <ArchiveRestore className="mr-2 h-4 w-4" />
+                                  Unarchive Project
+                                </>
+                              ) : (
+                                <>
+                                  <Archive className="mr-2 h-4 w-4" />
+                                  Archive Project
+                                </>
+                              )}
                             </DropdownMenuItem>
-                          )}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </TableCell>
+                            
+                            {/* Cancel Project - only for cancellable statuses */}
+                            {canCancel && (
+                              <DropdownMenuItem 
+                                className="text-destructive"
+                                onClick={() => setCancelDialog({ 
+                                  open: true, 
+                                  projectId: project.id, 
+                                  projectName: project.name 
+                                })}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Cancel Project
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </TableCell>
+                  )}
                 </TableRow>
               )
             })}
@@ -916,27 +1267,31 @@ export default function ProjectsPage() {
         </Table>
       </div>
 
-      {/* Empty State */}
+      {/* Empty State - PROJ-005-Client: Different messages for clients */}
       {filteredProjects.length === 0 && (
         <div className="flex h-64 items-center justify-center rounded-lg border border-dashed border-border">
           <div className="text-center">
             <p className="text-muted-foreground">
               {searchQuery || activeFilterCount > 0 
-                ? "No projects match your filters" 
-                : "No projects yet"}
+                ? (searchQuery ? "No projects match your search." : "No projects match these filters.")
+                : isClient 
+                  ? (isClientAdmin 
+                      ? "You don't have any projects yet. Click + New Project to create one."
+                      : "You don't have any projects yet. Your Client Admin will create projects for your team.")
+                  : "No projects yet"}
             </p>
             {(searchQuery || activeFilterCount > 0) ? (
               <Button variant="outline" className="mt-4" onClick={clearAllFilters}>
-                Clear Filters
+                Clear All Filters
               </Button>
-            ) : (
+            ) : (!isClient || isClientAdmin) ? (
               <Link href="/projects/new" prefetch={true}>
                 <Button className="mt-4 gap-1.5">
                   <Plus className="h-4 w-4" />
-                  Create First Project
+                  {isClient ? 'New Project' : 'Create First Project'}
                 </Button>
               </Link>
-            )}
+            ) : null}
           </div>
         </div>
       )}
