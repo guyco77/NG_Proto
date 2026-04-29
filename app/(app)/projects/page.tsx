@@ -501,6 +501,13 @@ export default function ProjectsPage() {
   const [isSplitting, setIsSplitting] = useState(false)
   const [splitProgress, setSplitProgress] = useState({ created: 0, total: 0 })
   const [splitError, setSplitError] = useState('')
+  // PROJ-013: Partial failure state
+  const [splitResult, setSplitResult] = useState<{
+    show: boolean
+    created: number
+    failed: number
+    failedEpisodes: number[] // episode numbers that failed
+  }>({ show: false, created: 0, failed: 0, failedEpisodes: [] })
   
   const pms = mockUsers.filter(u => u.role === 'admin' || u.role === 'pm')
   
@@ -747,48 +754,86 @@ export default function ProjectsPage() {
     return episodeNames.filter(name => existingNames.includes(name.toLowerCase()))
   }
   
-  const handleConfirmSplit = () => {
+  const handleConfirmSplit = (retryOnly = false, failedEpisodesToRetry: number[] = []) => {
     if (!splitTotalEpisodes || splitTotalEpisodes < 2 || !splitPrefix.trim()) return
     
-    const conflicts = checkNameConflicts(splitPrefix, splitTotalEpisodes)
-    if (conflicts.length > 0) {
-      setSplitError(`${conflicts.length} episode names already exist (e.g., ${conflicts[0]}). Choose a different prefix or delete the existing episodes first.`)
-      return
+    // Skip conflict check on retry (already passed initially)
+    if (!retryOnly) {
+      const conflicts = checkNameConflicts(splitPrefix, splitTotalEpisodes)
+      if (conflicts.length > 0) {
+        setSplitError(`${conflicts.length} episode names already exist (e.g., ${conflicts[0]}). Choose a different prefix or delete the existing episodes first.`)
+        return
+      }
     }
     
     setIsSplitting(true)
     setSplitError('')
-    const totalToCreate = splitTotalEpisodes - 1
+    setSplitResult({ show: false, created: 0, failed: 0, failedEpisodes: [] })
+    
+    const totalToCreate = retryOnly ? failedEpisodesToRetry.length : splitTotalEpisodes - 1
     setSplitProgress({ created: 0, total: totalToCreate })
     
-    // Simulate creating episodes with progress
+    // Simulate creating episodes with progress (with ~5% random failure chance for demo)
     let created = 0
+    let failed = 0
+    const failedEpisodes: number[] = []
+    let currentIndex = 0
+    
     const createInterval = setInterval(() => {
-      created++
-      setSplitProgress({ created, total: totalToCreate })
+      const episodeNumber = retryOnly ? failedEpisodesToRetry[currentIndex] : currentIndex + 2
+      currentIndex++
       
-      if (created >= totalToCreate) {
+      // Simulate ~5% failure rate for demo purposes (only if > 10 episodes to see the effect)
+      const simulateFailure = totalToCreate > 10 && Math.random() < 0.05
+      
+      if (simulateFailure) {
+        failed++
+        failedEpisodes.push(episodeNumber)
+      } else {
+        created++
+      }
+      
+      setSplitProgress({ created: created + failed, total: totalToCreate })
+      
+      if (currentIndex >= totalToCreate) {
         clearInterval(createInterval)
         setIsSplitting(false)
-        setSplitDialog({
-          open: false,
-          projectId: '',
-          projectName: '',
-          client: '',
-          services: [],
-          priority: '',
-          pm: '',
-        })
         
-        toast({
-          title: `Series split into ${splitTotalEpisodes} episodes.`,
-          description: 'Upload source files for each episode to continue.',
-        })
-        
-        // In real app, would refresh project list or add new projects to state
-        router.push('/projects')
+        if (failed > 0) {
+          // Partial failure - show results screen
+          setSplitResult({
+            show: true,
+            created,
+            failed,
+            failedEpisodes,
+          })
+        } else {
+          // Full success
+          setSplitDialog({
+            open: false,
+            projectId: '',
+            projectName: '',
+            client: '',
+            services: [],
+            priority: '',
+            pm: '',
+          })
+          setSplitResult({ show: false, created: 0, failed: 0, failedEpisodes: [] })
+          
+          toast({
+            title: `Series split into ${splitTotalEpisodes} episodes.`,
+            description: 'Upload source files for each episode to continue.',
+          })
+          
+          router.push('/projects')
+        }
       }
-    }, 150) // Simulate ~150ms per episode creation
+    }, 150)
+  }
+  
+  // Retry failed episodes
+  const handleRetryFailed = () => {
+    handleConfirmSplit(true, splitResult.failedEpisodes)
   }
 
   return (
@@ -1788,7 +1833,7 @@ export default function ProjectsPage() {
             )}
             
             {/* Progress indicator */}
-            {isSplitting && splitProgress.total > 0 && (
+            {isSplitting && splitProgress.total > 0 && !splitResult.show && (
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span>Creating episodes...</span>
@@ -1802,35 +1847,79 @@ export default function ProjectsPage() {
                 </div>
               </div>
             )}
+            
+            {/* Partial failure results screen */}
+            {splitResult.show && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-900">
+                      {splitResult.created} of {splitResult.created + splitResult.failed} episodes created. {splitResult.failed} failed.
+                    </p>
+                    <p className="text-xs text-amber-800 mt-1">
+                      Failed episodes: {splitResult.failedEpisodes.map(n => `E${String(n).padStart(splitTotalEpisodes && splitTotalEpisodes > 99 ? 3 : 2, '0')}`).join(', ')}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-amber-800">
+                  Successfully created episodes have been saved. You can retry the failed ones or close this dialog and retry later.
+                </p>
+              </div>
+            )}
           </div>
           
           <DialogFooter>
-            <Button 
-              variant="outline" 
-              onClick={() => setSplitDialog(prev => ({ ...prev, open: false }))}
-              disabled={isSplitting}
-            >
-              Cancel
-            </Button>
-            <Button 
-              onClick={handleConfirmSplit}
-              disabled={
-                !splitPrefix.trim() || 
-                splitTotalEpisodes === '' || 
-                splitTotalEpisodes < 2 || 
-                splitTotalEpisodes > 200 || 
-                isSplitting
-              }
-            >
+            {splitResult.show ? (
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setSplitDialog(prev => ({ ...prev, open: false }))
+                    setSplitResult({ show: false, created: 0, failed: 0, failedEpisodes: [] })
+                    toast({
+                      title: `${splitResult.created} episodes created.`,
+                      description: `${splitResult.failed} failed. You can retry from the project list.`,
+                    })
+                    router.push('/projects')
+                  }}
+                >
+                  Close
+                </Button>
+                <Button onClick={handleRetryFailed}>
+                  Retry failed ({splitResult.failed})
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setSplitDialog(prev => ({ ...prev, open: false }))}
+                  disabled={isSplitting}
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={() => handleConfirmSplit()}
+                  disabled={
+                    !splitPrefix.trim() || 
+                    splitTotalEpisodes === '' || 
+                    splitTotalEpisodes < 2 || 
+                    splitTotalEpisodes > 200 || 
+                    isSplitting
+                  }
+                >
               {isSplitting ? (
-                <>
-                  <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                  Creating {splitProgress.total > 0 ? `${splitProgress.created} of ${splitProgress.total}` : '...'}
-                </>
-              ) : (
-                'Split Project'
-              )}
-            </Button>
+                    <>
+                      <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      Creating {splitProgress.total > 0 ? `${splitProgress.created} of ${splitProgress.total}` : '...'}
+                    </>
+                  ) : (
+                    'Split Project'
+                  )}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
