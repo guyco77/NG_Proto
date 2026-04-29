@@ -10,6 +10,7 @@ export default function ProjectSuccessPage() {
   const searchParams = useSearchParams()
   const projectName = searchParams.get('name') || 'New Project'
   const projectId = searchParams.get('id') || 'new'
+  const isClientCreated = searchParams.get('client') === 'true'
 
   return (
     <div className="flex min-h-[calc(100vh-200px)] items-center justify-center p-6">
@@ -19,9 +20,11 @@ export default function ProjectSuccessPage() {
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 mb-4">
               <CheckCircle2 className="h-8 w-8 text-emerald-600" />
             </div>
-            <h1 className="text-2xl font-semibold text-foreground mb-2">Project Created</h1>
+            <h1 className="text-2xl font-semibold text-foreground mb-2">Project created.</h1>
             <p className="text-muted-foreground mb-6">
-              {projectName} has been created successfully with status Draft. All tasks are Unassigned — assign vendors to begin work.
+              {isClientCreated
+                ? 'Your project is ready. Assign your team members to tasks, or hand off to NG.'
+                : `${projectName} has been created successfully with status Draft. All tasks are Unassigned — assign vendors to begin work.`}
             </p>
             
             <div className="w-full space-y-3">
