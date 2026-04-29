@@ -5,10 +5,8 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import {
   Calendar,
-  Users,
   Building2,
   User,
-  DollarSign,
   Clock,
   MoreHorizontal,
   Plus,
@@ -18,14 +16,9 @@ import {
   Upload,
   Download,
   Lock,
-  MessageSquare,
-  AlertTriangle,
   Archive,
   CheckCircle2,
-  Play,
-  Eye,
   RefreshCw,
-  ChevronRight,
   Mic,
   Globe,
   ClipboardCheck,
@@ -35,10 +28,10 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
+
 import { StatusBadge } from '@/components/status-badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -64,16 +57,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
-import { mockProjects, mockTasks, mockQuotes, formatCurrency, formatDate, getStatusColor, getPriorityColor, PROJECT_STATUSES } from '@/lib/mock-data'
+import { mockProjects, mockTasks, mockQuotes, formatCurrency, formatDate, getPriorityColor, PROJECT_STATUSES } from '@/lib/mock-data'
 import { useRole } from '@/app/(app)/layout'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { OpenInEditorButton } from '@/components/open-in-editor-button'
-
-// Task status order for timeline
-const TASK_STAGES = ['Transcription', 'Timing', 'Translation', 'QA', 'Review']
 
 function getTaskIcon(service: string) {
   const serviceLower = service.toLowerCase()
@@ -402,9 +391,15 @@ const handleCancelEdit = () => {
                 <User className="h-3.5 w-3.5" />
                 {project.pm}
               </span>
+              {project.startDate && (
+                <span className="inline-flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5" />
+                  Started {formatDate(project.startDate)}
+                </span>
+              )}
               <span className="inline-flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5" />
-                {formatDate(project.startDate)}
+                <Clock className="h-3.5 w-3.5" />
+                Due {formatDate(project.deadline)}
               </span>
             </div>
           </div>
@@ -493,7 +488,6 @@ const handleCancelEdit = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="tasks">Tasks</TabsTrigger>
             <TabsTrigger value="files">Files</TabsTrigger>
             <TabsTrigger value="notes">Notes</TabsTrigger>
             {canSeeBilling && <TabsTrigger value="billing">Billing</TabsTrigger>}
@@ -501,75 +495,6 @@ const handleCancelEdit = () => {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            {/* Stats */}
-            <div className="grid gap-4 md:grid-cols-4">
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <Clock className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Progress</p>
-                      <p className="text-xl font-semibold">{project.progress}%</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <Calendar className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Deadline</p>
-                      <p className="text-xl font-semibold">{formatDate(project.deadline)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <DollarSign className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Budget</p>
-                      <p className="text-xl font-semibold">{formatCurrency(project.budget, project.currency)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <Users className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Tasks</p>
-                      <p className="text-xl font-semibold">{project.completedTasks}/{project.taskCount}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Progress Bar */}
-            <Card>
-              <CardContent className="p-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-sm font-medium">Overall Progress</span>
-                  <span className="text-sm text-muted-foreground">
-                    {project.completedTasks} of {project.taskCount} tasks completed
-                  </span>
-                </div>
-                <Progress value={project.progress} className="h-3" />
-              </CardContent>
-            </Card>
-
             {/* Project Details */}
             <div className="grid gap-6 md:grid-cols-2">
               <Card>
@@ -751,48 +676,53 @@ const handleCancelEdit = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="px-6 pb-6 pt-2">
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2">Services</p>
-                      <div className="flex flex-wrap gap-2">
-                        {project.services.map((service) => (
-                          <span key={service} className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium">
-                            {service}
+                  <div className="space-y-2">
+                    {/* Group languages by service name from catalog */}
+                    {project.languages && project.languages.length > 0 ? (
+                      // Show service name with its language pairs
+                      Object.entries(
+                        project.languages.reduce((acc, lang) => {
+                          const serviceName = lang.service
+                          if (!acc[serviceName]) acc[serviceName] = []
+                          acc[serviceName].push(lang)
+                          return acc
+                        }, {} as Record<string, typeof project.languages>)
+                      ).map(([serviceName, langs]) => (
+                        <div key={serviceName} className="text-sm">
+                          <span className="font-medium">{serviceName}</span>
+                          <span className="text-muted-foreground"> — </span>
+                          <span>
+                            {langs.map((lang, i) => (
+                              <span key={i}>
+                                {lang.source} → {lang.target}
+                                {i < langs.length - 1 && ', '}
+                              </span>
+                            ))}
                           </span>
-                        ))}
-                      </div>
-                    </div>
-                    {project.languages && project.languages.length > 0 && (
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-2">Language Pairs</p>
-                        <div className="space-y-1">
-                          {project.languages.map((lang, i) => (
-                            <div key={i} className="text-sm">
-                              {lang.source} → {lang.target} ({lang.service})
-                            </div>
-                          ))}
                         </div>
-                      </div>
+                      ))
+                    ) : (
+                      // Fallback: show services without language pairs (e.g. Convert Files)
+                      project.services.map((service) => (
+                        <div key={service} className="text-sm font-medium">
+                          {service}
+                        </div>
+                      ))
                     )}
                   </div>
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
 
-          {/* Tasks Tab - Horizontal Timeline */}
-          <TabsContent value="tasks" className="space-y-6">
-            {/* Task Timeline */}
+            {/* Task Pipeline - moved from Tasks tab */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-base font-semibold">Task Pipeline</CardTitle>
                 {canEditStatus && project.status !== 'draft' && project.status !== 'quoted' && (
-                  <Link href={`/tasks?project=${project.id}&new=true`}>
-                    <Button size="sm" className="gap-1.5">
-                      <Plus className="h-4 w-4" />
-                      Add Task
-                    </Button>
-                  </Link>
+                  <Button size="sm" className="gap-1.5" onClick={() => setShowAddTaskDialog(true)}>
+                    <Plus className="h-4 w-4" />
+                    Add Task
+                  </Button>
                 )}
                 {(project.status === 'draft' || project.status === 'quoted') && canEditStatus && (
                   <Button size="sm" className="gap-1.5" disabled title="Approve quote to add tasks">
@@ -841,17 +771,37 @@ const handleCancelEdit = () => {
                                         ? `${task.sourceLanguage} → ${task.targetLanguage}` 
                                         : task.targetLanguage || task.sourceLanguage || ''}
                                     </p>
-                                    {/* Assignee Badge - positioned at bottom */}
+                                    {/* Assignee Badge - positioned at bottom with tooltip for full name */}
                                     <div className="absolute -bottom-3 left-1/2 -translate-x-1/2">
-                                      {task.assignedVendor ? (
-                                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[9px] font-medium text-primary-foreground border-2 border-background leading-none">
-                                          {task.assignedVendor.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                                        </div>
-                                      ) : (
-                                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-[9px] text-gray-500 border-2 border-background leading-none">
-                                          N/A
-                                        </div>
-                                      )}
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            {task.assignedVendor ? (
+                                              <div 
+                                                className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[9px] font-medium text-primary-foreground border-2 border-background leading-none cursor-default"
+                                                aria-label={isClient && task.vendorId?.startsWith('v') ? 'Assigned' : task.assignedVendor}
+                                                title={isClient && task.vendorId?.startsWith('v') ? 'Assigned' : task.assignedVendor}
+                                              >
+                                                {task.assignedVendor.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                              </div>
+                                            ) : (
+                                              <div 
+                                                className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-[9px] text-gray-500 border-2 border-background leading-none cursor-default"
+                                                aria-label="Unassigned"
+                                                title="Unassigned"
+                                              >
+                                                N/A
+                                              </div>
+                                            )}
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            {task.assignedVendor 
+                                              ? (isClient && task.vendorId?.startsWith('v') ? 'Assigned' : task.assignedVendor)
+                                              : 'Unassigned'
+                                            }
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
                                     </div>
                                   </div>
                                 </Link>
@@ -896,62 +846,6 @@ const handleCancelEdit = () => {
                     </div>
                   </div>
                 )}
-              </CardContent>
-            </Card>
-
-            {/* Task List */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">All Tasks</CardTitle>
-              </CardHeader>
-              <CardContent className="px-6 pb-6 pt-2">
-                <div className="space-y-4">
-                  {projectTasks.map((task) => (
-                    <Link key={task.id} href={`/tasks/${task.id}`} className="block">
-                      <div className="flex items-center justify-between rounded-lg border border-border p-4 hover:bg-muted/50 transition-colors">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <h4 className="font-medium">{task.name}</h4>
-                            <StatusBadge status={task.status} />
-                          </div>
-                          <div className="mt-1 flex items-center gap-4 text-sm text-muted-foreground">
-                            <span>{task.service}</span>
-                            {task.sourceLanguage && task.targetLanguage && (
-                              <span>{task.sourceLanguage} → {task.targetLanguage}</span>
-                            )}
-                            <span>Due: {formatDate(task.dueDate)}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {/* EDIT-001: Open in Editor shortcut - hidden from Client view */}
-                          {!isClient && task.vendorId && (task.status === 'assigned' || task.status === 'in_progress') && (
-                            <div onClick={(e) => e.preventDefault()}>
-                              <OpenInEditorButton
-                                taskId={task.id}
-                                projectId={project.id}
-                                taskName={task.name}
-                                sourceLanguage={task.sourceLanguage}
-                                targetLanguage={task.targetLanguage}
-                                serviceType={task.service || 'Translation'}
-                                vendorId={task.vendorId}
-                                taskStatus={task.status as 'assigned' | 'in_progress'}
-                                isAssignedVendor={false}
-                                canView={isAdmin || isPM}
-                                variant="sm"
-                              />
-                            </div>
-                          )}
-                        </div>
-                        <div className="text-right ml-4">
-                          <p className="font-semibold">{formatCurrency(task.price, project.currency)}</p>
-                          {task.assignedVendor && (
-                            <p className="text-sm text-muted-foreground">{task.assignedVendor}</p>
-                          )}
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1354,48 +1248,86 @@ const handleCancelEdit = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Add Task Dialog */}
+      {/* Add Task Dialog - Individual task types only, no Service-level addition */}
       <Dialog open={showAddTaskDialog} onOpenChange={setShowAddTaskDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Task</DialogTitle>
             <DialogDescription>
-              Create a new task for this project.
+              Select a task type to add to this project. Individual tasks only.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="task-service">Service Type</Label>
+              <Label htmlFor="task-type">Task Type</Label>
               <Select value={newTaskService} onValueChange={setNewTaskService}>
-                <SelectTrigger id="task-service">
-                  <SelectValue placeholder="Select service type" />
+                <SelectTrigger id="task-type">
+                  <SelectValue placeholder="Select task type" />
                 </SelectTrigger>
                 <SelectContent>
+                  {/* Individual task step types only - per PRD PROJ-004 */}
                   <SelectItem value="Transcription">Transcription</SelectItem>
-                  <SelectItem value="Translation">Translation</SelectItem>
+                  <SelectItem value="Transcription AI">Transcription AI</SelectItem>
                   <SelectItem value="Timing">Timing</SelectItem>
-                  <SelectItem value="QA">QA</SelectItem>
-                  <SelectItem value="Review">Review</SelectItem>
+                  <SelectItem value="Timing AI">Timing AI</SelectItem>
+                  <SelectItem value="Translation">Translation</SelectItem>
+                  <SelectItem value="Translation from Audio">Translation from Audio</SelectItem>
+                  <SelectItem value="Upload TT">Upload TT</SelectItem>
+                  <SelectItem value="Upload Text File">Upload Text File</SelectItem>
+                  <SelectItem value="QC">QC</SelectItem>
+                  <SelectItem value="PM Verification">PM Verification</SelectItem>
+                  <SelectItem value="Proofread">Proofread</SelectItem>
+                  <SelectItem value="Client Review">Client Review</SelectItem>
+                  <SelectItem value="Upload Client Asset">Upload Client Asset</SelectItem>
+                  <SelectItem value="Upload Rough Cut">Upload Rough Cut</SelectItem>
+                  <SelectItem value="New Cut">New Cut</SelectItem>
+                  <SelectItem value="Project Creation">Project Creation</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="task-language">Target Language</Label>
-              <Select value={newTaskLanguage} onValueChange={setNewTaskLanguage}>
-                <SelectTrigger id="task-language">
-                  <SelectValue placeholder="Select language" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Spanish">Spanish</SelectItem>
-                  <SelectItem value="French">French</SelectItem>
-                  <SelectItem value="German">German</SelectItem>
-                  <SelectItem value="Japanese">Japanese</SelectItem>
-                  <SelectItem value="Korean">Korean</SelectItem>
-                  <SelectItem value="Arabic">Arabic</SelectItem>
-                  <SelectItem value="Portuguese">Portuguese</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Language pair selector - only for tasks that require it */}
+            {['Translation', 'Translation from Audio', 'QC', 'Proofread', 'Transcription', 'Transcription AI', 'Timing', 'Timing AI'].includes(newTaskService) && (
+              <div className="space-y-2">
+                <Label>Language Pair</Label>
+                <div className="flex items-center gap-2">
+                  <Select value={newTaskLanguage.split('→')[0]?.trim() || ''} onValueChange={(src) => setNewTaskLanguage(`${src} → ${newTaskLanguage.split('→')[1]?.trim() || ''}`)}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Source" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="EN">EN</SelectItem>
+                      <SelectItem value="ES">ES</SelectItem>
+                      <SelectItem value="FR">FR</SelectItem>
+                      <SelectItem value="DE">DE</SelectItem>
+                      <SelectItem value="JA">JA</SelectItem>
+                      <SelectItem value="KO">KO</SelectItem>
+                      <SelectItem value="AR">AR</SelectItem>
+                      <SelectItem value="HE">HE</SelectItem>
+                      <SelectItem value="PT">PT</SelectItem>
+                      <SelectItem value="ZH">ZH</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-muted-foreground">→</span>
+                  <Select value={newTaskLanguage.split('→')[1]?.trim() || ''} onValueChange={(tgt) => setNewTaskLanguage(`${newTaskLanguage.split('→')[0]?.trim() || ''} → ${tgt}`)}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Target" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="EN">EN</SelectItem>
+                      <SelectItem value="ES">ES</SelectItem>
+                      <SelectItem value="FR">FR</SelectItem>
+                      <SelectItem value="DE">DE</SelectItem>
+                      <SelectItem value="JA">JA</SelectItem>
+                      <SelectItem value="KO">KO</SelectItem>
+                      <SelectItem value="AR">AR</SelectItem>
+                      <SelectItem value="HE">HE</SelectItem>
+                      <SelectItem value="PT">PT</SelectItem>
+                      <SelectItem value="ZH">ZH</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddTaskDialog(false)}>
