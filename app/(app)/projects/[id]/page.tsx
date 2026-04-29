@@ -2,13 +2,11 @@
 
 import { use, useState, useRef } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import {
   Calendar,
-  Users,
   Building2,
   User,
-  DollarSign,
   Clock,
   MoreHorizontal,
   Plus,
@@ -18,27 +16,27 @@ import {
   Upload,
   Download,
   Lock,
-  MessageSquare,
-  AlertTriangle,
   Archive,
   CheckCircle2,
-  Play,
-  Eye,
   RefreshCw,
-  ChevronRight,
   Mic,
   Globe,
   ClipboardCheck,
   Timer,
   Volume2,
   Captions,
+  Eye,
+  Copy,
+  Split,
+  AlertTriangle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Progress } from '@/components/ui/progress'
+
 import { StatusBadge } from '@/components/status-badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -64,16 +62,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog'
-import { mockProjects, mockTasks, mockQuotes, formatCurrency, formatDate, getStatusColor, getPriorityColor, PROJECT_STATUSES } from '@/lib/mock-data'
+import { mockProjects, mockTasks, mockQuotes, formatCurrency, formatDate, getPriorityColor, PROJECT_STATUSES, SERVICES_LIST } from '@/lib/mock-data'
 import { useRole } from '@/app/(app)/layout'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { OpenInEditorButton } from '@/components/open-in-editor-button'
-
-// Task status order for timeline
-const TASK_STAGES = ['Transcription', 'Timing', 'Translation', 'QA', 'Review']
 
 function getTaskIcon(service: string) {
   const serviceLower = service.toLowerCase()
@@ -107,7 +101,10 @@ function getTaskIcon(service: string) {
 export default function ProjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const searchParams = useSearchParams()
-  const initialTab = searchParams.get('tab') || 'overview'
+  const router = useRouter()
+  // Check if this is a newly duplicated project - show Files tab if so
+  const isDuplicated = searchParams.get('duplicated') === 'true'
+  const initialTab = searchParams.get('tab') || (isDuplicated ? 'files' : 'overview')
   const { currentRole } = useRole()
   const { toast } = useToast()
   
@@ -121,6 +118,26 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [showCancelDialog, setShowCancelDialog] = useState(false)
   const [cancelReason, setCancelReason] = useState('')
   const [showArchiveDialog, setShowArchiveDialog] = useState(false)
+  
+  // PROJ-012: Duplicate Project dialog
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
+  const [duplicateName, setDuplicateName] = useState(`${project.name} (Copy)`)
+  const [isDuplicating, setIsDuplicating] = useState(false)
+  
+  // PROJ-013: Split Project (Series → Episodes) dialog
+  const [showSplitDialog, setShowSplitDialog] = useState(false)
+  const [splitTotalEpisodes, setSplitTotalEpisodes] = useState<number | ''>('')
+  const [splitPrefix, setSplitPrefix] = useState(project.name)
+  const [isSplitting, setIsSplitting] = useState(false)
+  const [splitProgress, setSplitProgress] = useState({ created: 0, total: 0 })
+  const [splitError, setSplitError] = useState('')
+  const [splitResult, setSplitResult] = useState<{
+    show: boolean
+    created: number
+    failed: number
+    failedEpisodes: number[]
+  }>({ show: false, created: 0, failed: 0, failedEpisodes: [] })
+  
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false)
   const [newTaskService, setNewTaskService] = useState('')
   const [newTaskLanguage, setNewTaskLanguage] = useState('')
@@ -186,11 +203,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     return false
   }
   
-  // Mock files data
-  const sourceFiles = [
-    { id: 'f1', name: 'Episode_01_Master.mov', size: 2500000000, uploadedAt: '2024-01-15', isLocked: isQuoteLocked },
-    { id: 'f2', name: 'Episode_01_Script.docx', size: 245000, uploadedAt: '2024-01-15', isLocked: isQuoteLocked },
-  ]
+  // Mock files data - Source is a SINGLE video file per project (per PROJ-006)
+  const [sourceFile, setSourceFile] = useState<{ id: string; name: string; size: number; duration?: string; uploadedAt: string; uploadedBy?: string } | null>(
+    { id: 'f1', name: 'Episode_01_Master.mov', size: 2500000000, duration: '45:32', uploadedAt: '2024-01-15', uploadedBy: 'Mike Manager' }
+  )
+  
+  // State for source file delete confirmation
+  const [showDeleteSourceDialog, setShowDeleteSourceDialog] = useState(false)
+  const [isUploadingSource, setIsUploadingSource] = useState(false)
   
   const referenceFiles = [
     { id: 'f3', name: 'Style_Guide.pdf', size: 1200000, uploadedAt: '2024-01-14', isLocked: false },
@@ -274,14 +294,38 @@ const handleCancelEdit = () => {
   }
 
   const handleSourceUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (files && files.length > 0) {
-      toast({
-        title: 'Source File Uploaded',
-        description: `${files.length} file(s) uploaded successfully.`,
-      })
+    const file = event.target.files?.[0]
+    if (file) {
+      // Only one source file allowed - set uploading state
+      setIsUploadingSource(true)
+      // Simulate upload delay
+      setTimeout(() => {
+        setSourceFile({
+          id: `f-${Date.now()}`,
+          name: file.name,
+          size: file.size,
+          duration: '45:32', // Would be detected from actual video
+          uploadedAt: new Date().toISOString().split('T')[0],
+          uploadedBy: 'Mike Manager', // Current user
+        })
+        setIsUploadingSource(false)
+        toast({
+          title: 'Source Video Uploaded',
+          description: `"${file.name}" uploaded successfully. Billable volume detected.`,
+        })
+      }, 1500)
       event.target.value = ''
     }
+  }
+
+  const handleDeleteSourceFile = () => {
+    const fileName = sourceFile?.name
+    setSourceFile(null)
+    setShowDeleteSourceDialog(false)
+    toast({
+      title: 'Source File Deleted',
+      description: `"${fileName}" has been deleted. Upload a new source video to continue.`,
+    })
   }
 
   const handleReferenceUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -297,10 +341,19 @@ const handleCancelEdit = () => {
   
   const handleCancelProject = () => {
     if (!cancelReason.trim()) return
-    toast({
-      title: 'Project Cancelled',
-      description: `Project has been cancelled. Reason: ${cancelReason}`,
-    })
+    if (isClient) {
+      // Client requesting cancellation - posts a note to PM
+      toast({
+        title: 'Cancellation Requested',
+        description: 'Your cancellation request has been submitted. Our team will review it and contact you.',
+      })
+    } else {
+      // Admin/PM actually cancelling
+      toast({
+        title: 'Project Cancelled',
+        description: `Project has been cancelled. Reason: ${cancelReason}`,
+      })
+    }
     setShowCancelDialog(false)
     setCancelReason('')
   }
@@ -311,6 +364,100 @@ const handleCancelEdit = () => {
       description: `"${project.name}" has been moved to the archive.`,
     })
     setShowArchiveDialog(false)
+  }
+
+  // PROJ-012: Duplicate Project handler
+  const handleDuplicateProject = () => {
+    if (!duplicateName.trim()) return
+    
+    setIsDuplicating(true)
+    
+    // Simulate API call
+    setTimeout(() => {
+      const newProjectId = `dup-${Date.now()}`
+      
+      setIsDuplicating(false)
+      setShowDuplicateDialog(false)
+      setDuplicateName(`${project.name} (Copy)`)
+      
+      toast({
+        title: 'Project duplicated. Upload your source files to continue.',
+        description: `"${duplicateName}" created in Draft status.`,
+      })
+      
+// Redirect to new project detail with highlight flag
+      router.push(`/projects/${newProjectId}?duplicated=true`)
+    }, 1000)
+  }
+
+  // PROJ-013: Split Project helpers and handler
+  const getEpisodeNames = (prefix: string, total: number) => {
+    if (total < 2) return []
+    const padLength = total > 99 ? 3 : 2
+    const names: string[] = []
+    for (let i = 2; i <= total; i++) {
+      names.push(`${prefix} E${String(i).padStart(padLength, '0')}`)
+    }
+    return names
+  }
+
+  const handleSplitProject = (retryOnly = false, failedEpisodesToRetry: number[] = []) => {
+    if (!splitTotalEpisodes || splitTotalEpisodes < 2 || !splitPrefix.trim()) return
+    
+    setIsSplitting(true)
+    setSplitError('')
+    setSplitResult({ show: false, created: 0, failed: 0, failedEpisodes: [] })
+    
+    const totalToCreate = retryOnly ? failedEpisodesToRetry.length : splitTotalEpisodes - 1
+    setSplitProgress({ created: 0, total: totalToCreate })
+    
+    // Simulate creating episodes with progress (with ~5% random failure chance for demo)
+    let created = 0
+    let failed = 0
+    const failedEpisodes: number[] = []
+    let currentIndex = 0
+    
+    const createInterval = setInterval(() => {
+      const episodeNumber = retryOnly ? failedEpisodesToRetry[currentIndex] : currentIndex + 2
+      currentIndex++
+      
+      // Simulate ~5% failure rate for demo purposes (only if > 10 episodes)
+      const simulateFailure = totalToCreate > 10 && Math.random() < 0.05
+      
+      if (simulateFailure) {
+        failed++
+        failedEpisodes.push(episodeNumber)
+      } else {
+        created++
+      }
+      
+      setSplitProgress({ created: created + failed, total: totalToCreate })
+      
+      if (currentIndex >= totalToCreate) {
+        clearInterval(createInterval)
+        setIsSplitting(false)
+        
+        if (failed > 0) {
+          // Partial failure - show results screen
+          setSplitResult({ show: true, created, failed, failedEpisodes })
+        } else {
+          // Full success
+          setShowSplitDialog(false)
+          setSplitResult({ show: false, created: 0, failed: 0, failedEpisodes: [] })
+          
+          toast({
+            title: `Series split into ${splitTotalEpisodes} episodes.`,
+            description: 'Upload source files for each episode to continue.',
+          })
+          
+          router.push('/projects')
+        }
+      }
+    }, 150)
+  }
+  
+  const handleRetryFailed = () => {
+    handleSplitProject(true, splitResult.failedEpisodes)
   }
 
   const handleAddTask = () => {
@@ -394,21 +541,34 @@ const handleCancelEdit = () => {
               )}
             </div>
             <div className="mt-1 flex items-center gap-4 text-sm text-muted-foreground">
+              {/* Client name hidden from client view - implicit from logged-in user's company */}
+              {!isClient && (
+                <span className="inline-flex items-center gap-1.5">
+                  <Building2 className="h-3.5 w-3.5" />
+                  {project.client}
+                </span>
+              )}
+              {/* PM hidden from client view */}
+              {!isClient && (
+                <span className="inline-flex items-center gap-1.5">
+                  <User className="h-3.5 w-3.5" />
+                  {project.pm}
+                </span>
+              )}
+              {project.startDate && (
+                <span className="inline-flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5" />
+                  Started {formatDate(project.startDate)}
+                </span>
+              )}
               <span className="inline-flex items-center gap-1.5">
-                <Building2 className="h-3.5 w-3.5" />
-                {project.client}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <User className="h-3.5 w-3.5" />
-                {project.pm}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <Calendar className="h-3.5 w-3.5" />
-                {formatDate(project.startDate)}
+                <Clock className="h-3.5 w-3.5" />
+                Due {formatDate(project.deadline)}
               </span>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Status selector - Admin/PM only */}
             {canEditStatus && (
               <Select defaultValue={project.status} onValueChange={handleStatusChange}>
                 <SelectTrigger className="w-[160px]">
@@ -423,7 +583,8 @@ const handleCancelEdit = () => {
                 </SelectContent>
               </Select>
             )}
-            {projectQuote && (
+            {/* View Quote - hidden from clients (quote flow is separate) */}
+            {projectQuote && !isClient && (
               <Link href={`/quotes/${projectQuote.id}`}>
                 <Button variant="outline" className="gap-1.5">
                   <FileText className="h-4 w-4" />
@@ -431,6 +592,7 @@ const handleCancelEdit = () => {
                 </Button>
               </Link>
             )}
+            {/* Create Quote - Admin/PM only */}
             {!projectQuote && canEditStatus && (
               <Link href={`/quotes/new?project=${project.id}`}>
                 <Button variant="outline" className="gap-1.5">
@@ -439,6 +601,7 @@ const handleCancelEdit = () => {
                 </Button>
               </Link>
             )}
+            {/* Edit button - Admin/PM only, hidden from clients */}
             {canEditStatus && !isEditing && (
               <Button variant="outline" className="gap-1.5" onClick={handleEditClick}>
                 <Edit className="h-4 w-4" />
@@ -455,35 +618,68 @@ const handleCancelEdit = () => {
                 </Button>
               </>
             )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {canEditStatus && canArchive && (
-                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowArchiveDialog(true); }}>
-                    <Archive className="mr-2 h-4 w-4" />
-                    Archive Project
+            {/* Actions menu - different for clients vs admins */}
+            {!isClient ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+<DropdownMenuContent align="end">
+                  {/* PROJ-012: Duplicate Project - available on any status */}
+                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowDuplicateDialog(true); }}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Duplicate Project
                   </DropdownMenuItem>
-                )}
-                {canEditStatus && canCancel && (
-                  <DropdownMenuItem 
-                    className="text-destructive"
-                    onSelect={(e) => { e.preventDefault(); setShowCancelDialog(true); }}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Cancel Project
+                  {/* PROJ-013: Split Project - available on any status */}
+                  <DropdownMenuItem onSelect={(e) => { 
+                    e.preventDefault(); 
+                    setSplitPrefix(project.name);
+                    setSplitTotalEpisodes('');
+                    setSplitError('');
+                    setShowSplitDialog(true); 
+                  }}>
+                    <Split className="mr-2 h-4 w-4" />
+                    Split Project
                   </DropdownMenuItem>
-                )}
-                {!canArchive && !canCancel && (
-                  <DropdownMenuItem disabled>
-                    No actions available
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                  {canEditStatus && canArchive && (
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowArchiveDialog(true); }}>
+                      <Archive className="mr-2 h-4 w-4" />
+                      Archive Project
+                    </DropdownMenuItem>
+                  )}
+                  {canEditStatus && canCancel && (
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onSelect={(e) => { e.preventDefault(); setShowCancelDialog(true); }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Cancel Project
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              /* Client view - only Request Cancellation available */
+              canCancel && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem 
+                      onSelect={(e) => { e.preventDefault(); setShowCancelDialog(true); }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Request Cancellation
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )
+            )}
           </div>
         </div>
       </div>
@@ -493,7 +689,6 @@ const handleCancelEdit = () => {
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="tasks">Tasks</TabsTrigger>
             <TabsTrigger value="files">Files</TabsTrigger>
             <TabsTrigger value="notes">Notes</TabsTrigger>
             {canSeeBilling && <TabsTrigger value="billing">Billing</TabsTrigger>}
@@ -501,75 +696,6 @@ const handleCancelEdit = () => {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            {/* Stats */}
-            <div className="grid gap-4 md:grid-cols-4">
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <Clock className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Progress</p>
-                      <p className="text-xl font-semibold">{project.progress}%</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <Calendar className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Deadline</p>
-                      <p className="text-xl font-semibold">{formatDate(project.deadline)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <DollarSign className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Budget</p>
-                      <p className="text-xl font-semibold">{formatCurrency(project.budget, project.currency)}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <Users className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="text-sm text-muted-foreground">Tasks</p>
-                      <p className="text-xl font-semibold">{project.completedTasks}/{project.taskCount}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Progress Bar */}
-            <Card>
-              <CardContent className="p-4">
-                <div className="mb-2 flex items-center justify-between">
-                  <span className="text-sm font-medium">Overall Progress</span>
-                  <span className="text-sm text-muted-foreground">
-                    {project.completedTasks} of {project.taskCount} tasks completed
-                  </span>
-                </div>
-                <Progress value={project.progress} className="h-3" />
-              </CardContent>
-            </Card>
-
             {/* Project Details */}
             <div className="grid gap-6 md:grid-cols-2">
               <Card>
@@ -578,79 +704,85 @@ const handleCancelEdit = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <TooltipProvider>
-                    {/* Client - always locked for PM, locked after approval for all */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground flex items-center gap-1.5">
-                        Client
-                        {!canEditField('client') && isEditing && (
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Lock className="h-3 w-3 text-muted-foreground" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {isQuoteLocked ? 'Locked — this field is tied to the approved quote.' : 'Admin only'}
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className="text-sm font-medium">{project.client}</span>
-                    </div>
+                    {/* Client - hidden from client view (implicit from logged-in user) */}
+                    {!isClient && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                          Client
+                          {!canEditField('client') && isEditing && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Lock className="h-3 w-3 text-muted-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {isQuoteLocked ? 'Locked — this field is tied to the approved quote.' : 'Admin only'}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </span>
+                        <span className="text-sm font-medium">{project.client}</span>
+                      </div>
+                    )}
                     
-                    {/* Client Contact */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground flex items-center gap-1.5">
-                        Client Contact
-                        {!canEditField('clientContact') && isEditing && (
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Lock className="h-3 w-3 text-muted-foreground" />
-                            </TooltipTrigger>
-                            <TooltipContent>Admin only</TooltipContent>
-                          </Tooltip>
+                    {/* Client Contact - hidden from client view */}
+                    {!isClient && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                          Client Contact
+                          {!canEditField('clientContact') && isEditing && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Lock className="h-3 w-3 text-muted-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent>Admin only</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </span>
+                        {isEditing && canEditField('clientContact') ? (
+                          <Input
+                            value={editedProject.clientContact}
+                            onChange={(e) => setEditedProject({ ...editedProject, clientContact: e.target.value })}
+                            className="w-40 h-7 text-sm"
+                          />
+                        ) : (
+                          <span className="text-sm font-medium">{project.clientContact || '-'}</span>
                         )}
-                      </span>
-                      {isEditing && canEditField('clientContact') ? (
-                        <Input
-                          value={editedProject.clientContact}
-                          onChange={(e) => setEditedProject({ ...editedProject, clientContact: e.target.value })}
-                          className="w-40 h-7 text-sm"
-                        />
-                      ) : (
-                        <span className="text-sm font-medium">{project.clientContact || '-'}</span>
-                      )}
-                    </div>
+                      </div>
+                    )}
                     
-                    {/* Project Manager */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground flex items-center gap-1.5">
-                        Project Manager
-                        {!canEditField('pm') && isEditing && (
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Lock className="h-3 w-3 text-muted-foreground" />
-                            </TooltipTrigger>
-                            <TooltipContent>Admin only</TooltipContent>
-                          </Tooltip>
+                    {/* Project Manager - hidden from client view */}
+                    {!isClient && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                          Project Manager
+                          {!canEditField('pm') && isEditing && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Lock className="h-3 w-3 text-muted-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent>Admin only</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </span>
+                        {isEditing && canEditField('pm') ? (
+                          <Select
+                            value={editedProject.pm}
+                            onValueChange={(value) => setEditedProject({ ...editedProject, pm: value })}
+                          >
+                            <SelectTrigger className="w-40 h-7 text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Mike Manager">Mike Manager</SelectItem>
+                              <SelectItem value="Sarah Admin">Sarah Admin</SelectItem>
+                              <SelectItem value="John PM">John PM</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className="text-sm font-medium">{project.pm}</span>
                         )}
-                      </span>
-                      {isEditing && canEditField('pm') ? (
-                        <Select
-                          value={editedProject.pm}
-                          onValueChange={(value) => setEditedProject({ ...editedProject, pm: value })}
-                        >
-                          <SelectTrigger className="w-40 h-7 text-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Mike Manager">Mike Manager</SelectItem>
-                            <SelectItem value="Sarah Admin">Sarah Admin</SelectItem>
-                            <SelectItem value="John PM">John PM</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <span className="text-sm font-medium">{project.pm}</span>
-                      )}
-                    </div>
+                      </div>
+                    )}
                     
                     {/* Start Date */}
                     <div className="flex items-center justify-between">
@@ -751,48 +883,53 @@ const handleCancelEdit = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="px-6 pb-6 pt-2">
-                  <div className="space-y-3">
-                    <div>
-                      <p className="text-sm text-muted-foreground mb-2">Services</p>
-                      <div className="flex flex-wrap gap-2">
-                        {project.services.map((service) => (
-                          <span key={service} className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium">
-                            {service}
+                  <div className="space-y-2">
+                    {/* Group languages by service name from catalog */}
+                    {project.languages && project.languages.length > 0 ? (
+                      // Show service name with its language pairs
+                      Object.entries(
+                        project.languages.reduce((acc, lang) => {
+                          const serviceName = lang.service
+                          if (!acc[serviceName]) acc[serviceName] = []
+                          acc[serviceName].push(lang)
+                          return acc
+                        }, {} as Record<string, typeof project.languages>)
+                      ).map(([serviceName, langs]) => (
+                        <div key={serviceName} className="text-sm">
+                          <span className="font-medium">{serviceName}</span>
+                          <span className="text-muted-foreground"> — </span>
+                          <span>
+                            {langs.map((lang, i) => (
+                              <span key={i}>
+                                {lang.source} → {lang.target}
+                                {i < langs.length - 1 && ', '}
+                              </span>
+                            ))}
                           </span>
-                        ))}
-                      </div>
-                    </div>
-                    {project.languages && project.languages.length > 0 && (
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-2">Language Pairs</p>
-                        <div className="space-y-1">
-                          {project.languages.map((lang, i) => (
-                            <div key={i} className="text-sm">
-                              {lang.source} → {lang.target} ({lang.service})
-                            </div>
-                          ))}
                         </div>
-                      </div>
+                      ))
+                    ) : (
+                      // Fallback: show services without language pairs (e.g. Convert Files)
+                      project.services.map((service) => (
+                        <div key={service} className="text-sm font-medium">
+                          {service}
+                        </div>
+                      ))
                     )}
                   </div>
                 </CardContent>
               </Card>
             </div>
-          </TabsContent>
 
-          {/* Tasks Tab - Horizontal Timeline */}
-          <TabsContent value="tasks" className="space-y-6">
-            {/* Task Timeline */}
+            {/* Task Pipeline - moved from Tasks tab */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-base font-semibold">Task Pipeline</CardTitle>
                 {canEditStatus && project.status !== 'draft' && project.status !== 'quoted' && (
-                  <Link href={`/tasks?project=${project.id}&new=true`}>
-                    <Button size="sm" className="gap-1.5">
-                      <Plus className="h-4 w-4" />
-                      Add Task
-                    </Button>
-                  </Link>
+                  <Button size="sm" className="gap-1.5" onClick={() => setShowAddTaskDialog(true)}>
+                    <Plus className="h-4 w-4" />
+                    Add Task
+                  </Button>
                 )}
                 {(project.status === 'draft' || project.status === 'quoted') && canEditStatus && (
                   <Button size="sm" className="gap-1.5" disabled title="Approve quote to add tasks">
@@ -841,17 +978,49 @@ const handleCancelEdit = () => {
                                         ? `${task.sourceLanguage} → ${task.targetLanguage}` 
                                         : task.targetLanguage || task.sourceLanguage || ''}
                                     </p>
-                                    {/* Assignee Badge - positioned at bottom */}
+                                    {/* Assignee Badge - positioned at bottom with tooltip for full name */}
                                     <div className="absolute -bottom-3 left-1/2 -translate-x-1/2">
-                                      {task.assignedVendor ? (
-                                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[9px] font-medium text-primary-foreground border-2 border-background leading-none">
-                                          {task.assignedVendor.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                                        </div>
-                                      ) : (
-                                        <div className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-[9px] text-gray-500 border-2 border-background leading-none">
-                                          N/A
-                                        </div>
-                                      )}
+                                      <TooltipProvider>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            {task.assignedVendor ? (
+                                              // Check if this is an NG vendor (vendorId starts with 'v') and we're in client view
+                                              isClient && task.vendorId?.startsWith('v') ? (
+                                                // NG vendor in client view - show "NG" badge
+                                                <div 
+                                                  className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[9px] font-medium text-primary-foreground border-2 border-background leading-none cursor-default"
+                                                  aria-label="Assigned"
+                                                >
+                                                  NG
+                                                </div>
+                                              ) : (
+                                                // Client team member or admin view - show initials
+                                                <div 
+                                                  className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[9px] font-medium text-primary-foreground border-2 border-background leading-none cursor-default"
+                                                  aria-label={task.assignedVendor}
+                                                  title={task.assignedVendor}
+                                                >
+                                                  {task.assignedVendor.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                                </div>
+                                              )
+                                            ) : (
+                                              <div 
+                                                className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-[9px] text-gray-500 border-2 border-background leading-none cursor-default"
+                                                aria-label="Unassigned"
+                                                title="Unassigned"
+                                              >
+                                                N/A
+                                              </div>
+                                            )}
+                                          </TooltipTrigger>
+                                          <TooltipContent>
+                                            {task.assignedVendor 
+                                              ? (isClient && task.vendorId?.startsWith('v') ? 'Assigned' : task.assignedVendor)
+                                              : 'Unassigned'
+                                            }
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </TooltipProvider>
                                     </div>
                                   </div>
                                 </Link>
@@ -898,137 +1067,115 @@ const handleCancelEdit = () => {
                 )}
               </CardContent>
             </Card>
-
-            {/* Task List */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">All Tasks</CardTitle>
-              </CardHeader>
-              <CardContent className="px-6 pb-6 pt-2">
-                <div className="space-y-4">
-                  {projectTasks.map((task) => (
-                    <Link key={task.id} href={`/tasks/${task.id}`} className="block">
-                      <div className="flex items-center justify-between rounded-lg border border-border p-4 hover:bg-muted/50 transition-colors">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3">
-                            <h4 className="font-medium">{task.name}</h4>
-                            <StatusBadge status={task.status} />
-                          </div>
-                          <div className="mt-1 flex items-center gap-4 text-sm text-muted-foreground">
-                            <span>{task.service}</span>
-                            {task.sourceLanguage && task.targetLanguage && (
-                              <span>{task.sourceLanguage} → {task.targetLanguage}</span>
-                            )}
-                            <span>Due: {formatDate(task.dueDate)}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          {/* EDIT-001: Open in Editor shortcut - hidden from Client view */}
-                          {!isClient && task.vendorId && (task.status === 'assigned' || task.status === 'in_progress') && (
-                            <div onClick={(e) => e.preventDefault()}>
-                              <OpenInEditorButton
-                                taskId={task.id}
-                                projectId={project.id}
-                                taskName={task.name}
-                                sourceLanguage={task.sourceLanguage}
-                                targetLanguage={task.targetLanguage}
-                                serviceType={task.service || 'Translation'}
-                                vendorId={task.vendorId}
-                                taskStatus={task.status as 'assigned' | 'in_progress'}
-                                isAssignedVendor={false}
-                                canView={isAdmin || isPM}
-                                variant="sm"
-                              />
-                            </div>
-                          )}
-                        </div>
-                        <div className="text-right ml-4">
-                          <p className="font-semibold">{formatCurrency(task.price, project.currency)}</p>
-                          {task.assignedVendor && (
-                            <p className="text-sm text-muted-foreground">{task.assignedVendor}</p>
-                          )}
-                        </div>
-                      </div>
-                    </Link>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
 
-          {/* Files Tab */}
-          <TabsContent value="files" className="space-y-6">
-            {isQuoteLocked && (
-              <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                <Lock className="h-4 w-4" />
-                <span>Source files are locked after quote approval. Only reference files can be updated.</span>
-              </div>
-            )}
-
-            {/* Source Files */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-base">Source Files ({sourceFiles.length})</CardTitle>
-                {!isQuoteLocked && canEditStatus && (
-                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => sourceUploadRef.current?.click()}>
-                    <Upload className="h-4 w-4" />
-                    Upload
-                  </Button>
+{/* Files Tab */}
+              <TabsContent value="files" className="space-y-6">
+                {/* PROJ-012: Upload prompt for duplicated projects */}
+                {isDuplicated && (
+                  <div className="flex items-center gap-3 rounded-lg border-2 border-primary bg-primary/5 p-4">
+                    <Upload className="h-5 w-5 text-primary" />
+                    <div>
+                      <p className="font-medium text-primary">Upload your source files to get started</p>
+                      <p className="text-sm text-muted-foreground">This project was duplicated from an existing project. Upload a new source video to continue.</p>
+                    </div>
+                  </div>
                 )}
-              </CardHeader>
-              <CardContent className="px-6 pb-6 pt-2">
-                <div className="space-y-2">
-                  {sourceFiles.length > 0 ? sourceFiles.map((file) => (
-                    <div key={file.id} className="flex items-center justify-between rounded-lg border border-border p-3">
+                {isQuoteLocked && (
+                  <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    <Lock className="h-4 w-4" />
+                    <span>Source files are locked after quote approval. Only reference files can be updated.</span>
+                  </div>
+                )}
+
+            {/* Source Video - ONE video per project (per PROJ-006) - hidden from clients on NG-led projects */}
+            {!isClient && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-base">Source Video</CardTitle>
+                  {/* Upload button only shown when no source file exists and not locked */}
+                  {!sourceFile && !isQuoteLocked && canEditStatus && !isUploadingSource && (
+                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => sourceUploadRef.current?.click()}>
+                      <Upload className="h-4 w-4" />
+                      Upload
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent className="px-6 pb-6 pt-2">
+                  {/* Uploading state */}
+                  {isUploadingSource && (
+                    <div className="flex h-20 items-center justify-center rounded-lg border border-border bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                        <p className="text-sm text-muted-foreground">Uploading source video...</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Filled state - source file exists */}
+                  {sourceFile && !isUploadingSource && (
+                    <div className="flex items-center justify-between rounded-lg border border-border p-3">
                       <div className="flex items-center gap-3">
                         <FileText className="h-5 w-5 text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium">{file.name}</p>
+                          <p className="text-sm font-medium">{sourceFile.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {formatFileSize(file.size)} · Uploaded by {file.uploadedBy || 'Admin'} · {formatDate(file.uploadedAt)}
+                            {formatFileSize(sourceFile.size)}
+                            {sourceFile.duration && ` · ${sourceFile.duration}`}
+                            {sourceFile.uploadedBy && ` · Uploaded by ${sourceFile.uploadedBy}`}
+                            {sourceFile.uploadedAt && ` · ${formatDate(sourceFile.uploadedAt)}`}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {isQuoteLocked && <Lock className="h-4 w-4 text-muted-foreground" />}
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button size="sm" variant="ghost">
-                                <Download className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Download file</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        {!isQuoteLocked && canEditStatus && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button size="sm" variant="ghost" onClick={() => handleReplaceFile(file.id, 'source')}>
-                                  <RefreshCw className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Replace file</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
+                      <div className="flex items-center gap-1">
+                        {/* Actions menu - Download and Delete (no Replace in v1 per PROJ-006) */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="ghost">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Download className="mr-2 h-4 w-4" />
+                              Download
+                            </DropdownMenuItem>
+                            {!isQuoteLocked && canEditStatus && (
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onSelect={() => setShowDeleteSourceDialog(true)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
-                  )) : (
-                    <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-border">
-                      <p className="text-sm text-muted-foreground">No source files uploaded</p>
+                  )}
+                  
+                  {/* Empty state - no source file, show upload zone */}
+                  {!sourceFile && !isUploadingSource && (
+                    <div 
+                      className="flex h-24 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-muted/30 transition-colors"
+                      onClick={() => !isQuoteLocked && canEditStatus && sourceUploadRef.current?.click()}
+                    >
+                      <Upload className="h-6 w-6 text-muted-foreground mb-2" />
+                      <p className="text-sm font-medium text-muted-foreground">Upload your source video</p>
+                      <p className="text-xs text-muted-foreground">One video file per project</p>
                     </div>
                   )}
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
-            {/* Reference Files */}
+            {/* Reference Files - NO LIMIT per PROJ-006, visible to clients for context */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-base">Reference Files ({referenceFiles.length})</CardTitle>
-                {!isQuoteLocked && canEditStatus && (
+                {/* Upload button ALWAYS visible (no limit on reference files) - per PROJ-006 */}
+                {canEditStatus && (
                   <Button size="sm" variant="outline" className="gap-1.5" onClick={() => referenceUploadRef.current?.click()}>
                     <Upload className="h-4 w-4" />
                     Upload
@@ -1044,34 +1191,40 @@ const handleCancelEdit = () => {
                         <div>
                           <p className="text-sm font-medium">{file.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {formatFileSize(file.size)} · Uploaded by {file.uploadedBy || 'Admin'} · {formatDate(file.uploadedAt)}
+                            {/* Hide uploader name from clients */}
+                            {formatFileSize(file.size)} · {isClient ? 'Uploaded' : `Uploaded by ${file.uploadedBy || 'Admin'}`} · {formatDate(file.uploadedAt)}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {isQuoteLocked && <Lock className="h-4 w-4 text-muted-foreground" />}
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button size="sm" variant="ghost">
-                                <Download className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Download file</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        {!isQuoteLocked && canEditStatus && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button size="sm" variant="ghost" onClick={() => handleReplaceFile(file.id, 'reference')}>
-                                  <RefreshCw className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Replace file</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
+                      <div className="flex items-center gap-1">
+                        {/* Actions menu for each reference file - can delete individually */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="ghost">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Download className="mr-2 h-4 w-4" />
+                              Download
+                            </DropdownMenuItem>
+                            {canEditStatus && (
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onSelect={() => {
+                                  toast({
+                                    title: 'Reference File Deleted',
+                                    description: `"${file.name}" has been deleted.`,
+                                  })
+                                }}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   )) : (
@@ -1097,7 +1250,8 @@ const handleCancelEdit = () => {
                         <div>
                           <p className="text-sm font-medium">{file.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {formatFileSize(file.size)} · Delivered by {file.uploadedBy || 'Vendor'} · {formatDate(file.uploadedAt)}
+                            {/* Hide vendor name from clients */}
+                            {formatFileSize(file.size)} · {isClient ? 'Delivered' : `Delivered by ${file.uploadedBy || 'Vendor'}`} · {formatDate(file.uploadedAt)}
                           </p>
                         </div>
                       </div>
@@ -1114,7 +1268,12 @@ const handleCancelEdit = () => {
                     </div>
                   )) : (
                     <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-border">
-                      <p className="text-sm text-muted-foreground">No delivered files yet</p>
+                      <p className="text-sm text-muted-foreground">
+                        {isClient 
+                          ? 'Deliveries will appear here when tasks are completed.' 
+                          : 'No delivered files yet'
+                        }
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1134,8 +1293,7 @@ const handleCancelEdit = () => {
               ref={sourceUploadRef}
               onChange={handleSourceUpload}
               className="hidden"
-              accept="*/*"
-              multiple
+              accept="video/*"
             />
             <input
               type="file"
@@ -1152,32 +1310,37 @@ const handleCancelEdit = () => {
             {/* Add Note */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Add Note</CardTitle>
+                <CardTitle className="text-base">{isClient ? 'Add Comment' : 'Add Note'}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Textarea
-                  placeholder="Write a note..."
+                  placeholder={isClient ? 'Write a comment...' : 'Write a note...'}
                   value={newNote}
                   onChange={(e) => setNewNote(e.target.value)}
                   rows={3}
                 />
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="visibility" className="text-sm">Visibility:</Label>
-                    <Select value={noteVisibility} onValueChange={(v: any) => setNoteVisibility(v)}>
-                      <SelectTrigger className="w-[140px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="internal">Internal</SelectItem>
-                        <SelectItem value="client">Client</SelectItem>
-                        <SelectItem value="vendor">Vendor</SelectItem>
-                        {canSeeBilling && <SelectItem value="billing">Billing</SelectItem>}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {/* Clients can only post Client Notes - no visibility selector needed */}
+                  {!isClient ? (
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="visibility" className="text-sm">Visibility:</Label>
+                      <Select value={noteVisibility} onValueChange={(v: any) => setNoteVisibility(v)}>
+                        <SelectTrigger className="w-[140px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="internal">Internal</SelectItem>
+                          <SelectItem value="client">Client</SelectItem>
+                          <SelectItem value="vendor">Vendor</SelectItem>
+                          {canSeeBilling && <SelectItem value="billing">Billing</SelectItem>}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <div /> /* Empty div to maintain flex spacing */
+                  )}
                   <Button onClick={handleAddNote} disabled={!newNote.trim()}>
-                    Add Note
+                    {isClient ? 'Post Comment' : 'Add Note'}
                   </Button>
                 </div>
               </CardContent>
@@ -1186,50 +1349,75 @@ const handleCancelEdit = () => {
             {/* Notes List */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Notes ({notes.length})</CardTitle>
+                <CardTitle className="text-base">
+                  {isClient ? 'Comments' : 'Notes'} ({
+                    isClient 
+                      ? notes.filter(n => n.visibility === 'client').length 
+                      : notes.length
+                  })
+                </CardTitle>
               </CardHeader>
               <CardContent className="px-6 pb-6 pt-2">
                 <div className="space-y-4">
-                  {[...notes].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((note) => (
-                    <div key={note.id} className="rounded-lg border border-border p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-6 w-6">
-                            <AvatarFallback className="text-xs">
-                              {note.authorName.split(' ').map(n => n[0]).join('')}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-sm font-medium">{note.authorName}</span>
-                          <span className={cn(
-                            'rounded-full px-2 py-0.5 text-xs font-medium',
-                            note.authorRole === 'admin' ? 'bg-red-100 text-red-700' :
-                            note.authorRole === 'pm' ? 'bg-blue-100 text-blue-700' :
-                            note.authorRole === 'finance' ? 'bg-amber-100 text-amber-700' :
-                            note.authorRole === 'vendor' ? 'bg-purple-100 text-purple-700' :
-                            note.authorRole === 'client' ? 'bg-green-100 text-green-700' :
-                            'bg-gray-100 text-gray-700'
-                          )}>
-                            {note.authorRole === 'pm' ? 'PM' : note.authorRole.charAt(0).toUpperCase() + note.authorRole.slice(1)}
-                          </span>
-                          <span className={cn(
-                            'rounded-full px-2 py-0.5 text-xs',
-                            note.visibility === 'internal' ? 'bg-gray-100 text-gray-700' :
-                            note.visibility === 'client' ? 'bg-blue-100 text-blue-700' :
-                            note.visibility === 'vendor' ? 'bg-purple-100 text-purple-700' :
-                            'bg-amber-100 text-amber-700'
-                          )}>
-                            {note.visibility.charAt(0).toUpperCase() + note.visibility.slice(1)}
-                          </span>
+                  {/* Filter notes for client view - only show Client Notes */}
+                  {[...notes]
+                    .filter(note => isClient ? note.visibility === 'client' : true)
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    .map((note) => {
+                      // For client view: show "NG Team" for admin/pm/finance roles
+                      const isNGStaff = ['admin', 'pm', 'finance'].includes(note.authorRole)
+                      const displayName = isClient && isNGStaff ? 'NG Team' : note.authorName
+                      const displayInitials = isClient && isNGStaff ? 'NG' : note.authorName.split(' ').map(n => n[0]).join('')
+                      
+                      return (
+                        <div key={note.id} className="rounded-lg border border-border p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-6 w-6">
+                                <AvatarFallback className="text-xs">
+                                  {displayInitials}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm font-medium">{displayName}</span>
+                              {/* Hide role badge for clients when viewing NG staff notes */}
+                              {!(isClient && isNGStaff) && (
+                                <span className={cn(
+                                  'rounded-full px-2 py-0.5 text-xs font-medium',
+                                  note.authorRole === 'admin' ? 'bg-red-100 text-red-700' :
+                                  note.authorRole === 'pm' ? 'bg-blue-100 text-blue-700' :
+                                  note.authorRole === 'finance' ? 'bg-amber-100 text-amber-700' :
+                                  note.authorRole === 'vendor' ? 'bg-purple-100 text-purple-700' :
+                                  note.authorRole === 'client' ? 'bg-green-100 text-green-700' :
+                                  'bg-gray-100 text-gray-700'
+                                )}>
+                                  {note.authorRole === 'pm' ? 'PM' : note.authorRole.charAt(0).toUpperCase() + note.authorRole.slice(1)}
+                                </span>
+                              )}
+                              {/* Hide visibility badge from clients */}
+                              {!isClient && (
+                                <span className={cn(
+                                  'rounded-full px-2 py-0.5 text-xs',
+                                  note.visibility === 'internal' ? 'bg-gray-100 text-gray-700' :
+                                  note.visibility === 'client' ? 'bg-blue-100 text-blue-700' :
+                                  note.visibility === 'vendor' ? 'bg-purple-100 text-purple-700' :
+                                  'bg-amber-100 text-amber-700'
+                                )}>
+                                  {note.visibility.charAt(0).toUpperCase() + note.visibility.slice(1)}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {formatDate(note.createdAt)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-foreground">{note.content}</p>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDate(note.createdAt)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-foreground">{note.content}</p>
-                    </div>
-                  ))}
-                  {notes.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-4">No notes yet</p>
+                      )
+                    })}
+                  {(isClient ? notes.filter(n => n.visibility === 'client').length : notes.length) === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      {isClient ? 'No comments yet' : 'No notes yet'}
+                    </p>
                   )}
                 </div>
               </CardContent>
@@ -1304,13 +1492,36 @@ const handleCancelEdit = () => {
         </Tabs>
       </div>
 
-      {/* Cancel Project Dialog */}
+      {/* Delete Source File Confirmation Dialog - per PROJ-006 */}
+      <Dialog open={showDeleteSourceDialog} onOpenChange={setShowDeleteSourceDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Source Video</DialogTitle>
+            <DialogDescription>
+              Delete &quot;{sourceFile?.name}&quot;? You&apos;ll need to upload a new source file to continue working on this project.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteSourceDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteSourceFile}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Project Dialog - different behavior for clients vs admin/PM */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cancel Project</DialogTitle>
+            <DialogTitle>{isClient ? 'Request Cancellation' : 'Cancel Project'}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to cancel this project? This action cannot be undone.
+              {isClient 
+                ? 'Submit a cancellation request. Our team will review it and contact you.'
+                : 'Are you sure you want to cancel this project? This action cannot be undone.'
+              }
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -1325,10 +1536,14 @@ const handleCancelEdit = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCancelDialog(false)}>
-              Keep Project
+              {isClient ? 'Cancel' : 'Keep Project'}
             </Button>
-            <Button variant="destructive" onClick={handleCancelProject} disabled={!cancelReason.trim()}>
-              Cancel Project
+            <Button 
+              variant={isClient ? 'default' : 'destructive'} 
+              onClick={handleCancelProject} 
+              disabled={!cancelReason.trim()}
+            >
+              {isClient ? 'Submit Request' : 'Cancel Project'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1354,48 +1569,86 @@ const handleCancelEdit = () => {
         </DialogContent>
       </Dialog>
 
-      {/* Add Task Dialog */}
+      {/* Add Task Dialog - Individual task types only, no Service-level addition */}
       <Dialog open={showAddTaskDialog} onOpenChange={setShowAddTaskDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add Task</DialogTitle>
             <DialogDescription>
-              Create a new task for this project.
+              Select a task type to add to this project. Individual tasks only.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="task-service">Service Type</Label>
+              <Label htmlFor="task-type">Task Type</Label>
               <Select value={newTaskService} onValueChange={setNewTaskService}>
-                <SelectTrigger id="task-service">
-                  <SelectValue placeholder="Select service type" />
+                <SelectTrigger id="task-type">
+                  <SelectValue placeholder="Select task type" />
                 </SelectTrigger>
                 <SelectContent>
+                  {/* Individual task step types only - per PRD PROJ-004 */}
                   <SelectItem value="Transcription">Transcription</SelectItem>
-                  <SelectItem value="Translation">Translation</SelectItem>
+                  <SelectItem value="Transcription AI">Transcription AI</SelectItem>
                   <SelectItem value="Timing">Timing</SelectItem>
-                  <SelectItem value="QA">QA</SelectItem>
-                  <SelectItem value="Review">Review</SelectItem>
+                  <SelectItem value="Timing AI">Timing AI</SelectItem>
+                  <SelectItem value="Translation">Translation</SelectItem>
+                  <SelectItem value="Translation from Audio">Translation from Audio</SelectItem>
+                  <SelectItem value="Upload TT">Upload TT</SelectItem>
+                  <SelectItem value="Upload Text File">Upload Text File</SelectItem>
+                  <SelectItem value="QC">QC</SelectItem>
+                  <SelectItem value="PM Verification">PM Verification</SelectItem>
+                  <SelectItem value="Proofread">Proofread</SelectItem>
+                  <SelectItem value="Client Review">Client Review</SelectItem>
+                  <SelectItem value="Upload Client Asset">Upload Client Asset</SelectItem>
+                  <SelectItem value="Upload Rough Cut">Upload Rough Cut</SelectItem>
+                  <SelectItem value="New Cut">New Cut</SelectItem>
+                  <SelectItem value="Project Creation">Project Creation</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="task-language">Target Language</Label>
-              <Select value={newTaskLanguage} onValueChange={setNewTaskLanguage}>
-                <SelectTrigger id="task-language">
-                  <SelectValue placeholder="Select language" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Spanish">Spanish</SelectItem>
-                  <SelectItem value="French">French</SelectItem>
-                  <SelectItem value="German">German</SelectItem>
-                  <SelectItem value="Japanese">Japanese</SelectItem>
-                  <SelectItem value="Korean">Korean</SelectItem>
-                  <SelectItem value="Arabic">Arabic</SelectItem>
-                  <SelectItem value="Portuguese">Portuguese</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Language pair selector - only for tasks that require it */}
+            {['Translation', 'Translation from Audio', 'QC', 'Proofread', 'Transcription', 'Transcription AI', 'Timing', 'Timing AI'].includes(newTaskService) && (
+              <div className="space-y-2">
+                <Label>Language Pair</Label>
+                <div className="flex items-center gap-2">
+                  <Select value={newTaskLanguage.split('→')[0]?.trim() || ''} onValueChange={(src) => setNewTaskLanguage(`${src} → ${newTaskLanguage.split('→')[1]?.trim() || ''}`)}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Source" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="EN">EN</SelectItem>
+                      <SelectItem value="ES">ES</SelectItem>
+                      <SelectItem value="FR">FR</SelectItem>
+                      <SelectItem value="DE">DE</SelectItem>
+                      <SelectItem value="JA">JA</SelectItem>
+                      <SelectItem value="KO">KO</SelectItem>
+                      <SelectItem value="AR">AR</SelectItem>
+                      <SelectItem value="HE">HE</SelectItem>
+                      <SelectItem value="PT">PT</SelectItem>
+                      <SelectItem value="ZH">ZH</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <span className="text-muted-foreground">→</span>
+                  <Select value={newTaskLanguage.split('→')[1]?.trim() || ''} onValueChange={(tgt) => setNewTaskLanguage(`${newTaskLanguage.split('→')[0]?.trim() || ''} → ${tgt}`)}>
+                    <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Target" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="EN">EN</SelectItem>
+                      <SelectItem value="ES">ES</SelectItem>
+                      <SelectItem value="FR">FR</SelectItem>
+                      <SelectItem value="DE">DE</SelectItem>
+                      <SelectItem value="JA">JA</SelectItem>
+                      <SelectItem value="KO">KO</SelectItem>
+                      <SelectItem value="AR">AR</SelectItem>
+                      <SelectItem value="HE">HE</SelectItem>
+                      <SelectItem value="PT">PT</SelectItem>
+                      <SelectItem value="ZH">ZH</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddTaskDialog(false)}>
@@ -1404,6 +1657,315 @@ const handleCancelEdit = () => {
             <Button onClick={handleAddTask} disabled={!newTaskService}>
               Add Task
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* PROJ-012: Duplicate Project Dialog */}
+      <Dialog open={showDuplicateDialog} onOpenChange={(open) => { 
+        setShowDuplicateDialog(open)
+        if (!open) {
+          setDuplicateName(`${project.name} (Copy)`)
+          setIsDuplicating(false)
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Duplicate &quot;{project.name}&quot;?</DialogTitle>
+            <DialogDescription>
+              Create a new project with the same settings. Source files are not duplicated — you&apos;ll upload a new video after creation.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="duplicate-name" className="text-sm font-medium">
+                New project name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="duplicate-name"
+                value={duplicateName}
+                onChange={(e) => setDuplicateName(e.target.value)}
+                placeholder="Enter project name..."
+                autoFocus
+              />
+              {!duplicateName.trim() && (
+                <p className="text-xs text-destructive">Project name is required.</p>
+              )}
+            </div>
+            
+            <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+              <p className="text-sm font-medium">What will be copied:</p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Client</span>
+                  <span className="font-medium">{project.client}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Priority</span>
+                  <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', getPriorityColor(project.priority))}>
+                    {project.priority.charAt(0).toUpperCase() + project.priority.slice(1)}
+                  </span>
+                </div>
+                <div className="flex justify-between col-span-2">
+                  <span className="text-muted-foreground">PM</span>
+                  <span className="font-medium">{project.pm}</span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Also copied: reference files, internal notes
+              </p>
+            </div>
+            
+            <p className="text-xs text-muted-foreground">
+              <strong>Not copied:</strong> source files, vendor assignments, billable volume, quotes/billing, delivered files, deadlines, status history
+            </p>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDuplicateDialog(false)} disabled={isDuplicating}>
+              Cancel
+            </Button>
+            <Button onClick={handleDuplicateProject} disabled={!duplicateName.trim() || isDuplicating}>
+              {isDuplicating ? (
+                <>
+                  <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Duplicating project...
+                </>
+              ) : (
+                'Duplicate Project'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* PROJ-013: Split Project (Series → Episodes) Dialog */}
+      <Dialog open={showSplitDialog} onOpenChange={(open) => { 
+        setShowSplitDialog(open)
+        if (!open) {
+          setSplitTotalEpisodes('')
+          setSplitPrefix(project.name)
+          setSplitError('')
+          setIsSplitting(false)
+          setSplitProgress({ created: 0, total: 0 })
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Split &quot;{project.name}&quot; into a series?</DialogTitle>
+            <DialogDescription>
+              &quot;{project.name}&quot; will be treated as Episode 01. We&apos;ll create additional episode projects for the rest of the series — same client, services, vendors, and settings. You&apos;ll upload each episode&apos;s source video after the split.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Total Episodes Input */}
+            <div className="space-y-2">
+              <Label htmlFor="split-total" className="text-sm font-medium">
+                Total episodes <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="split-total"
+                type="number"
+                min={2}
+                max={200}
+                value={splitTotalEpisodes}
+                onChange={(e) => {
+                  const val = e.target.value === '' ? '' : parseInt(e.target.value, 10)
+                  setSplitTotalEpisodes(val)
+                  setSplitError('')
+                }}
+                placeholder="e.g., 20"
+                disabled={isSplitting}
+              />
+              <p className="text-xs text-muted-foreground">
+                Total number of episodes in the series, including this one.
+              </p>
+              {splitTotalEpisodes !== '' && splitTotalEpisodes < 2 && (
+                <p className="text-xs text-destructive">Enter a total of 2 or more episodes.</p>
+              )}
+              {splitTotalEpisodes !== '' && splitTotalEpisodes > 200 && (
+                <p className="text-xs text-destructive">Total episodes too high — maximum is 200. For larger series, contact support.</p>
+              )}
+              {splitTotalEpisodes !== '' && splitTotalEpisodes > 50 && splitTotalEpisodes <= 200 && (
+                <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-800">
+                    You&apos;re about to create {splitTotalEpisodes - 1} new projects. This may take a moment to process and will appear at the top of your project list.
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            {/* Episode Name Prefix */}
+            <div className="space-y-2">
+              <Label htmlFor="split-prefix" className="text-sm font-medium">
+                Episode name prefix <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="split-prefix"
+                value={splitPrefix}
+                onChange={(e) => {
+                  setSplitPrefix(e.target.value)
+                  setSplitError('')
+                }}
+                placeholder="e.g., Tehran"
+                disabled={isSplitting}
+              />
+              <p className="text-xs text-muted-foreground">
+                New episodes will be named {splitPrefix || '{prefix}'} E02, {splitPrefix || '{prefix}'} E03, …
+              </p>
+              {splitPrefix === '' && (
+                <p className="text-xs text-destructive">Episode name prefix is required.</p>
+              )}
+            </div>
+            
+            {/* Live Preview */}
+            {splitTotalEpisodes !== '' && splitTotalEpisodes >= 2 && splitTotalEpisodes <= 200 && splitPrefix.trim() && (
+              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                <p className="text-sm font-medium">Preview</p>
+                <p className="text-sm text-muted-foreground">
+                  This will create <span className="font-medium text-foreground">{splitTotalEpisodes - 1}</span> new projects:{' '}
+                  {(() => {
+                    const names = getEpisodeNames(splitPrefix, splitTotalEpisodes)
+                    if (names.length <= 5) {
+                      return <span className="font-medium text-foreground">{names.join(', ')}</span>
+                    }
+                    return (
+                      <span className="font-medium text-foreground">
+                        {names.slice(0, 3).join(', ')}, …, {names[names.length - 1]}
+                      </span>
+                    )
+                  })()}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  The original project ({project.name}) remains as Episode 01 — it is not modified or renamed.
+                </p>
+              </div>
+            )}
+            
+            {/* What will be copied summary */}
+            <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+              <p className="text-sm font-medium">What each episode will inherit:</p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Client</span>
+                  <span className="font-medium">{project.client}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Priority</span>
+                  <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', getPriorityColor(project.priority))}>
+                    {project.priority.charAt(0).toUpperCase() + project.priority.slice(1)}
+                  </span>
+                </div>
+                <div className="flex justify-between col-span-2">
+                  <span className="text-muted-foreground">PM</span>
+                  <span className="font-medium">{project.pm}</span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Also copied: reference files, internal notes
+              </p>
+            </div>
+            
+            {/* Source files note */}
+            <p className="text-xs text-muted-foreground">
+              <strong>Note:</strong> Source files are not duplicated — you&apos;ll upload a video for each episode after the split.
+            </p>
+            
+            {/* Error message */}
+            {splitError && (
+              <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 p-3">
+                <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-800">{splitError}</p>
+              </div>
+            )}
+            
+            {/* Progress indicator */}
+            {isSplitting && splitProgress.total > 0 && !splitResult.show && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Creating episodes...</span>
+                  <span className="text-muted-foreground">{splitProgress.created} of {splitProgress.total}</span>
+                </div>
+                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div 
+                    className="h-full bg-primary transition-all duration-150"
+                    style={{ width: `${(splitProgress.created / splitProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+            
+            {/* Partial failure results screen */}
+            {splitResult.show && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-amber-900">
+                      {splitResult.created} of {splitResult.created + splitResult.failed} episodes created. {splitResult.failed} failed.
+                    </p>
+                    <p className="text-xs text-amber-800 mt-1">
+                      Failed episodes: {splitResult.failedEpisodes.map(n => `E${String(n).padStart(splitTotalEpisodes && splitTotalEpisodes > 99 ? 3 : 2, '0')}`).join(', ')}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs text-amber-800">
+                  Successfully created episodes have been saved. You can retry the failed ones or close this dialog and retry later.
+                </p>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            {splitResult.show ? (
+              <>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowSplitDialog(false)
+                    setSplitResult({ show: false, created: 0, failed: 0, failedEpisodes: [] })
+                    toast({
+                      title: `${splitResult.created} episodes created.`,
+                      description: `${splitResult.failed} failed. You can retry from the project list.`,
+                    })
+                    router.push('/projects')
+                  }}
+                >
+                  Close
+                </Button>
+                <Button onClick={handleRetryFailed}>
+                  Retry failed ({splitResult.failed})
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button variant="outline" onClick={() => setShowSplitDialog(false)} disabled={isSplitting}>
+                  Cancel
+                </Button>
+                <Button 
+                  onClick={() => handleSplitProject()}
+                  disabled={
+                    !splitPrefix.trim() || 
+                    splitTotalEpisodes === '' || 
+                    splitTotalEpisodes < 2 || 
+                    splitTotalEpisodes > 200 || 
+                    isSplitting
+                  }
+                >
+                  {isSplitting ? (
+                    <>
+                      <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                      Creating {splitProgress.total > 0 ? `${splitProgress.created} of ${splitProgress.total}` : '...'}
+                    </>
+                  ) : (
+                    'Split Project'
+                  )}
+                </Button>
+              </>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
