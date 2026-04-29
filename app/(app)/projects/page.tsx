@@ -705,10 +705,10 @@ export default function ProjectsPage() {
       )}
 
       {/* Projects Table/List */}
-      <div className="rounded-lg border border-border">
+      <div className="rounded-lg border border-border bg-background overflow-hidden">
         <Table>
           <TableHeader>
-            <TableRow className="hover:bg-transparent">
+            <TableRow className="hover:bg-transparent bg-muted/50">
               <TableHead className="w-[280px]">Project</TableHead>
               <TableHead className="w-[140px]">Client</TableHead>
               <TableHead className="w-[160px]">Status</TableHead>
@@ -728,7 +728,7 @@ export default function ProjectsPage() {
                 <TableRow
                   key={project.id}
                   className={cn(
-                    "cursor-pointer",
+                    "cursor-pointer bg-background hover:bg-muted/50",
                     isArchived && "opacity-60"
                   )}
                   onClick={() => router.push(`/projects/${project.id}`)}
