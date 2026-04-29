@@ -25,6 +25,7 @@ import {
   Timer,
   Volume2,
   Captions,
+  Eye,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -176,11 +177,14 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     return false
   }
   
-  // Mock files data
-  const sourceFiles = [
-    { id: 'f1', name: 'Episode_01_Master.mov', size: 2500000000, uploadedAt: '2024-01-15', isLocked: isQuoteLocked },
-    { id: 'f2', name: 'Episode_01_Script.docx', size: 245000, uploadedAt: '2024-01-15', isLocked: isQuoteLocked },
-  ]
+  // Mock files data - Source is a SINGLE video file per project (per PROJ-006)
+  const [sourceFile, setSourceFile] = useState<{ id: string; name: string; size: number; duration?: string; uploadedAt: string; uploadedBy?: string } | null>(
+    { id: 'f1', name: 'Episode_01_Master.mov', size: 2500000000, duration: '45:32', uploadedAt: '2024-01-15', uploadedBy: 'Mike Manager' }
+  )
+  
+  // State for source file delete confirmation
+  const [showDeleteSourceDialog, setShowDeleteSourceDialog] = useState(false)
+  const [isUploadingSource, setIsUploadingSource] = useState(false)
   
   const referenceFiles = [
     { id: 'f3', name: 'Style_Guide.pdf', size: 1200000, uploadedAt: '2024-01-14', isLocked: false },
@@ -264,14 +268,38 @@ const handleCancelEdit = () => {
   }
 
   const handleSourceUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files
-    if (files && files.length > 0) {
-      toast({
-        title: 'Source File Uploaded',
-        description: `${files.length} file(s) uploaded successfully.`,
-      })
+    const file = event.target.files?.[0]
+    if (file) {
+      // Only one source file allowed - set uploading state
+      setIsUploadingSource(true)
+      // Simulate upload delay
+      setTimeout(() => {
+        setSourceFile({
+          id: `f-${Date.now()}`,
+          name: file.name,
+          size: file.size,
+          duration: '45:32', // Would be detected from actual video
+          uploadedAt: new Date().toISOString().split('T')[0],
+          uploadedBy: 'Mike Manager', // Current user
+        })
+        setIsUploadingSource(false)
+        toast({
+          title: 'Source Video Uploaded',
+          description: `"${file.name}" uploaded successfully. Billable volume detected.`,
+        })
+      }, 1500)
       event.target.value = ''
     }
+  }
+
+  const handleDeleteSourceFile = () => {
+    const fileName = sourceFile?.name
+    setSourceFile(null)
+    setShowDeleteSourceDialog(false)
+    toast({
+      title: 'Source File Deleted',
+      description: `"${fileName}" has been deleted. Upload a new source video to continue.`,
+    })
   }
 
   const handleReferenceUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -919,12 +947,13 @@ const handleCancelEdit = () => {
               </div>
             )}
 
-            {/* Source Files - hidden from clients on NG-led projects per PRD */}
+            {/* Source Video - ONE video per project (per PROJ-006) - hidden from clients on NG-led projects */}
             {!isClient && (
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-base">Source Files ({sourceFiles.length})</CardTitle>
-                  {!isQuoteLocked && canEditStatus && (
+                  <CardTitle className="text-base">Source Video</CardTitle>
+                  {/* Upload button only shown when no source file exists and not locked */}
+                  {!sourceFile && !isQuoteLocked && canEditStatus && !isUploadingSource && (
                     <Button size="sm" variant="outline" className="gap-1.5" onClick={() => sourceUploadRef.current?.click()}>
                       <Upload className="h-4 w-4" />
                       Upload
@@ -932,60 +961,80 @@ const handleCancelEdit = () => {
                   )}
                 </CardHeader>
                 <CardContent className="px-6 pb-6 pt-2">
-                  <div className="space-y-2">
-                    {sourceFiles.length > 0 ? sourceFiles.map((file) => (
-                      <div key={file.id} className="flex items-center justify-between rounded-lg border border-border p-3">
-                        <div className="flex items-center gap-3">
-                          <FileText className="h-5 w-5 text-muted-foreground" />
-                          <div>
-                            <p className="text-sm font-medium">{file.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatFileSize(file.size)} · Uploaded by {file.uploadedBy || 'Admin'} · {formatDate(file.uploadedAt)}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {isQuoteLocked && <Lock className="h-4 w-4 text-muted-foreground" />}
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button size="sm" variant="ghost">
-                                  <Download className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Download file</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                          {!isQuoteLocked && canEditStatus && (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button size="sm" variant="ghost" onClick={() => handleReplaceFile(file.id, 'source')}>
-                                    <RefreshCw className="h-4 w-4" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>Replace file</TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          )}
+                  {/* Uploading state */}
+                  {isUploadingSource && (
+                    <div className="flex h-20 items-center justify-center rounded-lg border border-border bg-muted/30">
+                      <div className="flex items-center gap-3">
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                        <p className="text-sm text-muted-foreground">Uploading source video...</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Filled state - source file exists */}
+                  {sourceFile && !isUploadingSource && (
+                    <div className="flex items-center justify-between rounded-lg border border-border p-3">
+                      <div className="flex items-center gap-3">
+                        <FileText className="h-5 w-5 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium">{sourceFile.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {formatFileSize(sourceFile.size)}
+                            {sourceFile.duration && ` · ${sourceFile.duration}`}
+                            {sourceFile.uploadedBy && ` · Uploaded by ${sourceFile.uploadedBy}`}
+                            {sourceFile.uploadedAt && ` · ${formatDate(sourceFile.uploadedAt)}`}
+                          </p>
                         </div>
                       </div>
-                    )) : (
-                      <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-border">
-                        <p className="text-sm text-muted-foreground">No source files uploaded</p>
+                      <div className="flex items-center gap-1">
+                        {/* Actions menu - Download and Delete (no Replace in v1 per PROJ-006) */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="ghost">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Download className="mr-2 h-4 w-4" />
+                              Download
+                            </DropdownMenuItem>
+                            {!isQuoteLocked && canEditStatus && (
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onSelect={() => setShowDeleteSourceDialog(true)}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
-                    )}
-                  </div>
+                    </div>
+                  )}
+                  
+                  {/* Empty state - no source file, show upload zone */}
+                  {!sourceFile && !isUploadingSource && (
+                    <div 
+                      className="flex h-24 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-border hover:border-primary hover:bg-muted/30 transition-colors"
+                      onClick={() => !isQuoteLocked && canEditStatus && sourceUploadRef.current?.click()}
+                    >
+                      <Upload className="h-6 w-6 text-muted-foreground mb-2" />
+                      <p className="text-sm font-medium text-muted-foreground">Upload your source video</p>
+                      <p className="text-xs text-muted-foreground">One video file per project</p>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}
 
-            {/* Reference Files - visible to clients for context */}
+            {/* Reference Files - NO LIMIT per PROJ-006, visible to clients for context */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-base">Reference Files ({referenceFiles.length})</CardTitle>
-                {/* Upload button hidden from clients on NG-led projects */}
-                {!isQuoteLocked && canEditStatus && (
+                {/* Upload button ALWAYS visible (no limit on reference files) - per PROJ-006 */}
+                {canEditStatus && (
                   <Button size="sm" variant="outline" className="gap-1.5" onClick={() => referenceUploadRef.current?.click()}>
                     <Upload className="h-4 w-4" />
                     Upload
@@ -1006,30 +1055,35 @@ const handleCancelEdit = () => {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        {!isClient && isQuoteLocked && <Lock className="h-4 w-4 text-muted-foreground" />}
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button size="sm" variant="ghost">
-                                <Download className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Download file</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        {!isQuoteLocked && canEditStatus && (
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button size="sm" variant="ghost" onClick={() => handleReplaceFile(file.id, 'reference')}>
-                                  <RefreshCw className="h-4 w-4" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>Replace file</TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        )}
+                      <div className="flex items-center gap-1">
+                        {/* Actions menu for each reference file - can delete individually */}
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button size="sm" variant="ghost">
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>
+                              <Download className="mr-2 h-4 w-4" />
+                              Download
+                            </DropdownMenuItem>
+                            {canEditStatus && (
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onSelect={() => {
+                                  toast({
+                                    title: 'Reference File Deleted',
+                                    description: `"${file.name}" has been deleted.`,
+                                  })
+                                }}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Delete
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
                   )) : (
@@ -1098,8 +1152,7 @@ const handleCancelEdit = () => {
               ref={sourceUploadRef}
               onChange={handleSourceUpload}
               className="hidden"
-              accept="*/*"
-              multiple
+              accept="video/*"
             />
             <input
               type="file"
@@ -1297,6 +1350,26 @@ const handleCancelEdit = () => {
           )}
         </Tabs>
       </div>
+
+      {/* Delete Source File Confirmation Dialog - per PROJ-006 */}
+      <Dialog open={showDeleteSourceDialog} onOpenChange={setShowDeleteSourceDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Source Video</DialogTitle>
+            <DialogDescription>
+              Delete &quot;{sourceFile?.name}&quot;? You&apos;ll need to upload a new source file to continue working on this project.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDeleteSourceDialog(false)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteSourceFile}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Cancel Project Dialog - different behavior for clients vs admin/PM */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
