@@ -14,6 +14,9 @@ import {
   Clock,
   Video,
   Loader2,
+  Search,
+  Pencil,
+  ChevronDown,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,20 +30,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
 import { cn } from '@/lib/utils'
-import { mockClients, mockUsers, formatCurrency } from '@/lib/mock-data'
+import { mockClients, mockUsers, formatCurrency, mockServices, SERVICE_CATEGORIES } from '@/lib/mock-data'
+import type { Service, WorkflowStep } from '@/lib/types'
 import { useToast } from '@/hooks/use-toast'
 import { useRole } from '../../layout'
-
-const SERVICES = [
-  { id: 'subtitling', name: 'Subtitling', rate: 3000 },
-  { id: 'dubbing', name: 'Dubbing', rate: 15000 },
-  { id: 'transcription', name: 'Transcription', rate: 500 },
-  { id: 'translation', name: 'Translation', rate: 2000 },
-  { id: 'qc', name: 'QC', rate: 1000 },
-  { id: 'mixing', name: 'Mixing', rate: 5000 },
-  { id: 'closed_captions', name: 'Closed Captions', rate: 2500 },
-]
 
 const LANGUAGES = [
   'EN', 'ES', 'FR', 'DE', 'IT', 'PT', 'JA', 'KO', 'ZH', 'AR', 'RU', 'HI', 'NL', 'PL', 'TR', 'SV'
@@ -53,11 +60,17 @@ const PRIORITY_MULTIPLIERS = {
   urgent: 1.5,
 }
 
-interface LanguagePair {
+interface ServiceLanguagePair {
   id: string
   source: string
   target: string
-  service: string
+}
+
+interface SelectedService {
+  id: string
+  serviceId: string
+  service: Service
+  languagePairs: ServiceLanguagePair[]
 }
 
 interface UploadedFile {
@@ -82,8 +95,10 @@ export default function NewProjectPage() {
   
   // Step 1: Overview
   const [projectName, setProjectName] = useState('')
-  const [displayName, setDisplayName] = useState('')
   const [clientId, setClientId] = useState(autoClientId)
+  const [clientSearchOpen, setClientSearchOpen] = useState(false)
+  const [editingFileId, setEditingFileId] = useState<string | null>(null)
+  const [editingFileName, setEditingFileName] = useState('')
   const [pmId, setPmId] = useState('')
   const [detectedDuration, setDetectedDuration] = useState<number | null>(null)
   const [durationOverride, setDurationOverride] = useState<number | null>(null)
@@ -92,7 +107,8 @@ export default function NewProjectPage() {
   const [importUrl, setImportUrl] = useState('')
   
   // Step 2: Services & Timeline
-  const [languagePairs, setLanguagePairs] = useState<LanguagePair[]>([])
+  const [selectedServices, setSelectedServices] = useState<SelectedService[]>([])
+  const [serviceSearchOpen, setServiceSearchOpen] = useState(false)
   const [startDate, setStartDate] = useState('')
   const [deadline, setDeadline] = useState('')
   const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium')
@@ -103,16 +119,86 @@ export default function NewProjectPage() {
   
   const pms = mockUsers.filter(u => u.role === 'admin' || u.role === 'pm')
   
-  // Calculated cost
-  const calculateCost = () => {
-    let total = 0
-    languagePairs.forEach(pair => {
-      const service = SERVICES.find(s => s.id === pair.service)
-      if (service) {
-        total += service.rate * PRIORITY_MULTIPLIERS[priority]
-      }
-    })
-    return total
+  // Available services (not yet selected)
+  const availableServices = mockServices.filter(
+    s => !s.isArchived && !selectedServices.some(ss => ss.serviceId === s.id)
+  )
+
+  // Check if service requires language pairs (has translation/transcription steps)
+  const serviceRequiresLanguagePair = (service: Service) => {
+    return service.workflow.some(step => 
+      step.type === 'translation' || step.type === 'transcription'
+    )
+  }
+  
+  // Calculated cost per service
+  const calculateServiceCost = (selectedService: SelectedService) => {
+    const volume = durationOverride ?? detectedDuration ?? estimatedVolume
+    const pairsCount = Math.max(1, selectedService.languagePairs.length)
+    const baseRate = selectedService.service.defaultBaseRate
+    return baseRate * volume * pairsCount * PRIORITY_MULTIPLIERS[priority]
+  }
+
+  // Total cost
+  const calculateTotalCost = () => {
+    return selectedServices.reduce((total, ss) => total + calculateServiceCost(ss), 0)
+  }
+
+  // Add a service from catalog
+  const addService = (service: Service) => {
+    const newSelected: SelectedService = {
+      id: Math.random().toString(36).substr(2, 9),
+      serviceId: service.id,
+      service,
+      languagePairs: serviceRequiresLanguagePair(service) 
+        ? [{ id: Math.random().toString(36).substr(2, 9), source: 'EN', target: '' }]
+        : [],
+    }
+    setSelectedServices([...selectedServices, newSelected])
+    setServiceSearchOpen(false)
+  }
+
+  // Remove a selected service
+  const removeSelectedService = (id: string) => {
+    setSelectedServices(selectedServices.filter(s => s.id !== id))
+  }
+
+  // Add language pair to a service
+  const addLanguagePairToService = (selectedServiceId: string) => {
+    setSelectedServices(selectedServices.map(ss => 
+      ss.id === selectedServiceId 
+        ? {
+            ...ss,
+            languagePairs: [...ss.languagePairs, { id: Math.random().toString(36).substr(2, 9), source: 'EN', target: '' }]
+          }
+        : ss
+    ))
+  }
+
+  // Update language pair
+  const updateLanguagePair = (selectedServiceId: string, pairId: string, field: 'source' | 'target', value: string) => {
+    setSelectedServices(selectedServices.map(ss => 
+      ss.id === selectedServiceId 
+        ? {
+            ...ss,
+            languagePairs: ss.languagePairs.map(lp => 
+              lp.id === pairId ? { ...lp, [field]: value } : lp
+            )
+          }
+        : ss
+    ))
+  }
+
+  // Remove language pair
+  const removeLanguagePair = (selectedServiceId: string, pairId: string) => {
+    setSelectedServices(selectedServices.map(ss => 
+      ss.id === selectedServiceId 
+        ? {
+            ...ss,
+            languagePairs: ss.languagePairs.filter(lp => lp.id !== pairId)
+          }
+        : ss
+    ))
   }
   
   const handleFileUpload = (type: 'source' | 'reference') => {
@@ -164,26 +250,13 @@ export default function NewProjectPage() {
     }
   }
   
-  const addLanguagePair = () => {
-    setLanguagePairs([
-      ...languagePairs,
-      { id: Math.random().toString(36).substr(2, 9), source: 'EN', target: '', service: '' }
-    ])
-  }
-  
-  const updateLanguagePair = (id: string, field: keyof LanguagePair, value: string) => {
-    setLanguagePairs(languagePairs.map(lp => 
-      lp.id === id ? { ...lp, [field]: value } : lp
-    ))
-  }
-  
-  const removeLanguagePair = (id: string) => {
-    setLanguagePairs(languagePairs.filter(lp => lp.id !== id))
-  }
-  
   // For client role, clientId is auto-set so just check name and files
   const canProceedStep1 = projectName.trim() && (isClientRole || clientId) && sourceFiles.length > 0
-  const canProceedStep2 = languagePairs.length > 0 && languagePairs.every(lp => lp.target && lp.service) && deadline
+  // Step 2 validation: at least one service selected, all language pairs complete, deadline set
+  const canProceedStep2 = selectedServices.length > 0 && 
+    selectedServices.every(ss => 
+      ss.languagePairs.length === 0 || ss.languagePairs.every(lp => lp.source && lp.target)
+    ) && deadline
   
   const handleSubmit = () => {
     toast({
@@ -200,6 +273,38 @@ export default function NewProjectPage() {
     if (bytes >= 1000000000) return `${(bytes / 1000000000).toFixed(1)} GB`
     if (bytes >= 1000000) return `${(bytes / 1000000).toFixed(1)} MB`
     return `${(bytes / 1000).toFixed(1)} KB`
+  }
+
+  // Inline file name editing
+  const startEditingFileName = (file: UploadedFile) => {
+    setEditingFileId(file.id)
+    setEditingFileName(file.name)
+  }
+
+  const saveFileName = (fileId: string, type: 'source' | 'reference') => {
+    if (editingFileName.trim()) {
+      if (type === 'source') {
+        setSourceFiles(prev => prev.map(f => 
+          f.id === fileId ? { ...f, name: editingFileName.trim() } : f
+        ))
+      } else {
+        setReferenceFiles(prev => prev.map(f => 
+          f.id === fileId ? { ...f, name: editingFileName.trim() } : f
+        ))
+      }
+    }
+    setEditingFileId(null)
+    setEditingFileName('')
+  }
+
+  const handleFileNameKeyDown = (e: React.KeyboardEvent, fileId: string, type: 'source' | 'reference') => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      saveFileName(fileId, type)
+    } else if (e.key === 'Escape') {
+      setEditingFileId(null)
+      setEditingFileName('')
+    }
   }
 
   return (
@@ -254,43 +359,64 @@ export default function NewProjectPage() {
               <CardTitle className="text-base">Project Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="projectName">Project Name *</Label>
-                  <Input
-                    id="projectName"
-                    placeholder="e.g., Netflix Series S2"
-                    value={projectName}
-                    onChange={(e) => setProjectName(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="displayName">Display Name Override</Label>
-                  <Input
-                    id="displayName"
-                    placeholder="Optional client-facing name"
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="projectName">Project Name *</Label>
+                <Input
+                  id="projectName"
+                  placeholder="e.g., Netflix Series S2"
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  className="max-w-md"
+                />
               </div>
               {/* PROJ-010: Client role doesn't see client/PM selectors */}
               {!isClientRole && (
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="client">Client *</Label>
-                    <Select value={clientId} onValueChange={setClientId}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a client" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {mockClients.map((client) => (
-                          <SelectItem key={client.id} value={client.id}>
-                            {client.displayName}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Popover open={clientSearchOpen} onOpenChange={setClientSearchOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={clientSearchOpen}
+                          className="w-full justify-between font-normal"
+                        >
+                          {clientId
+                            ? mockClients.find((c) => c.id === clientId)?.displayName
+                            : "Search clients..."}
+                          <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Search clients..." />
+                          <CommandList>
+                            <CommandEmpty>No client found.</CommandEmpty>
+                            <CommandGroup>
+                              {mockClients.map((client) => (
+                                <CommandItem
+                                  key={client.id}
+                                  value={client.displayName}
+                                  onSelect={() => {
+                                    setClientId(client.id)
+                                    setClientSearchOpen(false)
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      clientId === client.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  {client.displayName}
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="pm">Project Manager</Label>
@@ -359,10 +485,27 @@ export default function NewProjectPage() {
                 <div className="mt-4 space-y-2">
                   {sourceFiles.map((file) => (
                     <div key={file.id} className="flex items-center justify-between rounded-lg border border-border p-3">
-                      <div className="flex items-center gap-3">
-                        <Video className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm font-medium">{file.name}</p>
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <Video className="h-5 w-5 text-muted-foreground shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          {editingFileId === file.id ? (
+                            <Input
+                              value={editingFileName}
+                              onChange={(e) => setEditingFileName(e.target.value)}
+                              onBlur={() => saveFileName(file.id, 'source')}
+                              onKeyDown={(e) => handleFileNameKeyDown(e, file.id, 'source')}
+                              autoFocus
+                              className="h-7 text-sm"
+                            />
+                          ) : (
+                            <button
+                              onClick={() => startEditingFileName(file)}
+                              className="flex items-center gap-1.5 text-sm font-medium hover:text-primary transition-colors text-left group"
+                            >
+                              <span className="truncate">{file.name}</span>
+                              <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 shrink-0" />
+                            </button>
+                          )}
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <span>{formatFileSize(file.size)}</span>
                             {file.isProcessing && (
@@ -452,10 +595,27 @@ export default function NewProjectPage() {
                 <div className="mt-4 space-y-2">
                   {referenceFiles.map((file) => (
                     <div key={file.id} className="flex items-center justify-between rounded-lg border border-border p-3">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm font-medium">{file.name}</p>
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <FileText className="h-5 w-5 text-muted-foreground shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          {editingFileId === file.id ? (
+                            <Input
+                              value={editingFileName}
+                              onChange={(e) => setEditingFileName(e.target.value)}
+                              onBlur={() => saveFileName(file.id, 'reference')}
+                              onKeyDown={(e) => handleFileNameKeyDown(e, file.id, 'reference')}
+                              autoFocus
+                              className="h-7 text-sm"
+                            />
+                          ) : (
+                            <button
+                              onClick={() => startEditingFileName(file)}
+                              className="flex items-center gap-1.5 text-sm font-medium hover:text-primary transition-colors text-left group"
+                            >
+                              <span className="truncate">{file.name}</span>
+                              <Pencil className="h-3 w-3 opacity-0 group-hover:opacity-100 shrink-0" />
+                            </button>
+                          )}
                           <p className="text-xs text-muted-foreground">{formatFileSize(file.size)}</p>
                         </div>
                       </div>
@@ -481,63 +641,143 @@ export default function NewProjectPage() {
       {/* Step 2: Services & Timeline */}
       {currentStep === 2 && (
         <div className="space-y-6">
+          {/* Service Catalog Selector */}
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle className="text-base">Language Pairs & Services</CardTitle>
-              <Button size="sm" variant="outline" onClick={addLanguagePair} className="gap-1.5">
-                <Plus className="h-4 w-4" />
-                Add Language Pair
-              </Button>
+            <CardHeader>
+              <CardTitle className="text-base">Select Services</CardTitle>
+              <p className="text-sm text-muted-foreground">Choose services from the catalog. Each service includes a default workflow.</p>
             </CardHeader>
             <CardContent className="px-6 pb-6 pt-2">
-              {languagePairs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-8">
-                  <p className="text-muted-foreground mb-3">No language pairs added yet</p>
-                  <Button variant="outline" onClick={addLanguagePair} className="gap-1.5">
+              {/* Add Service Button */}
+              <Popover open={serviceSearchOpen} onOpenChange={setServiceSearchOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start gap-2 mb-4">
                     <Plus className="h-4 w-4" />
-                    Add Language Pair
+                    Add Service from Catalog
                   </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[400px] p-0" align="start">
+                  <Command>
+                    <CommandInput placeholder="Search services..." />
+                    <CommandList>
+                      <CommandEmpty>No services found.</CommandEmpty>
+                      {SERVICE_CATEGORIES.map(category => {
+                        const categoryServices = availableServices.filter(s => s.category === category.value)
+                        if (categoryServices.length === 0) return null
+                        return (
+                          <CommandGroup key={category.value} heading={category.label}>
+                            {categoryServices.map((service) => (
+                              <CommandItem
+                                key={service.id}
+                                value={service.name}
+                                onSelect={() => addService(service)}
+                                className="flex items-center justify-between"
+                              >
+                                <div>
+                                  <span>{service.name}</span>
+                                  <span className="ml-2 text-xs text-muted-foreground">
+                                    {service.workflow.length} steps
+                                  </span>
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatCurrency(service.defaultBaseRate)}/{service.pricingModel === 'per_minute' ? 'min' : 'unit'}
+                                </span>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        )
+                      })}
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+
+              {/* Selected Services */}
+              {selectedServices.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-8">
+                  <p className="text-muted-foreground mb-1">No services selected yet</p>
+                  <p className="text-xs text-muted-foreground">Click "Add Service from Catalog" to begin</p>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {languagePairs.map((pair) => (
-                    <div key={pair.id} className="flex items-center gap-3 rounded-lg border border-border p-3">
-                      <Select value={pair.source} onValueChange={(v) => updateLanguagePair(pair.id, 'source', v)}>
-                        <SelectTrigger className="w-[100px]">
-                          <SelectValue placeholder="Source" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {LANGUAGES.map((lang) => (
-                            <SelectItem key={lang} value={lang}>{lang}</SelectItem>
+                <div className="space-y-4">
+                  {selectedServices.map((ss) => (
+                    <div key={ss.id} className="rounded-lg border border-border">
+                      {/* Service Header */}
+                      <div className="flex items-center justify-between p-3 bg-muted/30">
+                        <div>
+                          <h4 className="font-medium">{ss.service.name}</h4>
+                          <p className="text-xs text-muted-foreground">
+                            {ss.service.workflow.length} workflow steps - {formatCurrency(ss.service.defaultBaseRate)}/{ss.service.pricingModel === 'per_minute' ? 'min' : 'unit'}
+                          </p>
+                        </div>
+                        <Button size="icon" variant="ghost" onClick={() => removeSelectedService(ss.id)}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      
+                      {/* Workflow Preview */}
+                      <div className="px-3 py-2 border-b border-border bg-muted/10">
+                        <p className="text-xs text-muted-foreground mb-1">Workflow:</p>
+                        <div className="flex flex-wrap gap-1">
+                          {ss.service.workflow.map((step, idx) => (
+                            <span key={step.id} className="text-xs px-2 py-0.5 bg-background rounded border border-border">
+                              {idx + 1}. {step.name}
+                            </span>
                           ))}
-                        </SelectContent>
-                      </Select>
-                      <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                      <Select value={pair.target} onValueChange={(v) => updateLanguagePair(pair.id, 'target', v)}>
-                        <SelectTrigger className="w-[100px]">
-                          <SelectValue placeholder="Target" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {LANGUAGES.filter(l => l !== pair.source).map((lang) => (
-                            <SelectItem key={lang} value={lang}>{lang}</SelectItem>
+                        </div>
+                      </div>
+
+                      {/* Language Pairs (if service requires them) */}
+                      {serviceRequiresLanguagePair(ss.service) && (
+                        <div className="p-3 space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm">Language Pairs</Label>
+                            <Button 
+                              size="sm" 
+                              variant="ghost" 
+                              onClick={() => addLanguagePairToService(ss.id)}
+                              className="h-7 text-xs gap-1"
+                            >
+                              <Plus className="h-3 w-3" />
+                              Add Language Pair
+                            </Button>
+                          </div>
+                          {ss.languagePairs.map((lp) => (
+                            <div key={lp.id} className="flex items-center gap-2">
+                              <Select value={lp.source} onValueChange={(v) => updateLanguagePair(ss.id, lp.id, 'source', v)}>
+                                <SelectTrigger className="w-[100px]">
+                                  <SelectValue placeholder="Source" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {LANGUAGES.map((lang) => (
+                                    <SelectItem key={lang} value={lang}>{lang}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <ArrowRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                              <Select value={lp.target} onValueChange={(v) => updateLanguagePair(ss.id, lp.id, 'target', v)}>
+                                <SelectTrigger className="w-[100px]">
+                                  <SelectValue placeholder="Target" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {LANGUAGES.filter(l => l !== lp.source).map((lang) => (
+                                    <SelectItem key={lang} value={lang}>{lang}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              <Button 
+                                size="icon" 
+                                variant="ghost" 
+                                className="h-8 w-8"
+                                onClick={() => removeLanguagePair(ss.id, lp.id)}
+                                disabled={ss.languagePairs.length <= 1}
+                              >
+                                <X className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
                           ))}
-                        </SelectContent>
-                      </Select>
-                      <Select value={pair.service} onValueChange={(v) => updateLanguagePair(pair.id, 'service', v)}>
-                        <SelectTrigger className="flex-1">
-                          <SelectValue placeholder="Select service" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SERVICES.map((service) => (
-                            <SelectItem key={service.id} value={service.id}>
-                              {service.name} ({formatCurrency(service.rate)}/language)
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button size="icon" variant="ghost" onClick={() => removeLanguagePair(pair.id)}>
-                        <X className="h-4 w-4" />
-                      </Button>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -545,6 +785,7 @@ export default function NewProjectPage() {
             </CardContent>
           </Card>
 
+          {/* Timeline - Deadline on left (required), Start date on right (optional) */}
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Timeline</CardTitle>
@@ -552,22 +793,23 @@ export default function NewProjectPage() {
             <CardContent className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <Label htmlFor="startDate">Start Date</Label>
-                  <Input
-                    id="startDate"
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                  />
-                </div>
-                <div className="space-y-2">
                   <Label htmlFor="deadline">Deadline *</Label>
                   <Input
                     id="deadline"
                     type="date"
                     value={deadline}
                     onChange={(e) => setDeadline(e.target.value)}
-                    min={startDate || new Date().toISOString().split('T')[0]}
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="startDate">Start Date (optional)</Label>
+                  <Input
+                    id="startDate"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    max={deadline || undefined}
                   />
                 </div>
               </div>
@@ -592,10 +834,12 @@ export default function NewProjectPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Cost Estimate</CardTitle>
+              <CardTitle className="text-base">Project Summary & Estimated Cost</CardTitle>
+              <p className="text-sm text-muted-foreground">This is an estimate. Final pricing is set when creating the quote.</p>
             </CardHeader>
             <CardContent className="px-6 pb-6 pt-2">
               <div className="space-y-4">
+                {/* Billable Volume */}
                 <div className="space-y-2">
                   <Label htmlFor="volume">Billable Volume (minutes)</Label>
                   <div className="flex items-center gap-2">
@@ -606,7 +850,7 @@ export default function NewProjectPage() {
                       onChange={(e) => setDurationOverride(Number(e.target.value))}
                       min={1}
                       readOnly={!isClientRole && detectedDuration !== null && durationOverride === null}
-                      className={detectedDuration !== null && durationOverride === null ? 'bg-muted' : ''}
+                      className={cn("max-w-[200px]", detectedDuration !== null && durationOverride === null && 'bg-muted')}
                     />
                     {detectedDuration !== null && durationOverride === null && !isClientRole && (
                       <Button 
@@ -635,30 +879,101 @@ export default function NewProjectPage() {
                   )}
                 </div>
                 
-                <div className="rounded-lg bg-muted p-4">
-                  <div className="space-y-2">
-                    {languagePairs.map((pair) => {
-                      const service = SERVICES.find(s => s.id === pair.service)
-                      const cost = service ? service.rate * PRIORITY_MULTIPLIERS[priority] : 0
-                      return (
-                        <div key={pair.id} className="flex justify-between text-sm">
-                          <span>{pair.source} → {pair.target} ({service?.name || 'Unknown'})</span>
-                          <span>{formatCurrency(cost)}</span>
+                {/* Service Breakdown */}
+                <div className="space-y-4">
+                  {selectedServices.map((ss) => {
+                    const volume = durationOverride ?? detectedDuration ?? estimatedVolume
+                    const serviceCost = calculateServiceCost(ss)
+                    const hasRateMissing = ss.service.defaultBaseRate === 0
+                    
+                    return (
+                      <div key={ss.id} className="rounded-lg border border-border overflow-hidden">
+                        {/* Service Header */}
+                        <div className="flex items-center justify-between p-3 bg-muted/30">
+                          <div>
+                            <h4 className="font-medium">{ss.service.name}</h4>
+                            {ss.languagePairs.length > 0 && (
+                              <p className="text-xs text-muted-foreground">
+                                {ss.languagePairs.map(lp => `${lp.source} → ${lp.target}`).join(', ')}
+                              </p>
+                            )}
+                          </div>
+                          <span className="font-semibold">
+                            {hasRateMissing ? (
+                              <span className="text-amber-600 text-sm">Rate unavailable</span>
+                            ) : (
+                              formatCurrency(serviceCost)
+                            )}
+                          </span>
                         </div>
-                      )
-                    })}
-                    <div className="border-t border-border pt-2 mt-2 flex justify-between font-medium">
-                      <span>Total Estimate</span>
-                      <span className="text-lg">{formatCurrency(calculateCost())}</span>
-                    </div>
-                    {priority !== 'medium' && priority !== 'low' && (
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <AlertCircle className="h-3 w-3" />
-                        <span>Includes {priority === 'high' ? '20%' : '50%'} priority multiplier</span>
+                        
+                        {/* Task Breakdown */}
+                        <div className="p-3 space-y-1.5">
+                          {ss.service.workflow.map((step) => {
+                            const taskRate = ss.service.defaultBaseRate / ss.service.workflow.length
+                            const pairsCount = Math.max(1, ss.languagePairs.length)
+                            const taskCost = taskRate * volume * pairsCount * PRIORITY_MULTIPLIERS[priority]
+                            
+                            return (
+                              <div key={step.id} className="flex items-center justify-between text-sm">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-5 h-5 rounded-full bg-muted flex items-center justify-center text-xs">
+                                    {step.order}
+                                  </span>
+                                  <span className="text-muted-foreground">{step.name}</span>
+                                  {ss.languagePairs.length > 0 && (step.type === 'translation' || step.type === 'transcription') && (
+                                    <span className="text-xs text-muted-foreground">
+                                      ({ss.languagePairs.length} pair{ss.languagePairs.length > 1 ? 's' : ''})
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-muted-foreground text-xs">
+                                  {hasRateMissing ? '—' : (
+                                    <>
+                                      {volume} min × {formatCurrency(taskRate)}/min = {formatCurrency(taskCost)}
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                        
+                        {/* Service Subtotal */}
+                        <div className="flex items-center justify-between p-3 border-t border-border bg-muted/10">
+                          <span className="text-sm font-medium">Service Subtotal</span>
+                          <span className="font-medium">
+                            {hasRateMissing ? '—' : formatCurrency(serviceCost)}
+                          </span>
+                        </div>
                       </div>
-                    )}
-                  </div>
+                    )
+                  })}
                 </div>
+
+                {/* Grand Total */}
+                <div className="rounded-lg bg-primary/5 border border-primary/20 p-4">
+                  <div className="flex justify-between items-center">
+                    <span className="font-medium">Grand Total</span>
+                    <span className="text-xl font-semibold">{formatCurrency(calculateTotalCost())}</span>
+                  </div>
+                  {priority !== 'medium' && priority !== 'low' && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-2">
+                      <AlertCircle className="h-3 w-3" />
+                      <span>Includes {priority === 'high' ? '20%' : '50%'} priority multiplier</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Missing Rates Warning */}
+                {selectedServices.some(ss => ss.service.defaultBaseRate === 0) && (
+                  <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
+                    <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                    <p className="text-sm">
+                      Some tasks are missing rates — configure in <span className="font-medium">Settings → Services</span>.
+                    </p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -716,12 +1031,12 @@ export default function NewProjectPage() {
                   <span className="font-medium">{sourceFiles.length} file(s)</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Language Pairs</span>
-                  <span className="font-medium">{languagePairs.length} pair(s)</span>
+                  <span className="text-muted-foreground">Services</span>
+                  <span className="font-medium">{selectedServices.length} service(s)</span>
                 </div>
                 <div className="flex justify-between border-t border-border pt-3">
                   <span className="text-muted-foreground">Estimated Cost</span>
-                  <span className="font-semibold text-lg">{formatCurrency(calculateCost())}</span>
+                  <span className="font-semibold text-lg">{formatCurrency(calculateTotalCost())}</span>
                 </div>
               </div>
             </CardContent>
