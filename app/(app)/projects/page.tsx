@@ -1348,17 +1348,21 @@ export default function ProjectsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            {/* Duplicate Project - available on any status (PROJ-012) */}
-                            <DropdownMenuItem onClick={() => handleDuplicateProject(project.id)}>
-                              <Copy className="mr-2 h-4 w-4" />
-                              Duplicate Project
-                            </DropdownMenuItem>
+                            {/* Duplicate Project - available on any non-archived status (PROJ-012) */}
+                            {!isArchived && (
+                              <DropdownMenuItem onClick={() => handleDuplicateProject(project.id)}>
+                                <Copy className="mr-2 h-4 w-4" />
+                                Duplicate Project
+                              </DropdownMenuItem>
+                            )}
                             
-                            {/* Split Project - available on any status (PROJ-013) */}
-                            <DropdownMenuItem onClick={() => handleSplitProject(project.id)}>
-                              <Split className="mr-2 h-4 w-4" />
-                              Split Project
-                            </DropdownMenuItem>
+                            {/* Split Project - available on any non-archived status (PROJ-013) */}
+                            {!isArchived && (
+                              <DropdownMenuItem onClick={() => handleSplitProject(project.id)}>
+                                <Split className="mr-2 h-4 w-4" />
+                                Split Project
+                              </DropdownMenuItem>
+                            )}
                             
                             <DropdownMenuSeparator />
                             
