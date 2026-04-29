@@ -287,10 +287,19 @@ const handleCancelEdit = () => {
   
   const handleCancelProject = () => {
     if (!cancelReason.trim()) return
-    toast({
-      title: 'Project Cancelled',
-      description: `Project has been cancelled. Reason: ${cancelReason}`,
-    })
+    if (isClient) {
+      // Client requesting cancellation - posts a note to PM
+      toast({
+        title: 'Cancellation Requested',
+        description: 'Your cancellation request has been submitted. Our team will review it and contact you.',
+      })
+    } else {
+      // Admin/PM actually cancelling
+      toast({
+        title: 'Project Cancelled',
+        description: `Project has been cancelled. Reason: ${cancelReason}`,
+      })
+    }
     setShowCancelDialog(false)
     setCancelReason('')
   }
@@ -384,14 +393,20 @@ const handleCancelEdit = () => {
               )}
             </div>
             <div className="mt-1 flex items-center gap-4 text-sm text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                <Building2 className="h-3.5 w-3.5" />
-                {project.client}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <User className="h-3.5 w-3.5" />
-                {project.pm}
-              </span>
+              {/* Client name hidden from client view - implicit from logged-in user's company */}
+              {!isClient && (
+                <span className="inline-flex items-center gap-1.5">
+                  <Building2 className="h-3.5 w-3.5" />
+                  {project.client}
+                </span>
+              )}
+              {/* PM hidden from client view */}
+              {!isClient && (
+                <span className="inline-flex items-center gap-1.5">
+                  <User className="h-3.5 w-3.5" />
+                  {project.pm}
+                </span>
+              )}
               {project.startDate && (
                 <span className="inline-flex items-center gap-1.5">
                   <Calendar className="h-3.5 w-3.5" />
@@ -405,6 +420,7 @@ const handleCancelEdit = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Status selector - Admin/PM only */}
             {canEditStatus && (
               <Select defaultValue={project.status} onValueChange={handleStatusChange}>
                 <SelectTrigger className="w-[160px]">
@@ -419,7 +435,8 @@ const handleCancelEdit = () => {
                 </SelectContent>
               </Select>
             )}
-            {projectQuote && (
+            {/* View Quote - hidden from clients (quote flow is separate) */}
+            {projectQuote && !isClient && (
               <Link href={`/quotes/${projectQuote.id}`}>
                 <Button variant="outline" className="gap-1.5">
                   <FileText className="h-4 w-4" />
@@ -427,6 +444,7 @@ const handleCancelEdit = () => {
                 </Button>
               </Link>
             )}
+            {/* Create Quote - Admin/PM only */}
             {!projectQuote && canEditStatus && (
               <Link href={`/quotes/new?project=${project.id}`}>
                 <Button variant="outline" className="gap-1.5">
@@ -435,6 +453,7 @@ const handleCancelEdit = () => {
                 </Button>
               </Link>
             )}
+            {/* Edit button - Admin/PM only, hidden from clients */}
             {canEditStatus && !isEditing && (
               <Button variant="outline" className="gap-1.5" onClick={handleEditClick}>
                 <Edit className="h-4 w-4" />
@@ -451,35 +470,57 @@ const handleCancelEdit = () => {
                 </Button>
               </>
             )}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {canEditStatus && canArchive && (
-                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowArchiveDialog(true); }}>
-                    <Archive className="mr-2 h-4 w-4" />
-                    Archive Project
-                  </DropdownMenuItem>
-                )}
-                {canEditStatus && canCancel && (
-                  <DropdownMenuItem 
-                    className="text-destructive"
-                    onSelect={(e) => { e.preventDefault(); setShowCancelDialog(true); }}
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Cancel Project
-                  </DropdownMenuItem>
-                )}
-                {!canArchive && !canCancel && (
-                  <DropdownMenuItem disabled>
-                    No actions available
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {/* Actions menu - different for clients vs admins */}
+            {!isClient ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {canEditStatus && canArchive && (
+                    <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowArchiveDialog(true); }}>
+                      <Archive className="mr-2 h-4 w-4" />
+                      Archive Project
+                    </DropdownMenuItem>
+                  )}
+                  {canEditStatus && canCancel && (
+                    <DropdownMenuItem 
+                      className="text-destructive"
+                      onSelect={(e) => { e.preventDefault(); setShowCancelDialog(true); }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Cancel Project
+                    </DropdownMenuItem>
+                  )}
+                  {!canArchive && !canCancel && (
+                    <DropdownMenuItem disabled>
+                      No actions available
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              /* Client view - only Request Cancellation available */
+              canCancel && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="icon">
+                      <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem 
+                      onSelect={(e) => { e.preventDefault(); setShowCancelDialog(true); }}
+                    >
+                      <Trash2 className="mr-2 h-4 w-4" />
+                      Request Cancellation
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )
+            )}
           </div>
         </div>
       </div>
@@ -504,79 +545,85 @@ const handleCancelEdit = () => {
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <TooltipProvider>
-                    {/* Client - always locked for PM, locked after approval for all */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground flex items-center gap-1.5">
-                        Client
-                        {!canEditField('client') && isEditing && (
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Lock className="h-3 w-3 text-muted-foreground" />
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              {isQuoteLocked ? 'Locked — this field is tied to the approved quote.' : 'Admin only'}
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                      </span>
-                      <span className="text-sm font-medium">{project.client}</span>
-                    </div>
+                    {/* Client - hidden from client view (implicit from logged-in user) */}
+                    {!isClient && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                          Client
+                          {!canEditField('client') && isEditing && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Lock className="h-3 w-3 text-muted-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                {isQuoteLocked ? 'Locked — this field is tied to the approved quote.' : 'Admin only'}
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </span>
+                        <span className="text-sm font-medium">{project.client}</span>
+                      </div>
+                    )}
                     
-                    {/* Client Contact */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground flex items-center gap-1.5">
-                        Client Contact
-                        {!canEditField('clientContact') && isEditing && (
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Lock className="h-3 w-3 text-muted-foreground" />
-                            </TooltipTrigger>
-                            <TooltipContent>Admin only</TooltipContent>
-                          </Tooltip>
+                    {/* Client Contact - hidden from client view */}
+                    {!isClient && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                          Client Contact
+                          {!canEditField('clientContact') && isEditing && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Lock className="h-3 w-3 text-muted-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent>Admin only</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </span>
+                        {isEditing && canEditField('clientContact') ? (
+                          <Input
+                            value={editedProject.clientContact}
+                            onChange={(e) => setEditedProject({ ...editedProject, clientContact: e.target.value })}
+                            className="w-40 h-7 text-sm"
+                          />
+                        ) : (
+                          <span className="text-sm font-medium">{project.clientContact || '-'}</span>
                         )}
-                      </span>
-                      {isEditing && canEditField('clientContact') ? (
-                        <Input
-                          value={editedProject.clientContact}
-                          onChange={(e) => setEditedProject({ ...editedProject, clientContact: e.target.value })}
-                          className="w-40 h-7 text-sm"
-                        />
-                      ) : (
-                        <span className="text-sm font-medium">{project.clientContact || '-'}</span>
-                      )}
-                    </div>
+                      </div>
+                    )}
                     
-                    {/* Project Manager */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground flex items-center gap-1.5">
-                        Project Manager
-                        {!canEditField('pm') && isEditing && (
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Lock className="h-3 w-3 text-muted-foreground" />
-                            </TooltipTrigger>
-                            <TooltipContent>Admin only</TooltipContent>
-                          </Tooltip>
+                    {/* Project Manager - hidden from client view */}
+                    {!isClient && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                          Project Manager
+                          {!canEditField('pm') && isEditing && (
+                            <Tooltip>
+                              <TooltipTrigger>
+                                <Lock className="h-3 w-3 text-muted-foreground" />
+                              </TooltipTrigger>
+                              <TooltipContent>Admin only</TooltipContent>
+                            </Tooltip>
+                          )}
+                        </span>
+                        {isEditing && canEditField('pm') ? (
+                          <Select
+                            value={editedProject.pm}
+                            onValueChange={(value) => setEditedProject({ ...editedProject, pm: value })}
+                          >
+                            <SelectTrigger className="w-40 h-7 text-sm">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Mike Manager">Mike Manager</SelectItem>
+                              <SelectItem value="Sarah Admin">Sarah Admin</SelectItem>
+                              <SelectItem value="John PM">John PM</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <span className="text-sm font-medium">{project.pm}</span>
                         )}
-                      </span>
-                      {isEditing && canEditField('pm') ? (
-                        <Select
-                          value={editedProject.pm}
-                          onValueChange={(value) => setEditedProject({ ...editedProject, pm: value })}
-                        >
-                          <SelectTrigger className="w-40 h-7 text-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Mike Manager">Mike Manager</SelectItem>
-                            <SelectItem value="Sarah Admin">Sarah Admin</SelectItem>
-                            <SelectItem value="John PM">John PM</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      ) : (
-                        <span className="text-sm font-medium">{project.pm}</span>
-                      )}
-                    </div>
+                      </div>
+                    )}
                     
                     {/* Start Date */}
                     <div className="flex items-center justify-between">
@@ -778,13 +825,25 @@ const handleCancelEdit = () => {
                                         <Tooltip>
                                           <TooltipTrigger asChild>
                                             {task.assignedVendor ? (
-                                              <div 
-                                                className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[9px] font-medium text-primary-foreground border-2 border-background leading-none cursor-default"
-                                                aria-label={isClient && task.vendorId?.startsWith('v') ? 'Assigned' : task.assignedVendor}
-                                                title={isClient && task.vendorId?.startsWith('v') ? 'Assigned' : task.assignedVendor}
-                                              >
-                                                {task.assignedVendor.split(' ').map(n => n[0]).join('').slice(0, 2)}
-                                              </div>
+                                              // Check if this is an NG vendor (vendorId starts with 'v') and we're in client view
+                                              isClient && task.vendorId?.startsWith('v') ? (
+                                                // NG vendor in client view - show "NG" badge
+                                                <div 
+                                                  className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[9px] font-medium text-primary-foreground border-2 border-background leading-none cursor-default"
+                                                  aria-label="Assigned"
+                                                >
+                                                  NG
+                                                </div>
+                                              ) : (
+                                                // Client team member or admin view - show initials
+                                                <div 
+                                                  className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[9px] font-medium text-primary-foreground border-2 border-background leading-none cursor-default"
+                                                  aria-label={task.assignedVendor}
+                                                  title={task.assignedVendor}
+                                                >
+                                                  {task.assignedVendor.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                                </div>
+                                              )
                                             ) : (
                                               <div 
                                                 className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-200 text-[9px] text-gray-500 border-2 border-background leading-none cursor-default"
@@ -860,69 +919,72 @@ const handleCancelEdit = () => {
               </div>
             )}
 
-            {/* Source Files */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-base">Source Files ({sourceFiles.length})</CardTitle>
-                {!isQuoteLocked && canEditStatus && (
-                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => sourceUploadRef.current?.click()}>
-                    <Upload className="h-4 w-4" />
-                    Upload
-                  </Button>
-                )}
-              </CardHeader>
-              <CardContent className="px-6 pb-6 pt-2">
-                <div className="space-y-2">
-                  {sourceFiles.length > 0 ? sourceFiles.map((file) => (
-                    <div key={file.id} className="flex items-center justify-between rounded-lg border border-border p-3">
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm font-medium">{file.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatFileSize(file.size)} · Uploaded by {file.uploadedBy || 'Admin'} · {formatDate(file.uploadedAt)}
-                          </p>
+            {/* Source Files - hidden from clients on NG-led projects per PRD */}
+            {!isClient && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-base">Source Files ({sourceFiles.length})</CardTitle>
+                  {!isQuoteLocked && canEditStatus && (
+                    <Button size="sm" variant="outline" className="gap-1.5" onClick={() => sourceUploadRef.current?.click()}>
+                      <Upload className="h-4 w-4" />
+                      Upload
+                    </Button>
+                  )}
+                </CardHeader>
+                <CardContent className="px-6 pb-6 pt-2">
+                  <div className="space-y-2">
+                    {sourceFiles.length > 0 ? sourceFiles.map((file) => (
+                      <div key={file.id} className="flex items-center justify-between rounded-lg border border-border p-3">
+                        <div className="flex items-center gap-3">
+                          <FileText className="h-5 w-5 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium">{file.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatFileSize(file.size)} · Uploaded by {file.uploadedBy || 'Admin'} · {formatDate(file.uploadedAt)}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        {isQuoteLocked && <Lock className="h-4 w-4 text-muted-foreground" />}
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button size="sm" variant="ghost">
-                                <Download className="h-4 w-4" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Download file</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                        {!isQuoteLocked && canEditStatus && (
+                        <div className="flex items-center gap-2">
+                          {isQuoteLocked && <Lock className="h-4 w-4 text-muted-foreground" />}
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <Button size="sm" variant="ghost" onClick={() => handleReplaceFile(file.id, 'source')}>
-                                  <RefreshCw className="h-4 w-4" />
+                                <Button size="sm" variant="ghost">
+                                  <Download className="h-4 w-4" />
                                 </Button>
                               </TooltipTrigger>
-                              <TooltipContent>Replace file</TooltipContent>
+                              <TooltipContent>Download file</TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
-                        )}
+                          {!isQuoteLocked && canEditStatus && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button size="sm" variant="ghost" onClick={() => handleReplaceFile(file.id, 'source')}>
+                                    <RefreshCw className="h-4 w-4" />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent>Replace file</TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  )) : (
-                    <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-border">
-                      <p className="text-sm text-muted-foreground">No source files uploaded</p>
-                    </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                    )) : (
+                      <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-border">
+                        <p className="text-sm text-muted-foreground">No source files uploaded</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
-            {/* Reference Files */}
+            {/* Reference Files - visible to clients for context */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-base">Reference Files ({referenceFiles.length})</CardTitle>
+                {/* Upload button hidden from clients on NG-led projects */}
                 {!isQuoteLocked && canEditStatus && (
                   <Button size="sm" variant="outline" className="gap-1.5" onClick={() => referenceUploadRef.current?.click()}>
                     <Upload className="h-4 w-4" />
@@ -939,12 +1001,13 @@ const handleCancelEdit = () => {
                         <div>
                           <p className="text-sm font-medium">{file.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {formatFileSize(file.size)} · Uploaded by {file.uploadedBy || 'Admin'} · {formatDate(file.uploadedAt)}
+                            {/* Hide uploader name from clients */}
+                            {formatFileSize(file.size)} · {isClient ? 'Uploaded' : `Uploaded by ${file.uploadedBy || 'Admin'}`} · {formatDate(file.uploadedAt)}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        {isQuoteLocked && <Lock className="h-4 w-4 text-muted-foreground" />}
+                        {!isClient && isQuoteLocked && <Lock className="h-4 w-4 text-muted-foreground" />}
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
@@ -992,7 +1055,8 @@ const handleCancelEdit = () => {
                         <div>
                           <p className="text-sm font-medium">{file.name}</p>
                           <p className="text-xs text-muted-foreground">
-                            {formatFileSize(file.size)} · Delivered by {file.uploadedBy || 'Vendor'} · {formatDate(file.uploadedAt)}
+                            {/* Hide vendor name from clients */}
+                            {formatFileSize(file.size)} · {isClient ? 'Delivered' : `Delivered by ${file.uploadedBy || 'Vendor'}`} · {formatDate(file.uploadedAt)}
                           </p>
                         </div>
                       </div>
@@ -1009,7 +1073,12 @@ const handleCancelEdit = () => {
                     </div>
                   )) : (
                     <div className="flex h-20 items-center justify-center rounded-lg border border-dashed border-border">
-                      <p className="text-sm text-muted-foreground">No delivered files yet</p>
+                      <p className="text-sm text-muted-foreground">
+                        {isClient 
+                          ? 'Deliveries will appear here when tasks are completed.' 
+                          : 'No delivered files yet'
+                        }
+                      </p>
                     </div>
                   )}
                 </div>
@@ -1047,32 +1116,37 @@ const handleCancelEdit = () => {
             {/* Add Note */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Add Note</CardTitle>
+                <CardTitle className="text-base">{isClient ? 'Add Comment' : 'Add Note'}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Textarea
-                  placeholder="Write a note..."
+                  placeholder={isClient ? 'Write a comment...' : 'Write a note...'}
                   value={newNote}
                   onChange={(e) => setNewNote(e.target.value)}
                   rows={3}
                 />
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="visibility" className="text-sm">Visibility:</Label>
-                    <Select value={noteVisibility} onValueChange={(v: any) => setNoteVisibility(v)}>
-                      <SelectTrigger className="w-[140px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="internal">Internal</SelectItem>
-                        <SelectItem value="client">Client</SelectItem>
-                        <SelectItem value="vendor">Vendor</SelectItem>
-                        {canSeeBilling && <SelectItem value="billing">Billing</SelectItem>}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {/* Clients can only post Client Notes - no visibility selector needed */}
+                  {!isClient ? (
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="visibility" className="text-sm">Visibility:</Label>
+                      <Select value={noteVisibility} onValueChange={(v: any) => setNoteVisibility(v)}>
+                        <SelectTrigger className="w-[140px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="internal">Internal</SelectItem>
+                          <SelectItem value="client">Client</SelectItem>
+                          <SelectItem value="vendor">Vendor</SelectItem>
+                          {canSeeBilling && <SelectItem value="billing">Billing</SelectItem>}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <div /> /* Empty div to maintain flex spacing */
+                  )}
                   <Button onClick={handleAddNote} disabled={!newNote.trim()}>
-                    Add Note
+                    {isClient ? 'Post Comment' : 'Add Note'}
                   </Button>
                 </div>
               </CardContent>
@@ -1081,50 +1155,75 @@ const handleCancelEdit = () => {
             {/* Notes List */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Notes ({notes.length})</CardTitle>
+                <CardTitle className="text-base">
+                  {isClient ? 'Comments' : 'Notes'} ({
+                    isClient 
+                      ? notes.filter(n => n.visibility === 'client').length 
+                      : notes.length
+                  })
+                </CardTitle>
               </CardHeader>
               <CardContent className="px-6 pb-6 pt-2">
                 <div className="space-y-4">
-                  {[...notes].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).map((note) => (
-                    <div key={note.id} className="rounded-lg border border-border p-4">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="h-6 w-6">
-                            <AvatarFallback className="text-xs">
-                              {note.authorName.split(' ').map(n => n[0]).join('')}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="text-sm font-medium">{note.authorName}</span>
-                          <span className={cn(
-                            'rounded-full px-2 py-0.5 text-xs font-medium',
-                            note.authorRole === 'admin' ? 'bg-red-100 text-red-700' :
-                            note.authorRole === 'pm' ? 'bg-blue-100 text-blue-700' :
-                            note.authorRole === 'finance' ? 'bg-amber-100 text-amber-700' :
-                            note.authorRole === 'vendor' ? 'bg-purple-100 text-purple-700' :
-                            note.authorRole === 'client' ? 'bg-green-100 text-green-700' :
-                            'bg-gray-100 text-gray-700'
-                          )}>
-                            {note.authorRole === 'pm' ? 'PM' : note.authorRole.charAt(0).toUpperCase() + note.authorRole.slice(1)}
-                          </span>
-                          <span className={cn(
-                            'rounded-full px-2 py-0.5 text-xs',
-                            note.visibility === 'internal' ? 'bg-gray-100 text-gray-700' :
-                            note.visibility === 'client' ? 'bg-blue-100 text-blue-700' :
-                            note.visibility === 'vendor' ? 'bg-purple-100 text-purple-700' :
-                            'bg-amber-100 text-amber-700'
-                          )}>
-                            {note.visibility.charAt(0).toUpperCase() + note.visibility.slice(1)}
-                          </span>
+                  {/* Filter notes for client view - only show Client Notes */}
+                  {[...notes]
+                    .filter(note => isClient ? note.visibility === 'client' : true)
+                    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                    .map((note) => {
+                      // For client view: show "NG Team" for admin/pm/finance roles
+                      const isNGStaff = ['admin', 'pm', 'finance'].includes(note.authorRole)
+                      const displayName = isClient && isNGStaff ? 'NG Team' : note.authorName
+                      const displayInitials = isClient && isNGStaff ? 'NG' : note.authorName.split(' ').map(n => n[0]).join('')
+                      
+                      return (
+                        <div key={note.id} className="rounded-lg border border-border p-4">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-6 w-6">
+                                <AvatarFallback className="text-xs">
+                                  {displayInitials}
+                                </AvatarFallback>
+                              </Avatar>
+                              <span className="text-sm font-medium">{displayName}</span>
+                              {/* Hide role badge for clients when viewing NG staff notes */}
+                              {!(isClient && isNGStaff) && (
+                                <span className={cn(
+                                  'rounded-full px-2 py-0.5 text-xs font-medium',
+                                  note.authorRole === 'admin' ? 'bg-red-100 text-red-700' :
+                                  note.authorRole === 'pm' ? 'bg-blue-100 text-blue-700' :
+                                  note.authorRole === 'finance' ? 'bg-amber-100 text-amber-700' :
+                                  note.authorRole === 'vendor' ? 'bg-purple-100 text-purple-700' :
+                                  note.authorRole === 'client' ? 'bg-green-100 text-green-700' :
+                                  'bg-gray-100 text-gray-700'
+                                )}>
+                                  {note.authorRole === 'pm' ? 'PM' : note.authorRole.charAt(0).toUpperCase() + note.authorRole.slice(1)}
+                                </span>
+                              )}
+                              {/* Hide visibility badge from clients */}
+                              {!isClient && (
+                                <span className={cn(
+                                  'rounded-full px-2 py-0.5 text-xs',
+                                  note.visibility === 'internal' ? 'bg-gray-100 text-gray-700' :
+                                  note.visibility === 'client' ? 'bg-blue-100 text-blue-700' :
+                                  note.visibility === 'vendor' ? 'bg-purple-100 text-purple-700' :
+                                  'bg-amber-100 text-amber-700'
+                                )}>
+                                  {note.visibility.charAt(0).toUpperCase() + note.visibility.slice(1)}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {formatDate(note.createdAt)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-foreground">{note.content}</p>
                         </div>
-                        <span className="text-xs text-muted-foreground">
-                          {formatDate(note.createdAt)}
-                        </span>
-                      </div>
-                      <p className="text-sm text-foreground">{note.content}</p>
-                    </div>
-                  ))}
-                  {notes.length === 0 && (
-                    <p className="text-sm text-muted-foreground text-center py-4">No notes yet</p>
+                      )
+                    })}
+                  {(isClient ? notes.filter(n => n.visibility === 'client').length : notes.length) === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      {isClient ? 'No comments yet' : 'No notes yet'}
+                    </p>
                   )}
                 </div>
               </CardContent>
@@ -1199,13 +1298,16 @@ const handleCancelEdit = () => {
         </Tabs>
       </div>
 
-      {/* Cancel Project Dialog */}
+      {/* Cancel Project Dialog - different behavior for clients vs admin/PM */}
       <Dialog open={showCancelDialog} onOpenChange={setShowCancelDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Cancel Project</DialogTitle>
+            <DialogTitle>{isClient ? 'Request Cancellation' : 'Cancel Project'}</DialogTitle>
             <DialogDescription>
-              Are you sure you want to cancel this project? This action cannot be undone.
+              {isClient 
+                ? 'Submit a cancellation request. Our team will review it and contact you.'
+                : 'Are you sure you want to cancel this project? This action cannot be undone.'
+              }
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -1220,10 +1322,14 @@ const handleCancelEdit = () => {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowCancelDialog(false)}>
-              Keep Project
+              {isClient ? 'Cancel' : 'Keep Project'}
             </Button>
-            <Button variant="destructive" onClick={handleCancelProject} disabled={!cancelReason.trim()}>
-              Cancel Project
+            <Button 
+              variant={isClient ? 'default' : 'destructive'} 
+              onClick={handleCancelProject} 
+              disabled={!cancelReason.trim()}
+            >
+              {isClient ? 'Submit Request' : 'Cancel Project'}
             </Button>
           </DialogFooter>
         </DialogContent>
