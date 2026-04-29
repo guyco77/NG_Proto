@@ -102,12 +102,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const { id } = use(params)
   const searchParams = useSearchParams()
   const router = useRouter()
-  const initialTab = searchParams.get('tab') || 'overview'
+  // Check if this is a newly duplicated project - show Files tab if so
+  const isDuplicated = searchParams.get('duplicated') === 'true'
+  const initialTab = searchParams.get('tab') || (isDuplicated ? 'files' : 'overview')
   const { currentRole } = useRole()
   const { toast } = useToast()
-  
-  // Check if this is a newly duplicated project
-  const isDuplicated = searchParams.get('duplicated') === 'true'
   
   const project = mockProjects.find((p) => p.id === id) || mockProjects[0]
   const projectTasks = mockTasks.filter((t) => t.projectId === project.id)
@@ -1070,14 +1069,24 @@ const handleCancelEdit = () => {
             </Card>
           </TabsContent>
 
-          {/* Files Tab */}
-          <TabsContent value="files" className="space-y-6">
-            {isQuoteLocked && (
-              <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                <Lock className="h-4 w-4" />
-                <span>Source files are locked after quote approval. Only reference files can be updated.</span>
-              </div>
-            )}
+{/* Files Tab */}
+              <TabsContent value="files" className="space-y-6">
+                {/* PROJ-012: Upload prompt for duplicated projects */}
+                {isDuplicated && (
+                  <div className="flex items-center gap-3 rounded-lg border-2 border-primary bg-primary/5 p-4">
+                    <Upload className="h-5 w-5 text-primary" />
+                    <div>
+                      <p className="font-medium text-primary">Upload your source files to get started</p>
+                      <p className="text-sm text-muted-foreground">This project was duplicated from an existing project. Upload a new source video to continue.</p>
+                    </div>
+                  </div>
+                )}
+                {isQuoteLocked && (
+                  <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                    <Lock className="h-4 w-4" />
+                    <span>Source files are locked after quote approval. Only reference files can be updated.</span>
+                  </div>
+                )}
 
             {/* Source Video - ONE video per project (per PROJ-006) - hidden from clients on NG-led projects */}
             {!isClient && (
