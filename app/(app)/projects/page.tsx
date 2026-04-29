@@ -478,6 +478,30 @@ export default function ProjectsPage() {
   const [duplicateName, setDuplicateName] = useState('')
   const [isDuplicating, setIsDuplicating] = useState(false)
   
+  // PROJ-013: Split Project (Series → Episodes) dialog
+  const [splitDialog, setSplitDialog] = useState<{
+    open: boolean
+    projectId: string
+    projectName: string
+    client: string
+    services: string[]
+    priority: string
+    pm: string
+  }>({
+    open: false,
+    projectId: '',
+    projectName: '',
+    client: '',
+    services: [],
+    priority: '',
+    pm: '',
+  })
+  const [splitTotalEpisodes, setSplitTotalEpisodes] = useState<number | ''>('')
+  const [splitPrefix, setSplitPrefix] = useState('')
+  const [isSplitting, setIsSplitting] = useState(false)
+  const [splitProgress, setSplitProgress] = useState({ created: 0, total: 0 })
+  const [splitError, setSplitError] = useState('')
+  
   const pms = mockUsers.filter(u => u.role === 'admin' || u.role === 'pm')
   
   // Use seed projects - client sees client-specific projects, admin/PM sees all projects
@@ -685,12 +709,86 @@ export default function ProjectsPage() {
     }, 1000)
   }
   
-  const handleSplitProject = (projectId: string, projectName: string) => {
-    toast({
-      title: 'Split Project',
-      description: `Opening split dialog for "${projectName}"...`,
+  // PROJ-013: Split Project (Series → Episodes)
+  const handleSplitProject = (projectId: string) => {
+    const project = projects.find(p => p.id === projectId)
+    if (!project) return
+    
+    setSplitDialog({
+      open: true,
+      projectId: project.id,
+      projectName: project.name,
+      client: project.client,
+      services: project.services,
+      priority: project.priority,
+      pm: project.pm,
     })
-    // In real implementation, would open PROJ-013 modal
+    setSplitPrefix(project.name)
+    setSplitTotalEpisodes('')
+    setSplitError('')
+    setSplitProgress({ created: 0, total: 0 })
+  }
+  
+  // Generate episode names for preview
+  const getEpisodeNames = (prefix: string, total: number) => {
+    if (total < 2) return []
+    const padLength = total > 99 ? 3 : 2
+    const names: string[] = []
+    for (let i = 2; i <= total; i++) {
+      names.push(`${prefix} E${String(i).padStart(padLength, '0')}`)
+    }
+    return names
+  }
+  
+  // Check for name conflicts
+  const checkNameConflicts = (prefix: string, total: number) => {
+    const episodeNames = getEpisodeNames(prefix, total)
+    const existingNames = projects.map(p => p.name.toLowerCase())
+    return episodeNames.filter(name => existingNames.includes(name.toLowerCase()))
+  }
+  
+  const handleConfirmSplit = () => {
+    if (!splitTotalEpisodes || splitTotalEpisodes < 2 || !splitPrefix.trim()) return
+    
+    const conflicts = checkNameConflicts(splitPrefix, splitTotalEpisodes)
+    if (conflicts.length > 0) {
+      setSplitError(`${conflicts.length} episode names already exist (e.g., ${conflicts[0]}). Choose a different prefix or delete the existing episodes first.`)
+      return
+    }
+    
+    setIsSplitting(true)
+    setSplitError('')
+    const totalToCreate = splitTotalEpisodes - 1
+    setSplitProgress({ created: 0, total: totalToCreate })
+    
+    // Simulate creating episodes with progress
+    let created = 0
+    const createInterval = setInterval(() => {
+      created++
+      setSplitProgress({ created, total: totalToCreate })
+      
+      if (created >= totalToCreate) {
+        clearInterval(createInterval)
+        setIsSplitting(false)
+        setSplitDialog({
+          open: false,
+          projectId: '',
+          projectName: '',
+          client: '',
+          services: [],
+          priority: '',
+          pm: '',
+        })
+        
+        toast({
+          title: `Series split into ${splitTotalEpisodes} episodes.`,
+          description: 'Upload source files for each episode to continue.',
+        })
+        
+        // In real app, would refresh project list or add new projects to state
+        router.push('/projects')
+      }
+    }, 150) // Simulate ~150ms per episode creation
   }
 
   return (
@@ -1211,8 +1309,8 @@ export default function ProjectsPage() {
                               Duplicate Project
                             </DropdownMenuItem>
                             
-                            {/* Split Project - available on any status */}
-                            <DropdownMenuItem onClick={() => handleSplitProject(project.id, project.name)}>
+                            {/* Split Project - available on any status (PROJ-013) */}
+                            <DropdownMenuItem onClick={() => handleSplitProject(project.id)}>
                               <Split className="mr-2 h-4 w-4" />
                               Split Project
                             </DropdownMenuItem>
@@ -1528,6 +1626,209 @@ export default function ProjectsPage() {
                 </>
               ) : (
                 'Duplicate Project'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* PROJ-013: Split Project (Series → Episodes) Dialog */}
+      <Dialog open={splitDialog.open} onOpenChange={(open) => { 
+        setSplitDialog(prev => ({ ...prev, open }))
+        if (!open) {
+          setSplitTotalEpisodes('')
+          setSplitPrefix('')
+          setSplitError('')
+          setIsSplitting(false)
+          setSplitProgress({ created: 0, total: 0 })
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Split &quot;{splitDialog.projectName}&quot; into a series?</DialogTitle>
+            <DialogDescription>
+              &quot;{splitDialog.projectName}&quot; will be treated as Episode 01. We&apos;ll create additional episode projects for the rest of the series — same client, services, vendors, and settings. You&apos;ll upload each episode&apos;s source video after the split.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Total Episodes Input */}
+            <div className="space-y-2">
+              <Label htmlFor="split-total" className="text-sm font-medium">
+                Total episodes <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="split-total"
+                type="number"
+                min={2}
+                max={200}
+                value={splitTotalEpisodes}
+                onChange={(e) => {
+                  const val = e.target.value === '' ? '' : parseInt(e.target.value, 10)
+                  setSplitTotalEpisodes(val)
+                  setSplitError('')
+                }}
+                placeholder="e.g., 20"
+                disabled={isSplitting}
+              />
+              <p className="text-xs text-muted-foreground">
+                Total number of episodes in the series, including this one.
+              </p>
+              {splitTotalEpisodes !== '' && splitTotalEpisodes < 2 && (
+                <p className="text-xs text-destructive">Enter a total of 2 or more episodes.</p>
+              )}
+              {splitTotalEpisodes !== '' && splitTotalEpisodes > 200 && (
+                <p className="text-xs text-destructive">Total episodes too high — maximum is 200. For larger series, contact support.</p>
+              )}
+              {splitTotalEpisodes !== '' && splitTotalEpisodes > 50 && splitTotalEpisodes <= 200 && (
+                <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-800">
+                    You&apos;re about to create {splitTotalEpisodes - 1} new projects. This may take a moment to process and will appear at the top of your project list.
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            {/* Episode Name Prefix */}
+            <div className="space-y-2">
+              <Label htmlFor="split-prefix" className="text-sm font-medium">
+                Episode name prefix <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="split-prefix"
+                value={splitPrefix}
+                onChange={(e) => {
+                  setSplitPrefix(e.target.value)
+                  setSplitError('')
+                }}
+                placeholder="e.g., Tehran"
+                disabled={isSplitting}
+              />
+              <p className="text-xs text-muted-foreground">
+                New episodes will be named {splitPrefix || '{prefix}'} E02, {splitPrefix || '{prefix}'} E03, …
+              </p>
+              {splitPrefix === '' && (
+                <p className="text-xs text-destructive">Episode name prefix is required.</p>
+              )}
+            </div>
+            
+            {/* Live Preview */}
+            {splitTotalEpisodes !== '' && splitTotalEpisodes >= 2 && splitTotalEpisodes <= 200 && splitPrefix.trim() && (
+              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                <p className="text-sm font-medium">Preview</p>
+                <p className="text-sm text-muted-foreground">
+                  This will create <span className="font-medium text-foreground">{splitTotalEpisodes - 1}</span> new projects:{' '}
+                  {(() => {
+                    const names = getEpisodeNames(splitPrefix, splitTotalEpisodes)
+                    if (names.length <= 5) {
+                      return <span className="font-medium text-foreground">{names.join(', ')}</span>
+                    }
+                    return (
+                      <span className="font-medium text-foreground">
+                        {names.slice(0, 3).join(', ')}, …, {names[names.length - 1]}
+                      </span>
+                    )
+                  })()}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  The original project ({splitDialog.projectName}) remains as Episode 01 — it is not modified or renamed.
+                </p>
+              </div>
+            )}
+            
+            {/* What will be copied summary */}
+            <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+              <p className="text-sm font-medium">What each episode will inherit:</p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Client</span>
+                  <span className="font-medium">{splitDialog.client}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Priority</span>
+                  <span className={cn(
+                    'rounded-full px-2 py-0.5 text-xs font-medium',
+                    getPriorityColor(splitDialog.priority)
+                  )}>
+                    {splitDialog.priority ? splitDialog.priority.charAt(0).toUpperCase() + splitDialog.priority.slice(1) : '-'}
+                  </span>
+                </div>
+                <div className="flex justify-between col-span-2">
+                  <span className="text-muted-foreground">PM</span>
+                  <span className="font-medium">{splitDialog.pm || '-'}</span>
+                </div>
+                <div className="col-span-2">
+                  <span className="text-muted-foreground block mb-1">Services + Language Pairs</span>
+                  <div className="flex flex-wrap gap-1">
+                    {splitDialog.services.map((service, idx) => (
+                      <span key={idx} className="text-xs px-2 py-0.5 bg-background rounded border border-border">
+                        {service}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Also copied: reference files, internal notes
+              </p>
+            </div>
+            
+            {/* Source files note */}
+            <p className="text-xs text-muted-foreground">
+              <strong>Note:</strong> Source files are not duplicated — you&apos;ll upload a video for each episode after the split.
+            </p>
+            
+            {/* Error message */}
+            {splitError && (
+              <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 p-3">
+                <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-800">{splitError}</p>
+              </div>
+            )}
+            
+            {/* Progress indicator */}
+            {isSplitting && splitProgress.total > 0 && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Creating episodes...</span>
+                  <span className="text-muted-foreground">{splitProgress.created} of {splitProgress.total}</span>
+                </div>
+                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div 
+                    className="h-full bg-primary transition-all duration-150"
+                    style={{ width: `${(splitProgress.created / splitProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setSplitDialog(prev => ({ ...prev, open: false }))}
+              disabled={isSplitting}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleConfirmSplit}
+              disabled={
+                !splitPrefix.trim() || 
+                splitTotalEpisodes === '' || 
+                splitTotalEpisodes < 2 || 
+                splitTotalEpisodes > 200 || 
+                isSplitting
+              }
+            >
+              {isSplitting ? (
+                <>
+                  <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Creating {splitProgress.total > 0 ? `${splitProgress.created} of ${splitProgress.total}` : '...'}
+                </>
+              ) : (
+                'Split Project'
               )}
             </Button>
           </DialogFooter>

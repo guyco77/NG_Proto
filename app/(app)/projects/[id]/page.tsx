@@ -27,6 +27,8 @@ import {
   Captions,
   Eye,
   Copy,
+  Split,
+  AlertTriangle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -122,6 +124,15 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
   const [duplicateName, setDuplicateName] = useState(`${project.name} (Copy)`)
   const [isDuplicating, setIsDuplicating] = useState(false)
+  
+  // PROJ-013: Split Project (Series → Episodes) dialog
+  const [showSplitDialog, setShowSplitDialog] = useState(false)
+  const [splitTotalEpisodes, setSplitTotalEpisodes] = useState<number | ''>('')
+  const [splitPrefix, setSplitPrefix] = useState(project.name)
+  const [isSplitting, setIsSplitting] = useState(false)
+  const [splitProgress, setSplitProgress] = useState({ created: 0, total: 0 })
+  const [splitError, setSplitError] = useState('')
+  
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false)
   const [newTaskService, setNewTaskService] = useState('')
   const [newTaskLanguage, setNewTaskLanguage] = useState('')
@@ -374,6 +385,46 @@ const handleCancelEdit = () => {
     }, 1000)
   }
 
+  // PROJ-013: Split Project helpers and handler
+  const getEpisodeNames = (prefix: string, total: number) => {
+    if (total < 2) return []
+    const padLength = total > 99 ? 3 : 2
+    const names: string[] = []
+    for (let i = 2; i <= total; i++) {
+      names.push(`${prefix} E${String(i).padStart(padLength, '0')}`)
+    }
+    return names
+  }
+
+  const handleSplitProject = () => {
+    if (!splitTotalEpisodes || splitTotalEpisodes < 2 || !splitPrefix.trim()) return
+    
+    setIsSplitting(true)
+    setSplitError('')
+    const totalToCreate = splitTotalEpisodes - 1
+    setSplitProgress({ created: 0, total: totalToCreate })
+    
+    // Simulate creating episodes with progress
+    let created = 0
+    const createInterval = setInterval(() => {
+      created++
+      setSplitProgress({ created, total: totalToCreate })
+      
+      if (created >= totalToCreate) {
+        clearInterval(createInterval)
+        setIsSplitting(false)
+        setShowSplitDialog(false)
+        
+        toast({
+          title: `Series split into ${splitTotalEpisodes} episodes.`,
+          description: 'Upload source files for each episode to continue.',
+        })
+        
+        router.push('/projects')
+      }
+    }, 150)
+  }
+
   const handleAddTask = () => {
     if (!newTaskService) return
     toast({
@@ -540,7 +591,23 @@ const handleCancelEdit = () => {
                     <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+<DropdownMenuContent align="end">
+                  {/* PROJ-012: Duplicate Project - available on any status */}
+                  <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowDuplicateDialog(true); }}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Duplicate Project
+                  </DropdownMenuItem>
+                  {/* PROJ-013: Split Project - available on any status */}
+                  <DropdownMenuItem onSelect={(e) => { 
+                    e.preventDefault(); 
+                    setSplitPrefix(project.name);
+                    setSplitTotalEpisodes('');
+                    setSplitError('');
+                    setShowSplitDialog(true); 
+                  }}>
+                    <Split className="mr-2 h-4 w-4" />
+                    Split Project
+                  </DropdownMenuItem>
                   {canEditStatus && canArchive && (
                     <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowArchiveDialog(true); }}>
                       <Archive className="mr-2 h-4 w-4" />
@@ -548,17 +615,12 @@ const handleCancelEdit = () => {
                     </DropdownMenuItem>
                   )}
                   {canEditStatus && canCancel && (
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       className="text-destructive"
                       onSelect={(e) => { e.preventDefault(); setShowCancelDialog(true); }}
                     >
                       <Trash2 className="mr-2 h-4 w-4" />
                       Cancel Project
-                    </DropdownMenuItem>
-                  )}
-                  {!canArchive && !canCancel && (
-                    <DropdownMenuItem disabled>
-                      No actions available
                     </DropdownMenuItem>
                   )}
                 </DropdownMenuContent>
@@ -1549,6 +1611,271 @@ const handleCancelEdit = () => {
             </Button>
             <Button onClick={handleAddTask} disabled={!newTaskService}>
               Add Task
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* PROJ-012: Duplicate Project Dialog */}
+      <Dialog open={showDuplicateDialog} onOpenChange={(open) => { 
+        setShowDuplicateDialog(open)
+        if (!open) {
+          setDuplicateName(`${project.name} (Copy)`)
+          setIsDuplicating(false)
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Duplicate &quot;{project.name}&quot;?</DialogTitle>
+            <DialogDescription>
+              Create a new project with the same settings. Source files are not duplicated — you&apos;ll upload a new video after creation.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="duplicate-name" className="text-sm font-medium">
+                New project name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="duplicate-name"
+                value={duplicateName}
+                onChange={(e) => setDuplicateName(e.target.value)}
+                placeholder="Enter project name..."
+                autoFocus
+              />
+              {!duplicateName.trim() && (
+                <p className="text-xs text-destructive">Project name is required.</p>
+              )}
+            </div>
+            
+            <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+              <p className="text-sm font-medium">What will be copied:</p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Client</span>
+                  <span className="font-medium">{project.client}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Priority</span>
+                  <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', getPriorityColor(project.priority))}>
+                    {project.priority.charAt(0).toUpperCase() + project.priority.slice(1)}
+                  </span>
+                </div>
+                <div className="flex justify-between col-span-2">
+                  <span className="text-muted-foreground">PM</span>
+                  <span className="font-medium">{project.pm}</span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Also copied: reference files, internal notes
+              </p>
+            </div>
+            
+            <p className="text-xs text-muted-foreground">
+              <strong>Not copied:</strong> source files, vendor assignments, billable volume, quotes/billing, delivered files, deadlines, status history
+            </p>
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowDuplicateDialog(false)} disabled={isDuplicating}>
+              Cancel
+            </Button>
+            <Button onClick={handleDuplicateProject} disabled={!duplicateName.trim() || isDuplicating}>
+              {isDuplicating ? (
+                <>
+                  <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Duplicating project...
+                </>
+              ) : (
+                'Duplicate Project'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* PROJ-013: Split Project (Series → Episodes) Dialog */}
+      <Dialog open={showSplitDialog} onOpenChange={(open) => { 
+        setShowSplitDialog(open)
+        if (!open) {
+          setSplitTotalEpisodes('')
+          setSplitPrefix(project.name)
+          setSplitError('')
+          setIsSplitting(false)
+          setSplitProgress({ created: 0, total: 0 })
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Split &quot;{project.name}&quot; into a series?</DialogTitle>
+            <DialogDescription>
+              &quot;{project.name}&quot; will be treated as Episode 01. We&apos;ll create additional episode projects for the rest of the series — same client, services, vendors, and settings. You&apos;ll upload each episode&apos;s source video after the split.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            {/* Total Episodes Input */}
+            <div className="space-y-2">
+              <Label htmlFor="split-total" className="text-sm font-medium">
+                Total episodes <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="split-total"
+                type="number"
+                min={2}
+                max={200}
+                value={splitTotalEpisodes}
+                onChange={(e) => {
+                  const val = e.target.value === '' ? '' : parseInt(e.target.value, 10)
+                  setSplitTotalEpisodes(val)
+                  setSplitError('')
+                }}
+                placeholder="e.g., 20"
+                disabled={isSplitting}
+              />
+              <p className="text-xs text-muted-foreground">
+                Total number of episodes in the series, including this one.
+              </p>
+              {splitTotalEpisodes !== '' && splitTotalEpisodes < 2 && (
+                <p className="text-xs text-destructive">Enter a total of 2 or more episodes.</p>
+              )}
+              {splitTotalEpisodes !== '' && splitTotalEpisodes > 200 && (
+                <p className="text-xs text-destructive">Total episodes too high — maximum is 200. For larger series, contact support.</p>
+              )}
+              {splitTotalEpisodes !== '' && splitTotalEpisodes > 50 && splitTotalEpisodes <= 200 && (
+                <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-2">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-xs text-amber-800">
+                    You&apos;re about to create {splitTotalEpisodes - 1} new projects. This may take a moment to process and will appear at the top of your project list.
+                  </p>
+                </div>
+              )}
+            </div>
+            
+            {/* Episode Name Prefix */}
+            <div className="space-y-2">
+              <Label htmlFor="split-prefix" className="text-sm font-medium">
+                Episode name prefix <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="split-prefix"
+                value={splitPrefix}
+                onChange={(e) => {
+                  setSplitPrefix(e.target.value)
+                  setSplitError('')
+                }}
+                placeholder="e.g., Tehran"
+                disabled={isSplitting}
+              />
+              <p className="text-xs text-muted-foreground">
+                New episodes will be named {splitPrefix || '{prefix}'} E02, {splitPrefix || '{prefix}'} E03, …
+              </p>
+              {splitPrefix === '' && (
+                <p className="text-xs text-destructive">Episode name prefix is required.</p>
+              )}
+            </div>
+            
+            {/* Live Preview */}
+            {splitTotalEpisodes !== '' && splitTotalEpisodes >= 2 && splitTotalEpisodes <= 200 && splitPrefix.trim() && (
+              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
+                <p className="text-sm font-medium">Preview</p>
+                <p className="text-sm text-muted-foreground">
+                  This will create <span className="font-medium text-foreground">{splitTotalEpisodes - 1}</span> new projects:{' '}
+                  {(() => {
+                    const names = getEpisodeNames(splitPrefix, splitTotalEpisodes)
+                    if (names.length <= 5) {
+                      return <span className="font-medium text-foreground">{names.join(', ')}</span>
+                    }
+                    return (
+                      <span className="font-medium text-foreground">
+                        {names.slice(0, 3).join(', ')}, …, {names[names.length - 1]}
+                      </span>
+                    )
+                  })()}
+                </p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  The original project ({project.name}) remains as Episode 01 — it is not modified or renamed.
+                </p>
+              </div>
+            )}
+            
+            {/* What will be copied summary */}
+            <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+              <p className="text-sm font-medium">What each episode will inherit:</p>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Client</span>
+                  <span className="font-medium">{project.client}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Priority</span>
+                  <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', getPriorityColor(project.priority))}>
+                    {project.priority.charAt(0).toUpperCase() + project.priority.slice(1)}
+                  </span>
+                </div>
+                <div className="flex justify-between col-span-2">
+                  <span className="text-muted-foreground">PM</span>
+                  <span className="font-medium">{project.pm}</span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Also copied: reference files, internal notes
+              </p>
+            </div>
+            
+            {/* Source files note */}
+            <p className="text-xs text-muted-foreground">
+              <strong>Note:</strong> Source files are not duplicated — you&apos;ll upload a video for each episode after the split.
+            </p>
+            
+            {/* Error message */}
+            {splitError && (
+              <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 p-3">
+                <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-red-800">{splitError}</p>
+              </div>
+            )}
+            
+            {/* Progress indicator */}
+            {isSplitting && splitProgress.total > 0 && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span>Creating episodes...</span>
+                  <span className="text-muted-foreground">{splitProgress.created} of {splitProgress.total}</span>
+                </div>
+                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div 
+                    className="h-full bg-primary transition-all duration-150"
+                    style={{ width: `${(splitProgress.created / splitProgress.total) * 100}%` }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSplitDialog(false)} disabled={isSplitting}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleSplitProject}
+              disabled={
+                !splitPrefix.trim() || 
+                splitTotalEpisodes === '' || 
+                splitTotalEpisodes < 2 || 
+                splitTotalEpisodes > 200 || 
+                isSplitting
+              }
+            >
+              {isSplitting ? (
+                <>
+                  <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  Creating {splitProgress.total > 0 ? `${splitProgress.created} of ${splitProgress.total}` : '...'}
+                </>
+              ) : (
+                'Split Project'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
