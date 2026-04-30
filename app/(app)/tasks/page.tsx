@@ -120,6 +120,7 @@ export default function TasksPage() {
 
   const isAdmin = currentRole === 'admin'
   const isPM = currentRole === 'pm'
+  const isVendor = currentRole === 'vendor'
 
   // Filter tasks based on role and filters
   const filteredTasks = useMemo(() => {
@@ -133,7 +134,11 @@ export default function TasksPage() {
     tasks = tasks.filter(t => t.status !== 'deleted')
 
     // Role-based filtering
-    if (isPM && !isAdmin) {
+    if (isVendor) {
+      // Vendor sees only their own assigned tasks (simulated with vendor id 'v1')
+      // In production, this is enforced at DB layer via RLS
+      tasks = tasks.filter(t => t.vendorId === 'v1')
+    } else if (isPM && !isAdmin) {
       // PM sees only tasks in projects assigned to them (simplified for mock - using PM id '2')
       const pmProjects = mockProjects.filter(p => p.pmId === '2').map(p => p.id)
       tasks = tasks.filter(t => pmProjects.includes(t.projectId))
@@ -405,8 +410,8 @@ export default function TasksPage() {
     <div className="p-6 lg:p-8 space-y-8">
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Tasks</h1>
-        <p className="text-sm text-muted-foreground mt-1">{filteredTasks.length} tasks</p>
+        <h1 className="text-2xl font-semibold text-foreground">{isVendor ? 'My Tasks' : 'Tasks'}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''}</p>
       </div>
 
       {/* Filters */}
@@ -534,20 +539,22 @@ export default function TasksPage() {
           </PopoverContent>
         </Popover>
 
-        {/* Vendor Filter */}
-        <Select value={vendorFilter} onValueChange={setVendorFilter}>
-          <SelectTrigger className="w-40 h-9">
-            <SelectValue placeholder="Vendor" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Vendors</SelectItem>
-            {mockVendors.map((vendor) => (
-              <SelectItem key={vendor.id} value={vendor.id}>
-                {vendor.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Vendor Filter - hidden for vendors (they only see their own tasks) */}
+        {!isVendor && (
+          <Select value={vendorFilter} onValueChange={setVendorFilter}>
+            <SelectTrigger className="w-40 h-9">
+              <SelectValue placeholder="Vendor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Vendors</SelectItem>
+              {mockVendors.map((vendor) => (
+                <SelectItem key={vendor.id} value={vendor.id}>
+                  {vendor.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {/* Sort */}
         <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
@@ -601,8 +608,8 @@ export default function TasksPage() {
         </div>
       )}
 
-      {/* Bulk Action Bar */}
-      {selectedTasks.length > 0 && (
+      {/* Bulk Action Bar - Admin/PM only */}
+      {!isVendor && selectedTasks.length > 0 && (
         <div className="mb-4 flex items-center gap-4 rounded-lg bg-muted p-3">
           <span className="text-sm font-medium">{selectedTasks.length} tasks selected</span>
           {selectedTasks.length > 50 ? (
@@ -633,16 +640,20 @@ export default function TasksPage() {
           <table className="w-full">
             <thead className="border-b border-border bg-muted/50">
               <tr>
-                <th className="w-10 px-4 py-3">
-                  <Checkbox
-                    checked={selectedTasks.length === paginatedTasks.length && paginatedTasks.length > 0}
-                    onCheckedChange={toggleAllSelection}
-                  />
-                </th>
+                {/* Checkbox column hidden for vendors - no bulk actions */}
+                {!isVendor && (
+                  <th className="w-10 px-4 py-3">
+                    <Checkbox
+                      checked={selectedTasks.length === paginatedTasks.length && paginatedTasks.length > 0}
+                      onCheckedChange={toggleAllSelection}
+                    />
+                  </th>
+                )}
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Task</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Project</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Language</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Vendor</th>
+                {/* Vendor column hidden for vendors - they only see their own tasks */}
+                {!isVendor && <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Vendor</th>}
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Deadline</th>
                 <th className="w-10 px-4 py-3"></th>
@@ -659,12 +670,15 @@ export default function TasksPage() {
                       taskOverdue && "bg-red-50/50"
                     )}
                   >
-                    <td className="px-4 py-3">
-                      <Checkbox
-                        checked={selectedTasks.includes(task.id)}
-                        onCheckedChange={() => toggleTaskSelection(task.id)}
-                      />
-                    </td>
+                    {/* Checkbox column hidden for vendors */}
+                    {!isVendor && (
+                      <td className="px-4 py-3">
+                        <Checkbox
+                          checked={selectedTasks.includes(task.id)}
+                          onCheckedChange={() => toggleTaskSelection(task.id)}
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <Link href={`/tasks/${task.id}`} className="hover:text-primary">
                         <div className="flex items-center gap-2">
@@ -692,18 +706,21 @@ export default function TasksPage() {
                         <span className="text-sm text-muted-foreground">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      {task.assignedVendor ? (
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
-                            <User className="h-3 w-3 text-primary" />
+                    {/* Vendor column hidden for vendors */}
+                    {!isVendor && (
+                      <td className="px-4 py-3">
+                        {task.assignedVendor ? (
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
+                              <User className="h-3 w-3 text-primary" />
+                            </div>
+                            <span className="text-sm">{task.assignedVendor}</span>
                           </div>
-                          <span className="text-sm">{task.assignedVendor}</span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">Unassigned</span>
-                      )}
-                    </td>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">Unassigned</span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <StatusBadge status={task.status} />
@@ -731,50 +748,55 @@ export default function TasksPage() {
                                           <DropdownMenuItem asChild>
                                             <Link href={`/tasks/${task.id}`}>View Details</Link>
                                           </DropdownMenuItem>
-                                          {/* TASK-003: Assign Vendor - available for unassigned and open_for_offers */}
-                                          {(task.status === 'unassigned' || task.status === 'open_for_offers') && (
-                                            <DropdownMenuItem onClick={() => {
-                                              setAssigningTaskId(task.id)
-                                              setShowAssignDialog(true)
-                                            }}>
-                                              <UserPlus className="mr-2 h-4 w-4" />
-                                              Assign Vendor
-                                            </DropdownMenuItem>
-                                          )}
-                                          {/* TASK-009: Post as Open Offer - only for unassigned */}
-                                          {task.status === 'unassigned' && (
-                                            <DropdownMenuItem onClick={() => {
-                                              setOfferingTaskId(task.id)
-                                              setShowOfferDialog(true)
-                                            }}>
-                                              <Send className="mr-2 h-4 w-4" />
-                                              Post as Open Offer
-                                            </DropdownMenuItem>
-                                          )}
-                                          {/* TASK-009: Withdraw Offer - only for open_for_offers */}
-                                          {task.status === 'open_for_offers' && (
-                                            <DropdownMenuItem onClick={() => {
-                                              setWithdrawingTaskId(task.id)
-                                              setShowWithdrawDialog(true)
-                                            }}>
-                                              <Undo2 className="mr-2 h-4 w-4" />
-                                              Withdraw Offer
-                                            </DropdownMenuItem>
-                                          )}
-                                          {/* Delete Task - not shown for assigned, in_progress, submitted, complete */}
-                                          {!['assigned', 'in_progress', 'submitted', 'complete'].includes(task.status) && (
+                                          {/* Admin/PM-only actions - hidden for vendors */}
+                                          {!isVendor && (
                                             <>
-                                              <DropdownMenuSeparator />
-                                              <DropdownMenuItem 
-                                                className="text-destructive"
-                                                onClick={() => {
-                                                  setDeletingTaskId(task.id)
-                                                  setShowDeleteDialog(true)
-                                                }}
-                                              >
-                                                <Trash2 className="mr-2 h-4 w-4" />
-                                                Delete Task
-                                              </DropdownMenuItem>
+                                              {/* TASK-003: Assign Vendor - available for unassigned and open_for_offers */}
+                                              {(task.status === 'unassigned' || task.status === 'open_for_offers') && (
+                                                <DropdownMenuItem onClick={() => {
+                                                  setAssigningTaskId(task.id)
+                                                  setShowAssignDialog(true)
+                                                }}>
+                                                  <UserPlus className="mr-2 h-4 w-4" />
+                                                  Assign Vendor
+                                                </DropdownMenuItem>
+                                              )}
+                                              {/* TASK-009: Post as Open Offer - only for unassigned */}
+                                              {task.status === 'unassigned' && (
+                                                <DropdownMenuItem onClick={() => {
+                                                  setOfferingTaskId(task.id)
+                                                  setShowOfferDialog(true)
+                                                }}>
+                                                  <Send className="mr-2 h-4 w-4" />
+                                                  Post as Open Offer
+                                                </DropdownMenuItem>
+                                              )}
+                                              {/* TASK-009: Withdraw Offer - only for open_for_offers */}
+                                              {task.status === 'open_for_offers' && (
+                                                <DropdownMenuItem onClick={() => {
+                                                  setWithdrawingTaskId(task.id)
+                                                  setShowWithdrawDialog(true)
+                                                }}>
+                                                  <Undo2 className="mr-2 h-4 w-4" />
+                                                  Withdraw Offer
+                                                </DropdownMenuItem>
+                                              )}
+                                              {/* Delete Task - not shown for assigned, in_progress, submitted, complete */}
+                                              {!['assigned', 'in_progress', 'submitted', 'complete'].includes(task.status) && (
+                                                <>
+                                                  <DropdownMenuSeparator />
+                                                  <DropdownMenuItem 
+                                                    className="text-destructive"
+                                                    onClick={() => {
+                                                      setDeletingTaskId(task.id)
+                                                      setShowDeleteDialog(true)
+                                                    }}
+                                                  >
+                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                    Delete Task
+                                                  </DropdownMenuItem>
+                                                </>
+                                              )}
                                             </>
                                           )}
                                         </DropdownMenuContent>

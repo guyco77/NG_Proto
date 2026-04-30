@@ -259,14 +259,30 @@ export const TASK_STATUSES: { value: string; label: string; color: string }[] = 
   { value: 'complete', label: 'Complete', color: 'green' },
 ]
 
-export const TASK_SERVICE_TYPES = [
+// Canonical Task Step Names (Workflow Steps) - single source of truth
+// These are the ONLY valid task step types for workflows, tasks, and filters
+// Distinct from the 17 Project Services in Epic 14 - Services
+export const TASK_STEP_TYPES = [
   'Transcription',
+  'Transcription AI',
   'Timing',
+  'Timing AI',
   'Translation',
+  'Translation from Audio',
+  'Upload TT',
+  'Upload Text File',
   'QC',
   'PM Verification',
+  'Proofread',
   'Client Review',
-]
+  'Upload Client Asset',
+  'Upload Rough Cut',
+  'New Cut',
+  'Project Creation',
+] as const
+
+// Alias for backwards compatibility
+export const TASK_SERVICE_TYPES = TASK_STEP_TYPES
 
 export const mockQuotes: Quote[] = [
   {
