@@ -310,9 +310,22 @@ export default function TasksPage() {
     const updates: Record<string, { status: string; assignedVendor?: string; vendorId?: string }> = {}
     taskIdsToAssign.forEach(id => {
       updates[id] = { status: 'assigned', assignedVendor: vendor?.name, vendorId: selectedVendorId }
+      
+      // Audit logging - In production, recorded in audit_log table
+      console.log('[Audit] Vendor assigned:', {
+        taskId: id,
+        actor: userName,
+        timestamp: new Date().toISOString(),
+        action: 'vendor_assigned',
+        vendorId: selectedVendorId,
+        vendorName: vendor?.name,
+        previousStatus: filteredTasks.find(t => t.id === id)?.status,
+        newStatus: 'assigned',
+      })
     })
     setLocalTaskUpdates(prev => ({ ...prev, ...updates }))
     
+    // Notifications - In production, vendor notified via email + in-app
     // Toast message
     if (isBulkAssign) {
       toast({
@@ -345,19 +358,33 @@ export default function TasksPage() {
     setShowAssignDialog(true)
   }
   
-  // TASK-009: Handle post as open offer
+// TASK-009: Handle post as open offer
   const handlePostOffer = async () => {
     if (!offeringTaskId) return
     setIsPosting(true)
     await new Promise(r => setTimeout(r, 500))
+    
+    const offeringTask = filteredTasks.find(t => t.id === offeringTaskId)
+    
+    // Audit logging - In production, recorded in audit_log table
+    console.log('[Audit] Task posted as open offer:', {
+      taskId: offeringTaskId,
+      actor: userName,
+      timestamp: new Date().toISOString(),
+      action: 'posted_as_open_offer',
+      previousStatus: offeringTask?.status,
+      newStatus: 'open_for_offers',
+      description: offerDescription || null,
+    })
     
     setLocalTaskUpdates(prev => ({
       ...prev,
       [offeringTaskId]: { status: 'open_for_offers' }
     }))
     
+    // Notifications - In production, matching vendors notified via email + in-app
     toast({
-      title: `Task posted as open offer.`,
+      title: 'Posted to Offers Board',
       description: 'Matching vendors have been notified.',
     })
     
@@ -367,11 +394,21 @@ export default function TasksPage() {
     setOfferDescription('')
   }
   
-  // TASK-009: Handle withdraw offer
+// TASK-009: Handle withdraw offer
   const handleWithdrawOffer = async () => {
     if (!withdrawingTaskId) return
     setIsWithdrawing(true)
     await new Promise(r => setTimeout(r, 500))
+    
+    // Audit logging - In production, recorded in audit_log table
+    console.log('[Audit] Offer withdrawn:', {
+      taskId: withdrawingTaskId,
+      actor: userName,
+      timestamp: new Date().toISOString(),
+      action: 'offer_withdrawn',
+      previousStatus: 'open_for_offers',
+      newStatus: 'unassigned',
+    })
     
     setLocalTaskUpdates(prev => ({
       ...prev,
@@ -379,8 +416,8 @@ export default function TasksPage() {
     }))
     
     toast({
-      title: 'Offer withdrawn.',
-      description: 'Task is now unassigned.',
+      title: 'Offer Withdrawn',
+      description: 'Task returned to Unassigned status.',
     })
     
     setIsWithdrawing(false)
@@ -388,21 +425,34 @@ export default function TasksPage() {
     setWithdrawingTaskId(null)
   }
   
-  // Delete task handler
+// Delete task handler
   const handleDeleteTask = async () => {
     if (!deletingTaskId) return
     setIsDeleting(true)
     await new Promise(r => setTimeout(r, 500))
     
-    // For mock, just remove from local updates (in real app, soft delete)
-    setLocalTaskUpdates(prev => ({
-      ...prev,
-      [deletingTaskId]: { status: 'deleted' as string }
-    }))
+    const deletedTask = filteredTasks.find(t => t.id === deletingTaskId)
+    
+    // Audit logging - In production, recorded in audit_log table
+    console.log('[Audit] Task deleted:', {
+      taskId: deletingTaskId,
+      actor: userName,
+      timestamp: new Date().toISOString(),
+      action: 'task_soft_deleted',
+      taskName: deletedTask?.name,
+      previousStatus: deletedTask?.status,
+      wasOpenOffer: deletedTask?.status === 'open_for_offers',
+      recoverableUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    })
+    
+    // Remove task from local view (soft delete - still recoverable by Admin for 30 days)
+    setDeletedTaskIds(prev => [...prev, deletingTaskId])
     
     toast({
-      title: 'Task deleted.',
-      description: 'Task has been soft-deleted. Admin can recover within 30 days.',
+      title: 'Task deleted',
+      description: deletedTask?.status === 'open_for_offers'
+        ? 'Task deleted and open offer withdrawn. Admins can recover within 30 days.'
+        : 'Task has been soft-deleted. Admins can recover within 30 days.',
     })
     
     setIsDeleting(false)
@@ -423,6 +473,16 @@ export default function TasksPage() {
     const updates: Record<string, { status: string }> = {}
     unassignedIds.forEach(id => {
       updates[id] = { status: 'open_for_offers' }
+      
+      // Audit logging - In production, recorded in audit_log table
+      console.log('[Audit] Bulk task posted as open offer:', {
+        taskId: id,
+        actor: userName,
+        timestamp: new Date().toISOString(),
+        action: 'bulk_posted_as_open_offer',
+        previousStatus: 'unassigned',
+        newStatus: 'open_for_offers',
+      })
     })
     setLocalTaskUpdates(prev => ({ ...prev, ...updates }))
     
