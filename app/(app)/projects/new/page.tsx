@@ -955,8 +955,8 @@ export default function NewProjectPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">Source Files *</CardTitle>
-                {/* Update PROJ-001/PROJ-006: Multi-video count indicator for Admin/PM */}
-                {!isClientRole && videoFiles.length > 0 && (
+                {/* Update PROJ-010: Multi-video count indicator for both Client and Admin/PM */}
+                {videoFiles.length > 0 && (
                   <span className={cn(
                     "text-xs px-2 py-0.5 rounded-full",
                     isMultiVideo ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground"
@@ -967,28 +967,23 @@ export default function NewProjectPage() {
               </div>
             </CardHeader>
             <CardContent className="px-6 pb-6 pt-2">
-              {/* PROJ-006: Client role - one source video per project
-                  Update PROJ-001: Admin/PM can upload up to 50 videos (multi-Scene creation) */}
-              {((!isClientRole && videoFiles.length < 50) || (isClientRole && sourceFiles.length === 0)) && (
+              {/* Update PROJ-010: Both Client and Admin/PM can upload up to 50 videos (multi-Scene creation) */}
+              {videoFiles.length < 50 && (
                 <div
                   className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-8 hover:border-primary/50 transition-colors cursor-pointer"
                   onClick={() => handleFileUpload('source')}
                 >
                   <Upload className="h-10 w-10 text-muted-foreground mb-3" />
                   <p className="text-sm font-medium">
-                    {isClientRole ? 'Upload your source video' : 'Drag and drop files here'}
+                    {isClientRole ? 'Upload your source video(s)' : 'Drag and drop files here'}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">or click to browse</p>
                   <p className="text-xs text-muted-foreground mt-2">
                     Supports: MP4, MOV, MKV{!isClientRole && ', SRT, VTT'}
                   </p>
-                  {isClientRole ? (
-                    <p className="text-xs text-muted-foreground mt-1">One source video per project</p>
-                  ) : (
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Up to 50 videos — each creates a separate Scene
-                    </p>
-                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Up to 50 videos — each creates a separate Scene
+                  </p>
                 </div>
               )}
               
@@ -1870,17 +1865,67 @@ export default function NewProjectPage() {
       {/* Step 3: Notes & Review (Client) or Billing, Notes & Review (Admin/PM) */}
       {currentStep === 3 && (
         <div className="space-y-6">
-          {/* PROJ-010: Client sees Project Summary (no cost), Admin/PM sees full billing */}
+          {/* Update PROJ-010: Client sees Project Summary with Show + Scene, no cost */}
           {isClientRole ? (
             // CLIENT PROJECT SUMMARY (no pricing)
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Project Summary</CardTitle>
+                <CardTitle className="text-base">Scene Summary</CardTitle>
               </CardHeader>
               <CardContent className="px-6 pb-6 pt-2">
                 <div className="space-y-4">
+                  {/* Update PROJ-010: Show + Scene display */}
+                  <div className="rounded-lg bg-muted/30 p-3 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Show</span>
+                      <span className="font-medium">{selectedShow?.name || '-'}</span>
+                    </div>
+                    {!isMultiVideo && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Scene</span>
+                        <span className="font-medium">{sceneName}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Update PROJ-010: Multi-video Scene preview for client */}
+                  {isMultiVideo && (
+                    <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 space-y-3">
+                      <div className="flex items-center gap-2 text-blue-800">
+                        <Info className="h-4 w-4" />
+                        <span className="font-medium text-sm">{videoFiles.length} Scenes will be created</span>
+                      </div>
+                      <p className="text-xs text-blue-700">One per uploaded video. Scene names will use the video file names:</p>
+                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                        {videoFiles.slice(0, 10).map((video, idx) => {
+                          const autoName = video.name.replace(/\.[^/.]+$/, '')
+                          return (
+                            <div key={idx} className="flex items-center justify-between text-xs bg-white/50 rounded px-2 py-1">
+                              <span className="text-blue-800 truncate flex-1">{autoName}</span>
+                              {video.duration && (
+                                <span className="text-blue-600 ml-2 flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {video.duration} min
+                                </span>
+                              )}
+                            </div>
+                          )
+                        })}
+                        {videoFiles.length > 10 && (
+                          <p className="text-xs text-blue-600 pl-2">...and {videoFiles.length - 10} more scenes</p>
+                        )}
+                      </div>
+                      <div className="pt-2 border-t border-blue-200">
+                        <p className="text-xs text-blue-700">
+                          One <strong>approved quote per Scene</strong> will be generated. You&apos;ll assign team members per Scene after submission.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* Task Summary */}
                   <div className="space-y-3">
+                    <h4 className="text-sm font-medium text-muted-foreground">Tasks{isMultiVideo ? ' (per Scene)' : ''}</h4>
                     {selectedTaskTypes.map((st) => {
                       const taskCount = Math.max(1, st.languagePairs.length)
                       return (
@@ -1921,7 +1966,10 @@ export default function NewProjectPage() {
                   
                   {/* Footer notice */}
                   <p className="text-xs text-muted-foreground">
-                    NG will confirm pricing and timing for your project. You&apos;ll see updates in My Projects.
+                    {isMultiVideo 
+                      ? `${videoFiles.length} approved quotes will be generated — one per Scene. You'll see updates in My Projects.`
+                      : "NG will confirm pricing and timing for your project. You'll see updates in My Projects."
+                    }
                   </p>
                 </div>
               </CardContent>

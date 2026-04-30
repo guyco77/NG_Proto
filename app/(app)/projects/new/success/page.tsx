@@ -14,6 +14,8 @@ export default function ProjectSuccessPage() {
   // Update PROJ-001: Multi-scene creation support
   const sceneCount = parseInt(searchParams.get('scenes') || '1', 10)
   const isMultiScene = sceneCount > 1
+  // Update PROJ-010: Show name for client success page
+  const showName = searchParams.get('show') || ''
 
   // Update PROJ-001: Dynamic messaging for single vs multi-scene
   const getTitle = () => {
@@ -22,8 +24,12 @@ export default function ProjectSuccessPage() {
   }
 
   const getDescription = () => {
+    // Update PROJ-010: Client multi-video messaging with Show + per-Scene team assignment
     if (isClientCreated) {
-      return 'Your project is ready. Assign your team members to tasks, or hand off to NG.'
+      if (isMultiScene) {
+        return `${sceneCount} scenes have been created under "${showName}". One approved quote per scene. Assign your team members to tasks per scene, or hand off to NG.`
+      }
+      return `"${sceneName}" is ready under "${showName}". Assign your team members to tasks, or hand off to NG.`
     }
     if (isMultiScene) {
       return `${sceneCount} scenes have been created under the selected Show. Tasks and quotes generated per scene. All tasks are Unassigned — assign vendors to begin work.`
