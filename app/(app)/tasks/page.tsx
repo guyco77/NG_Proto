@@ -306,12 +306,16 @@ export default function TasksPage() {
     
     const vendor = mockVendors.find(v => v.id === selectedVendorId)
     
+    // TASK-004: Generate bulk-action id for traceability when bulk assigning
+    const bulkActionId = isBulkAssign ? `bulk-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` : null
+    
     // Update all tasks
     const updates: Record<string, { status: string; assignedVendor?: string; vendorId?: string }> = {}
     taskIdsToAssign.forEach(id => {
       updates[id] = { status: 'assigned', assignedVendor: vendor?.name, vendorId: selectedVendorId }
       
       // Audit logging - In production, recorded in audit_log table
+      // TASK-004: bulkActionId groups all entries from the same bulk action for traceability
       console.log('[Audit] Vendor assigned:', {
         taskId: id,
         actor: userName,
@@ -321,6 +325,7 @@ export default function TasksPage() {
         vendorName: vendor?.name,
         previousStatus: filteredTasks.find(t => t.id === id)?.status,
         newStatus: 'assigned',
+        bulkActionId, // null for single assign, unique ID for bulk assign
       })
     })
     setLocalTaskUpdates(prev => ({ ...prev, ...updates }))
@@ -469,12 +474,16 @@ export default function TasksPage() {
     
     if (unassignedIds.length === 0) return
     
+    // TASK-004: Generate bulk-action id for traceability
+    const bulkActionId = `bulk-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    
     // Update all unassigned tasks to open_for_offers
     const updates: Record<string, { status: string }> = {}
     unassignedIds.forEach(id => {
       updates[id] = { status: 'open_for_offers' }
       
       // Audit logging - In production, recorded in audit_log table
+      // bulkActionId groups all entries from the same bulk action for traceability
       console.log('[Audit] Bulk task posted as open offer:', {
         taskId: id,
         actor: userName,
@@ -482,6 +491,7 @@ export default function TasksPage() {
         action: 'bulk_posted_as_open_offer',
         previousStatus: 'unassigned',
         newStatus: 'open_for_offers',
+        bulkActionId,
       })
     })
     setLocalTaskUpdates(prev => ({ ...prev, ...updates }))
@@ -984,6 +994,22 @@ export default function TasksPage() {
                 No Unassigned tasks in selection. Select at least one Unassigned task to assign.
               </div>
             )}
+            
+            {/* TASK-004: No single vendor matches all selected tasks warning */}
+            {isBulkAssign && eligibleBulkTasks.length > 0 && (() => {
+              // In production, filter vendors who can handle ALL selected tasks' workflow step types + language pairs
+              // For mock, we simulate this - check if any vendor matches all task types
+              const requiredTypes = new Set(eligibleBulkTasks.map(t => t.serviceType))
+              const requiredLanguages = new Set(eligibleBulkTasks.map(t => t.targetLanguage))
+              // Mock: if more than 3 different types or languages, show warning
+              const noMatch = requiredTypes.size > 3 || requiredLanguages.size > 3
+              return noMatch ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  <AlertTriangle className="inline h-4 w-4 mr-1.5 -mt-0.5" />
+                  No single vendor matches all selected tasks. Assign individually.
+                </div>
+              ) : null
+            })()}
             
             {/* Search */}
             <Input
