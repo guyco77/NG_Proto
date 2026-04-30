@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   Search,
@@ -14,6 +15,10 @@ import {
   AlertTriangle,
   UserPlus,
   X,
+  FileCheck,
+  Trash2,
+  Send,
+  Undo2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -21,6 +26,16 @@ import { StatusBadge } from '@/components/status-badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +55,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import { useToast } from '@/hooks/use-toast'
 import { mockTasks, mockProjects, mockVendors, formatCurrency, formatDate, TASK_STATUSES, TASK_SERVICE_TYPES } from '@/lib/mock-data'
 import { useRole } from '../layout'
 import { cn } from '@/lib/utils'
@@ -48,13 +64,24 @@ import type { TaskStatus } from '@/lib/types'
 const ITEMS_PER_PAGE = 50
 
 function getServiceIcon(serviceType: string): string {
+  // Icons for all 16 canonical Task Step Types
   const icons: Record<string, string> = {
     'Transcription': '🎙️',
+    'Transcription AI': '🤖',
     'Timing': '⏱️',
+    'Timing AI': '⏰',
     'Translation': '🌐',
+    'Translation from Audio': '🎧',
+    'Upload TT': '📤',
+    'Upload Text File': '📄',
     'QC': '✅',
     'PM Verification': '📋',
+    'Proofread': '📝',
     'Client Review': '👤',
+    'Upload Client Asset': '📁',
+    'Upload Rough Cut': '🎬',
+    'New Cut': '✂️',
+    'Project Creation': '🆕',
   }
   return icons[serviceType] || '📄'
 }
@@ -65,6 +92,23 @@ function isOverdue(dateString: string): boolean {
 
 export default function TasksPage() {
   const { currentRole } = useRole()
+  const { toast } = useToast()
+  const searchParams = useSearchParams()
+  const acceptedTaskId = searchParams.get('accepted')
+  
+  // State for highlighting just-accepted task
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null)
+  
+  // Show highlight animation when task is just accepted from offers
+  useEffect(() => {
+    if (acceptedTaskId) {
+      setHighlightedTaskId(acceptedTaskId)
+      // Remove highlight after 3 seconds
+      const timer = setTimeout(() => setHighlightedTaskId(null), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [acceptedTaskId])
+  
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [projectFilters, setProjectFilters] = useState<string[]>([])
@@ -74,16 +118,55 @@ export default function TasksPage() {
   const [includeCompleted, setIncludeCompleted] = useState(false)
   const [selectedTasks, setSelectedTasks] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
+  
+  // TASK-003 & TASK-004: Assign Vendor dialog state (single or bulk)
+  const [showAssignDialog, setShowAssignDialog] = useState(false)
+  const [assigningTaskId, setAssigningTaskId] = useState<string | null>(null)
+  const [assigningTaskIds, setAssigningTaskIds] = useState<string[]>([]) // TASK-004: bulk assign
+  const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null)
+  const [vendorSearchQuery, setVendorSearchQuery] = useState('')
+  const [isAssigning, setIsAssigning] = useState(false)
+  
+  // TASK-009: Post as Open Offer dialog state
+  const [showOfferDialog, setShowOfferDialog] = useState(false)
+  const [offeringTaskId, setOfferingTaskId] = useState<string | null>(null)
+  const [offerDescription, setOfferDescription] = useState('')
+  const [isPosting, setIsPosting] = useState(false)
+  
+  // TASK-009: Withdraw Offer confirmation
+  const [showWithdrawDialog, setShowWithdrawDialog] = useState(false)
+  const [withdrawingTaskId, setWithdrawingTaskId] = useState<string | null>(null)
+  const [isWithdrawing, setIsWithdrawing] = useState(false)
+  
+  // Delete task dialog state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+  
+  // Local task state for inline updates (simulating backend)
+  const [localTaskUpdates, setLocalTaskUpdates] = useState<Record<string, { status?: string; assignedVendor?: string; vendorId?: string }>>({})
 
   const isAdmin = currentRole === 'admin'
   const isPM = currentRole === 'pm'
+  const isVendor = currentRole === 'vendor'
 
   // Filter tasks based on role and filters
   const filteredTasks = useMemo(() => {
-    let tasks = [...mockTasks]
+    // Apply local updates to mock tasks
+    let tasks = mockTasks.map(t => ({
+      ...t,
+      ...localTaskUpdates[t.id],
+    }))
+    
+    // Filter out deleted tasks
+    tasks = tasks.filter(t => t.status !== 'deleted')
 
     // Role-based filtering
-    if (isPM && !isAdmin) {
+    if (isVendor) {
+      // Vendor sees only their own assigned tasks (simulated with vendor id 'v1')
+      // In production, this is enforced at DB layer via RLS
+      tasks = tasks.filter(t => t.vendorId === 'v1')
+    } else if (isPM && !isAdmin) {
       // PM sees only tasks in projects assigned to them (simplified for mock - using PM id '2')
       const pmProjects = mockProjects.filter(p => p.pmId === '2').map(p => p.id)
       tasks = tasks.filter(t => pmProjects.includes(t.projectId))
@@ -141,7 +224,7 @@ export default function TasksPage() {
     })
 
     return tasks
-  }, [searchQuery, statusFilters, projectFilters, serviceTypeFilters, vendorFilter, sortBy, includeCompleted, isPM, isAdmin])
+  }, [searchQuery, statusFilters, projectFilters, serviceTypeFilters, vendorFilter, sortBy, includeCompleted, isPM, isAdmin, localTaskUpdates])
 
   // Pagination
   const totalPages = Math.ceil(filteredTasks.length / ITEMS_PER_PAGE)
@@ -190,16 +273,243 @@ export default function TasksPage() {
 
   // Count unassigned tasks in selection
   const unassignedSelected = selectedTasks.filter(id => {
-    const task = mockTasks.find(t => t.id === id)
+    const task = filteredTasks.find(t => t.id === id)
     return task && task.status === 'unassigned'
   }).length
+  
+  // Get task being assigned/offered for dialog context
+  const assigningTask = assigningTaskId ? filteredTasks.find(t => t.id === assigningTaskId) : null
+  const offeringTask = offeringTaskId ? filteredTasks.find(t => t.id === offeringTaskId) : null
+  const deletingTask = deletingTaskId ? filteredTasks.find(t => t.id === deletingTaskId) : null
+  
+  // TASK-004: Get tasks being bulk assigned
+  const bulkAssignTasks = assigningTaskIds.length > 0 
+    ? assigningTaskIds.map(id => filteredTasks.find(t => t.id === id)).filter(Boolean) as typeof filteredTasks
+    : []
+  const eligibleBulkTasks = bulkAssignTasks.filter(t => t.status === 'unassigned')
+  const ineligibleCount = bulkAssignTasks.length - eligibleBulkTasks.length
+  const isBulkAssign = assigningTaskIds.length > 0
+  
+  // TASK-003 & TASK-004: Handle vendor assignment (single or bulk)
+  const handleAssignVendor = async () => {
+    if (!selectedVendorId) return
+    
+    // Determine which tasks to assign
+    const taskIdsToAssign = isBulkAssign 
+      ? eligibleBulkTasks.map(t => t.id)
+      : (assigningTaskId ? [assigningTaskId] : [])
+    
+    if (taskIdsToAssign.length === 0) return
+    
+    setIsAssigning(true)
+    await new Promise(r => setTimeout(r, 500))
+    
+    const vendor = mockVendors.find(v => v.id === selectedVendorId)
+    
+    // TASK-004: Generate bulk-action id for traceability when bulk assigning
+    const bulkActionId = isBulkAssign ? `bulk-${Date.now()}-${Math.random().toString(36).substr(2, 9)}` : null
+    
+    // Update all tasks
+    const updates: Record<string, { status: string; assignedVendor?: string; vendorId?: string }> = {}
+    taskIdsToAssign.forEach(id => {
+      updates[id] = { status: 'assigned', assignedVendor: vendor?.name, vendorId: selectedVendorId }
+      
+      // Audit logging - In production, recorded in audit_log table
+      // TASK-004: bulkActionId groups all entries from the same bulk action for traceability
+      console.log('[Audit] Vendor assigned:', {
+        taskId: id,
+        actor: userName,
+        timestamp: new Date().toISOString(),
+        action: 'vendor_assigned',
+        vendorId: selectedVendorId,
+        vendorName: vendor?.name,
+        previousStatus: filteredTasks.find(t => t.id === id)?.status,
+        newStatus: 'assigned',
+        bulkActionId, // null for single assign, unique ID for bulk assign
+      })
+    })
+    setLocalTaskUpdates(prev => ({ ...prev, ...updates }))
+    
+    // Notifications - In production, vendor notified via email + in-app
+    // Toast message
+    if (isBulkAssign) {
+      toast({
+        title: `${vendor?.name} assigned to ${taskIdsToAssign.length} tasks.`,
+        description: 'Vendor has been notified via a single consolidated notification.',
+      })
+      setSelectedTasks([]) // Clear selection after bulk assign
+    } else {
+      toast({
+        title: `${vendor?.name} assigned to ${assigningTask?.name}.`,
+        description: 'Vendor has been notified via email and in-app notification.',
+      })
+    }
+    
+    setIsAssigning(false)
+    setShowAssignDialog(false)
+    setAssigningTaskId(null)
+    setAssigningTaskIds([])
+    setSelectedVendorId(null)
+    setVendorSearchQuery('')
+  }
+  
+  // TASK-004: Open bulk assign modal
+  const handleOpenBulkAssign = () => {
+    const unassignedIds = selectedTasks.filter(id => {
+      const task = filteredTasks.find(t => t.id === id)
+      return task && task.status === 'unassigned'
+    })
+    setAssigningTaskIds(selectedTasks) // Include all selected, we'll filter in modal
+    setShowAssignDialog(true)
+  }
+  
+// TASK-009: Handle post as open offer
+  const handlePostOffer = async () => {
+    if (!offeringTaskId) return
+    setIsPosting(true)
+    await new Promise(r => setTimeout(r, 500))
+    
+    const offeringTask = filteredTasks.find(t => t.id === offeringTaskId)
+    
+    // Audit logging - In production, recorded in audit_log table
+    console.log('[Audit] Task posted as open offer:', {
+      taskId: offeringTaskId,
+      actor: userName,
+      timestamp: new Date().toISOString(),
+      action: 'posted_as_open_offer',
+      previousStatus: offeringTask?.status,
+      newStatus: 'open_for_offers',
+      description: offerDescription || null,
+    })
+    
+    setLocalTaskUpdates(prev => ({
+      ...prev,
+      [offeringTaskId]: { status: 'open_for_offers' }
+    }))
+    
+    // Notifications - In production, matching vendors notified via email + in-app
+    toast({
+      title: 'Posted to Offers Board',
+      description: 'Matching vendors have been notified.',
+    })
+    
+    setIsPosting(false)
+    setShowOfferDialog(false)
+    setOfferingTaskId(null)
+    setOfferDescription('')
+  }
+  
+// TASK-009: Handle withdraw offer
+  const handleWithdrawOffer = async () => {
+    if (!withdrawingTaskId) return
+    setIsWithdrawing(true)
+    await new Promise(r => setTimeout(r, 500))
+    
+    // Audit logging - In production, recorded in audit_log table
+    console.log('[Audit] Offer withdrawn:', {
+      taskId: withdrawingTaskId,
+      actor: userName,
+      timestamp: new Date().toISOString(),
+      action: 'offer_withdrawn',
+      previousStatus: 'open_for_offers',
+      newStatus: 'unassigned',
+    })
+    
+    setLocalTaskUpdates(prev => ({
+      ...prev,
+      [withdrawingTaskId]: { status: 'unassigned' }
+    }))
+    
+    toast({
+      title: 'Offer Withdrawn',
+      description: 'Task returned to Unassigned status.',
+    })
+    
+    setIsWithdrawing(false)
+    setShowWithdrawDialog(false)
+    setWithdrawingTaskId(null)
+  }
+  
+// Delete task handler
+  const handleDeleteTask = async () => {
+    if (!deletingTaskId) return
+    setIsDeleting(true)
+    await new Promise(r => setTimeout(r, 500))
+    
+    const deletedTask = filteredTasks.find(t => t.id === deletingTaskId)
+    
+    // Audit logging - In production, recorded in audit_log table
+    console.log('[Audit] Task deleted:', {
+      taskId: deletingTaskId,
+      actor: userName,
+      timestamp: new Date().toISOString(),
+      action: 'task_soft_deleted',
+      taskName: deletedTask?.name,
+      previousStatus: deletedTask?.status,
+      wasOpenOffer: deletedTask?.status === 'open_for_offers',
+      recoverableUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+    })
+    
+    // Remove task from local view (soft delete - still recoverable by Admin for 30 days)
+    setDeletedTaskIds(prev => [...prev, deletingTaskId])
+    
+    toast({
+      title: 'Task deleted',
+      description: deletedTask?.status === 'open_for_offers'
+        ? 'Task deleted and open offer withdrawn. Admins can recover within 30 days.'
+        : 'Task has been soft-deleted. Admins can recover within 30 days.',
+    })
+    
+    setIsDeleting(false)
+    setShowDeleteDialog(false)
+    setDeletingTaskId(null)
+  }
+  
+  // Bulk post as open offer
+  const handleBulkPostOffer = async () => {
+    const unassignedIds = selectedTasks.filter(id => {
+      const task = filteredTasks.find(t => t.id === id)
+      return task && task.status === 'unassigned'
+    })
+    
+    if (unassignedIds.length === 0) return
+    
+    // TASK-004: Generate bulk-action id for traceability
+    const bulkActionId = `bulk-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    
+    // Update all unassigned tasks to open_for_offers
+    const updates: Record<string, { status: string }> = {}
+    unassignedIds.forEach(id => {
+      updates[id] = { status: 'open_for_offers' }
+      
+      // Audit logging - In production, recorded in audit_log table
+      // bulkActionId groups all entries from the same bulk action for traceability
+      console.log('[Audit] Bulk task posted as open offer:', {
+        taskId: id,
+        actor: userName,
+        timestamp: new Date().toISOString(),
+        action: 'bulk_posted_as_open_offer',
+        previousStatus: 'unassigned',
+        newStatus: 'open_for_offers',
+        bulkActionId,
+      })
+    })
+    setLocalTaskUpdates(prev => ({ ...prev, ...updates }))
+    
+    toast({
+      title: `${unassignedIds.length} tasks posted as open offers.`,
+      description: 'Matching vendors have been notified.',
+    })
+    
+    setSelectedTasks([])
+  }
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Tasks</h1>
-        <p className="text-sm text-muted-foreground mt-1">{filteredTasks.length} tasks</p>
+        <h1 className="text-2xl font-semibold text-foreground">{isVendor ? 'My Tasks' : 'Tasks'}</h1>
+        <p className="text-sm text-muted-foreground mt-1">{filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''}</p>
       </div>
 
       {/* Filters */}
@@ -327,20 +637,22 @@ export default function TasksPage() {
           </PopoverContent>
         </Popover>
 
-        {/* Vendor Filter */}
-        <Select value={vendorFilter} onValueChange={setVendorFilter}>
-          <SelectTrigger className="w-40 h-9">
-            <SelectValue placeholder="Vendor" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Vendors</SelectItem>
-            {mockVendors.map((vendor) => (
-              <SelectItem key={vendor.id} value={vendor.id}>
-                {vendor.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {/* Vendor Filter - hidden for vendors (they only see their own tasks) */}
+        {!isVendor && (
+          <Select value={vendorFilter} onValueChange={setVendorFilter}>
+            <SelectTrigger className="w-40 h-9">
+              <SelectValue placeholder="Vendor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Vendors</SelectItem>
+              {mockVendors.map((vendor) => (
+                <SelectItem key={vendor.id} value={vendor.id}>
+                  {vendor.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
 
         {/* Sort */}
         <Select value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
@@ -394,17 +706,23 @@ export default function TasksPage() {
         </div>
       )}
 
-      {/* Bulk Action Bar */}
-      {selectedTasks.length > 0 && (
+      {/* Bulk Action Bar - Admin/PM only */}
+      {!isVendor && selectedTasks.length > 0 && (
         <div className="mb-4 flex items-center gap-4 rounded-lg bg-muted p-3">
           <span className="text-sm font-medium">{selectedTasks.length} tasks selected</span>
-          {unassignedSelected > 0 && selectedTasks.length <= 50 ? (
-            <Button size="sm" className="gap-1.5">
-              <UserPlus className="h-4 w-4" />
-              Assign Vendor to {unassignedSelected} Unassigned
-            </Button>
-          ) : selectedTasks.length > 50 ? (
-            <span className="text-sm text-muted-foreground">Select up to 50 tasks at a time for bulk assign</span>
+          {selectedTasks.length > 50 ? (
+            <span className="text-sm text-muted-foreground">Select up to 50 tasks at a time for bulk actions</span>
+          ) : unassignedSelected > 0 ? (
+            <>
+              <Button size="sm" className="gap-1.5" onClick={handleOpenBulkAssign}>
+                <UserPlus className="h-4 w-4" />
+                Assign Vendor to {unassignedSelected} Unassigned
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={handleBulkPostOffer}>
+                <Send className="h-4 w-4" />
+                Post {unassignedSelected} as Open Offer
+              </Button>
+            </>
           ) : (
             <span className="text-sm text-muted-foreground">No unassigned tasks selected</span>
           )}
@@ -420,16 +738,20 @@ export default function TasksPage() {
           <table className="w-full">
             <thead className="border-b border-border bg-muted/50">
               <tr>
-                <th className="w-10 px-4 py-3">
-                  <Checkbox
-                    checked={selectedTasks.length === paginatedTasks.length && paginatedTasks.length > 0}
-                    onCheckedChange={toggleAllSelection}
-                  />
-                </th>
+                {/* Checkbox column hidden for vendors - no bulk actions */}
+                {!isVendor && (
+                  <th className="w-10 px-4 py-3">
+                    <Checkbox
+                      checked={selectedTasks.length === paginatedTasks.length && paginatedTasks.length > 0}
+                      onCheckedChange={toggleAllSelection}
+                    />
+                  </th>
+                )}
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Task</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Project</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Language</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Vendor</th>
+                {/* Vendor column hidden for vendors - they only see their own tasks */}
+                {!isVendor && <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Vendor</th>}
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">Deadline</th>
                 <th className="w-10 px-4 py-3"></th>
@@ -438,20 +760,25 @@ export default function TasksPage() {
             <tbody className="divide-y divide-border">
               {paginatedTasks.map((task) => {
                 const taskOverdue = isOverdue(task.dueDate) && task.status !== 'complete'
+                const isHighlighted = highlightedTaskId === task.id
                 return (
                   <tr 
                     key={task.id} 
                     className={cn(
-                      "hover:bg-muted/50",
-                      taskOverdue && "bg-red-50/50"
+                      "hover:bg-muted/50 transition-colors duration-500",
+                      taskOverdue && "bg-red-50/50",
+                      isHighlighted && "animate-pulse bg-emerald-50 ring-2 ring-emerald-500 ring-inset"
                     )}
                   >
-                    <td className="px-4 py-3">
-                      <Checkbox
-                        checked={selectedTasks.includes(task.id)}
-                        onCheckedChange={() => toggleTaskSelection(task.id)}
-                      />
-                    </td>
+                    {/* Checkbox column hidden for vendors */}
+                    {!isVendor && (
+                      <td className="px-4 py-3">
+                        <Checkbox
+                          checked={selectedTasks.includes(task.id)}
+                          onCheckedChange={() => toggleTaskSelection(task.id)}
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <Link href={`/tasks/${task.id}`} className="hover:text-primary">
                         <div className="flex items-center gap-2">
@@ -479,31 +806,42 @@ export default function TasksPage() {
                         <span className="text-sm text-muted-foreground">-</span>
                       )}
                     </td>
-                    <td className="px-4 py-3">
-                      {task.assignedVendor ? (
-                        <div className="flex items-center gap-2">
-                          <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
-                            <User className="h-3 w-3 text-primary" />
+                    {/* Vendor column hidden for vendors */}
+                    {!isVendor && (
+                      <td className="px-4 py-3">
+                        {task.assignedVendor ? (
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
+                              <User className="h-3 w-3 text-primary" />
+                            </div>
+                            <span className="text-sm">{task.assignedVendor}</span>
                           </div>
-                          <span className="text-sm">{task.assignedVendor}</span>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">Unassigned</span>
-                      )}
-                    </td>
+                        ) : (
+                          <span className="text-sm text-muted-foreground">Unassigned</span>
+                        )}
+                      </td>
+                    )}
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <StatusBadge status={task.status} />
                         {taskOverdue && (
-                          <AlertTriangle className="h-4 w-4 text-red-500" />
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                            <AlertTriangle className="h-3 w-3" />
+                            Overdue
+                          </span>
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <Calendar className={cn("h-4 w-4", taskOverdue ? "text-red-500" : "text-muted-foreground")} />
                         <span className={cn(taskOverdue && "text-red-600 font-medium")}>
                           {formatDate(task.dueDate)}
+                          {taskOverdue && (
+                            <span className="ml-1 text-red-500">
+                              ({Math.ceil((new Date().getTime() - new Date(task.dueDate).getTime()) / (1000 * 60 * 60 * 24))}d overdue)
+                            </span>
+                          )}
                         </span>
                       </div>
                     </td>
@@ -514,19 +852,62 @@ export default function TasksPage() {
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem asChild>
-                            <Link href={`/tasks/${task.id}`}>View Details</Link>
-                          </DropdownMenuItem>
-                          {task.status === 'unassigned' && (
-                            <DropdownMenuItem>Assign Vendor</DropdownMenuItem>
-                          )}
-                          {task.status === 'unassigned' && (
-                            <DropdownMenuItem>Post as Open Offer</DropdownMenuItem>
-                          )}
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem className="text-destructive">Delete Task</DropdownMenuItem>
-                        </DropdownMenuContent>
+<DropdownMenuContent align="end">
+                                          <DropdownMenuItem asChild>
+                                            <Link href={`/tasks/${task.id}`}>View Details</Link>
+                                          </DropdownMenuItem>
+                                          {/* Admin/PM-only actions - hidden for vendors */}
+                                          {!isVendor && (
+                                            <>
+                                              {/* TASK-003: Assign Vendor - available for unassigned and open_for_offers */}
+                                              {(task.status === 'unassigned' || task.status === 'open_for_offers') && (
+                                                <DropdownMenuItem onClick={() => {
+                                                  setAssigningTaskId(task.id)
+                                                  setShowAssignDialog(true)
+                                                }}>
+                                                  <UserPlus className="mr-2 h-4 w-4" />
+                                                  Assign Vendor
+                                                </DropdownMenuItem>
+                                              )}
+                                              {/* TASK-009: Post as Open Offer - only for unassigned */}
+                                              {task.status === 'unassigned' && (
+                                                <DropdownMenuItem onClick={() => {
+                                                  setOfferingTaskId(task.id)
+                                                  setShowOfferDialog(true)
+                                                }}>
+                                                  <Send className="mr-2 h-4 w-4" />
+                                                  Post as Open Offer
+                                                </DropdownMenuItem>
+                                              )}
+                                              {/* TASK-009: Withdraw Offer - only for open_for_offers */}
+                                              {task.status === 'open_for_offers' && (
+                                                <DropdownMenuItem onClick={() => {
+                                                  setWithdrawingTaskId(task.id)
+                                                  setShowWithdrawDialog(true)
+                                                }}>
+                                                  <Undo2 className="mr-2 h-4 w-4" />
+                                                  Withdraw Offer
+                                                </DropdownMenuItem>
+                                              )}
+                                              {/* Delete Task - not shown for assigned, in_progress, submitted, complete */}
+                                              {!['assigned', 'in_progress', 'submitted', 'complete'].includes(task.status) && (
+                                                <>
+                                                  <DropdownMenuSeparator />
+                                                  <DropdownMenuItem 
+                                                    className="text-destructive"
+                                                    onClick={() => {
+                                                      setDeletingTaskId(task.id)
+                                                      setShowDeleteDialog(true)
+                                                    }}
+                                                  >
+                                                    <Trash2 className="mr-2 h-4 w-4" />
+                                                    Delete Task
+                                                  </DropdownMenuItem>
+                                                </>
+                                              )}
+                                            </>
+                                          )}
+                                        </DropdownMenuContent>
                       </DropdownMenu>
                     </td>
                   </tr>
@@ -575,6 +956,258 @@ export default function TasksPage() {
           )}
         </CardContent>
       </Card>
+      
+      {/* TASK-003 & TASK-004: Assign Vendor Modal (single or bulk) */}
+      <Dialog open={showAssignDialog} onOpenChange={(open) => {
+        setShowAssignDialog(open)
+        if (!open) {
+          setAssigningTaskId(null)
+          setAssigningTaskIds([])
+          setSelectedVendorId(null)
+          setVendorSearchQuery('')
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Assign Vendor</DialogTitle>
+            <DialogDescription>
+              {isBulkAssign ? (
+                <>Select a vendor for {eligibleBulkTasks.length} task{eligibleBulkTasks.length !== 1 ? 's' : ''}</>
+              ) : assigningTask ? (
+                <>Select a vendor for {assigningTask.serviceType || assigningTask.service} ({assigningTask.sourceLanguage} → {assigningTask.targetLanguage})</>
+              ) : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {/* TASK-004: Ineligible tasks banner */}
+            {isBulkAssign && ineligibleCount > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                <AlertTriangle className="inline h-4 w-4 mr-1.5 -mt-0.5" />
+                {ineligibleCount} of {bulkAssignTasks.length} selected tasks aren&apos;t Unassigned and will be skipped.
+              </div>
+            )}
+            
+            {/* TASK-004: No eligible tasks warning */}
+            {isBulkAssign && eligibleBulkTasks.length === 0 && (
+              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertTriangle className="inline h-4 w-4 mr-1.5 -mt-0.5" />
+                No Unassigned tasks in selection. Select at least one Unassigned task to assign.
+              </div>
+            )}
+            
+            {/* TASK-004: No single vendor matches all selected tasks warning */}
+            {isBulkAssign && eligibleBulkTasks.length > 0 && (() => {
+              // In production, filter vendors who can handle ALL selected tasks' workflow step types + language pairs
+              // For mock, we simulate this - check if any vendor matches all task types
+              const requiredTypes = new Set(eligibleBulkTasks.map(t => t.serviceType))
+              const requiredLanguages = new Set(eligibleBulkTasks.map(t => t.targetLanguage))
+              // Mock: if more than 3 different types or languages, show warning
+              const noMatch = requiredTypes.size > 3 || requiredLanguages.size > 3
+              return noMatch ? (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  <AlertTriangle className="inline h-4 w-4 mr-1.5 -mt-0.5" />
+                  No single vendor matches all selected tasks. Assign individually.
+                </div>
+              ) : null
+            })()}
+            
+            {/* Search */}
+            <Input
+              placeholder="Search vendors..."
+              value={vendorSearchQuery}
+              onChange={(e) => setVendorSearchQuery(e.target.value)}
+            />
+            
+            {/* Vendor List */}
+            <div className="max-h-80 overflow-y-auto space-y-2">
+              {mockVendors
+                .filter(v => v.name.toLowerCase().includes(vendorSearchQuery.toLowerCase()))
+                .sort((a, b) => {
+                  // Sort by availability first (Available > Limited > Unavailable)
+                  const availOrder = { available: 0, limited: 1, unavailable: 2 }
+                  const aOrder = availOrder[a.availability as keyof typeof availOrder] ?? 2
+                  const bOrder = availOrder[b.availability as keyof typeof availOrder] ?? 2
+                  if (aOrder !== bOrder) return aOrder - bOrder
+                  // Then by on-time rate
+                  return (b.onTimeRate || 0) - (a.onTimeRate || 0)
+                })
+                .map((vendor) => {
+                  const isUnavailable = vendor.availability === 'unavailable'
+                  const availabilityIcon = vendor.availability === 'available' ? '🟢' : vendor.availability === 'limited' ? '🟡' : '🔴'
+                  
+                  return (
+                    <div
+                      key={vendor.id}
+                      onClick={() => !isUnavailable && setSelectedVendorId(vendor.id)}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                        selectedVendorId === vendor.id 
+                          ? "border-primary bg-primary/5" 
+                          : "border-border hover:border-primary/50",
+                        isUnavailable && "opacity-50 cursor-not-allowed hover:border-border"
+                      )}
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                        <User className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{vendor.name}</span>
+                          <span title={`${vendor.availability}`}>{availabilityIcon}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground space-y-0.5">
+                          <p>
+                            {vendor.tasksDelivered || 0} tasks delivered in {isBulkAssign ? 'selected types' : (assigningTask?.serviceType || 'Translation')}, {vendor.onTimeRate || 95}% on-time
+                          </p>
+                          <p>{vendor.activeTasks || 0} active task{(vendor.activeTasks || 0) !== 1 ? 's' : ''} this week</p>
+                        </div>
+                      </div>
+                      {selectedVendorId === vendor.id && (
+                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          <FileCheck className="h-3 w-3" />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              
+              {mockVendors.filter(v => v.name.toLowerCase().includes(vendorSearchQuery.toLowerCase())).length === 0 && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                  No vendors available for this service type.
+                </p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowAssignDialog(false)
+              setAssigningTaskId(null)
+              setAssigningTaskIds([])
+              setSelectedVendorId(null)
+              setVendorSearchQuery('')
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAssignVendor}
+              disabled={!selectedVendorId || isAssigning || (isBulkAssign && eligibleBulkTasks.length === 0)}
+            >
+              {isAssigning ? 'Assigning...' : isBulkAssign ? `Assign to ${eligibleBulkTasks.length} Tasks` : 'Assign'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* TASK-009: Post as Open Offer Dialog */}
+      <Dialog open={showOfferDialog} onOpenChange={(open) => {
+        setShowOfferDialog(open)
+        if (!open) {
+          setOfferingTaskId(null)
+          setOfferDescription('')
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Post as Open Offer</DialogTitle>
+            <DialogDescription>
+              Post this task to the vendor offers board? Matching vendors will be notified.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {offeringTask && (
+              <div className="rounded-lg border border-border bg-muted/30 p-3">
+                <p className="font-medium text-sm">{offeringTask.name}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {offeringTask.serviceType || offeringTask.service} · {offeringTask.sourceLanguage} → {offeringTask.targetLanguage}
+                </p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label htmlFor="offer-description">Additional instructions (optional)</Label>
+              <Textarea
+                id="offer-description"
+                placeholder="Add any special requirements or notes for vendors..."
+                value={offerDescription}
+                onChange={(e) => setOfferDescription(e.target.value)}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowOfferDialog(false)
+              setOfferingTaskId(null)
+              setOfferDescription('')
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handlePostOffer} disabled={isPosting}>
+              {isPosting ? 'Posting...' : 'Post Offer'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* TASK-009: Withdraw Offer Confirmation Dialog */}
+      <Dialog open={showWithdrawDialog} onOpenChange={(open) => {
+        setShowWithdrawDialog(open)
+        if (!open) setWithdrawingTaskId(null)
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Withdraw Offer?</DialogTitle>
+            <DialogDescription>
+              This will remove the task from the vendor offers board and revert it to Unassigned status.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowWithdrawDialog(false)
+              setWithdrawingTaskId(null)
+            }}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleWithdrawOffer} disabled={isWithdrawing}>
+              {isWithdrawing ? 'Withdrawing...' : 'Withdraw Offer'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Delete Task Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={(open) => {
+        setShowDeleteDialog(open)
+        if (!open) setDeletingTaskId(null)
+      }}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Delete Task?</DialogTitle>
+            <DialogDescription>
+              {deletingTask && (
+                <>
+                  Are you sure you want to delete &quot;{deletingTask.name}&quot;? This action will soft-delete the task. Admins can recover it within 30 days.
+                  {deletingTask.status === 'open_for_offers' && (
+                    <span className="block mt-2 text-amber-600">
+                      Note: This task has an active open offer which will be automatically withdrawn.
+                    </span>
+                  )}
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowDeleteDialog(false)
+              setDeletingTaskId(null)
+            }}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteTask} disabled={isDeleting}>
+              {isDeleting ? 'Deleting...' : 'Delete Task'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

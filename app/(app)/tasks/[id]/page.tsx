@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useState } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Calendar,
@@ -18,6 +19,7 @@ import {
   AlertTriangle,
   Trash2,
   RefreshCw,
+  ArrowLeft,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { OpenInEditorButton } from '@/components/open-in-editor-button'
@@ -51,6 +53,7 @@ import {
 import { mockTasks, mockProjects, mockVendors, formatCurrency, formatDate, formatDateTime, TASK_STATUSES } from '@/lib/mock-data'
 import { Input } from '@/components/ui/input'
 import { useRole } from '../../layout'
+import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import type { TaskStatus } from '@/lib/types'
 
@@ -132,11 +135,19 @@ function getServiceIcon(serviceType: string): string {
 
 export default function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const searchParams = useSearchParams()
+  const router = useRouter()
   const { currentRole, userName } = useRole()
+  const { toast } = useToast()
   const task = mockTasks.find((t) => t.id === id) || mockTasks[0]
   const project = mockProjects.find((p) => p.id === task.projectId)
   
+  // TASK-011: Back to Project navigation
+  const fromProject = searchParams.get('from') === 'project'
+  const originProjectId = searchParams.get('projectId')
+  
   const [notes, setNotes] = useState(mockTaskNotes)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [newNote, setNewNote] = useState('')
   const [isBlocker, setIsBlocker] = useState(false)
   const [isSendingNote, setIsSendingNote] = useState(false)
@@ -185,14 +196,64 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   }
 
   const handleStatusChange = (newStatus: TaskStatus) => {
+    const previousStatus = currentStatus
     setCurrentStatus(newStatus)
-    // In a real app, this would call an API
+    
+    // TASK-002: Audit logging - In production, this is recorded in the audit_log table
+    // with actor (userName), timestamp, task_id, previous_status, new_status
+    console.log('[Audit] Status transition:', {
+      taskId: task.id,
+      actor: userName,
+      timestamp: new Date().toISOString(),
+      previousStatus,
+      newStatus,
+    })
+    
+    // TASK-002: Notifications on key transitions
+    // In production, these trigger email + in-app notifications via notification service
+    const notificationMessages: Record<string, string> = {
+      'open_for_offers': 'Task posted to Offers Board. Matching vendors notified.',
+      'assigned': task.assignedVendor 
+        ? `${task.assignedVendor} has been notified of assignment.`
+        : 'Vendor assignment notification sent.',
+      'submitted': 'PM notified: Task submitted for review.',
+      'in_progress': previousStatus === 'submitted' 
+        ? 'Vendor notified: Task sent back for rework.'
+        : 'Task started.',
+      'complete': 'Task completed. PM notified.',
+      'unassigned': previousStatus === 'open_for_offers'
+        ? 'Offer withdrawn from board.'
+        : 'Task unassigned.',
+    }
+    
+    if (notificationMessages[newStatus]) {
+      toast({
+        title: `Status: ${newStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`,
+        description: notificationMessages[newStatus],
+      })
+    }
   }
 
-  const handleDeleteTask = () => {
-    // In a real app, this would call an API for soft delete
+  const handleDeleteTask = async () => {
+    setIsDeleting(true)
+    // Simulate API call for soft delete
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // If task was open_for_offers, the offer is withdrawn as part of deletion
+    const wasOpenOffer = currentStatus === 'open_for_offers'
+    
     setShowDeleteDialog(false)
+    setIsDeleting(false)
+    
+    toast({
+      title: 'Task deleted',
+      description: wasOpenOffer 
+        ? 'Task deleted and open offer withdrawn. Admin can recover within 30 days.'
+        : 'Task has been soft-deleted. Admin can recover within 30 days.',
+    })
+    
     // Navigate back to tasks list
+    router.push('/tasks')
   }
 
   return (
@@ -201,6 +262,16 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       <div className="border-b border-border bg-card px-6 py-4">
         <div className="flex items-start justify-between">
           <div>
+            {/* TASK-011: Back to Project navigation */}
+            {fromProject && originProjectId && project && (
+              <Link 
+                href={`/projects/${originProjectId}`}
+                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2 transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to {project.name}
+              </Link>
+            )}
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-semibold text-foreground">{task.name}</h1>
               <StatusBadge status={currentStatus} />
@@ -212,10 +283,21 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               )}
             </div>
             {project && (
-              <Link href={`/projects/${project.id}`} className="mt-1 flex items-center gap-1 text-muted-foreground hover:text-foreground">
-                <FolderKanban className="h-4 w-4" />
-                {project.name}
-              </Link>
+              <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">{project.client}</span>
+                <span>·</span>
+                <Link href={`/projects/${project.id}`} className="flex items-center gap-1 hover:text-foreground">
+                  <FolderKanban className="h-4 w-4" />
+                  {project.name}
+                </Link>
+                {/* Service name visible to Admin/PM only */}
+                {(isAdmin || isPM) && task.service && (
+                  <>
+                    <span>·</span>
+                    <span className="text-muted-foreground">{task.service}</span>
+                  </>
+                )}
+              </div>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -232,31 +314,34 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               isAssignedVendor={isAssignedVendor}
               canView={canEditTask}
             />
-            {currentStatus === 'assigned' && isAssignedVendor && (
+            {/* Vendor actions - hidden when task is complete (read-only state) */}
+            {!isTaskComplete && currentStatus === 'assigned' && isAssignedVendor && (
               <Button variant="outline" className="gap-1.5" onClick={() => handleStatusChange('in_progress')}>
                 <Play className="h-4 w-4" />
                 Start Task
               </Button>
             )}
-            {currentStatus === 'in_progress' && isAssignedVendor && (
+            {!isTaskComplete && currentStatus === 'in_progress' && isAssignedVendor && (
               <Button variant="outline" className="gap-1.5" onClick={() => handleStatusChange('submitted')}>
                 <FileCheck className="h-4 w-4" />
                 Submit for Review
               </Button>
             )}
-            {!task.assignedVendor && canEditTask && (
+            {/* PM/Admin actions - hidden when task is complete (read-only state) */}
+            {!isTaskComplete && !task.assignedVendor && canEditTask && (
               <Button variant="outline" className="gap-1.5" onClick={() => setShowAssignDialog(true)}>
                 <UserPlus className="h-4 w-4" />
                 Assign Vendor
               </Button>
             )}
-            {task.assignedVendor && canEditTask && currentStatus !== 'complete' && (
+            {!isTaskComplete && task.assignedVendor && canEditTask && (
               <Button variant="outline" className="gap-1.5" onClick={() => setShowReassignDialog(true)}>
                 <RefreshCw className="h-4 w-4" />
                 Reassign
               </Button>
             )}
-            {canEditTask && (
+            {/* Actions menu - hidden for complete tasks (fully read-only) */}
+            {canEditTask && !isTaskComplete && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon">
@@ -285,15 +370,13 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                     </>
                   )}
                   <DropdownMenuSeparator />
-                  {!isTaskComplete && (
-                    <DropdownMenuItem 
-                      className="text-destructive"
-                      onClick={() => setShowDeleteDialog(true)}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete Task
-                    </DropdownMenuItem>
-                  )}
+                  <DropdownMenuItem 
+                    className="text-destructive"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Task
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -313,7 +396,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               <CardContent className="px-6 pb-6 pt-2">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Service Type</p>
+                    <p className="text-sm text-muted-foreground">Task Type</p>
                     <div className="flex items-center gap-2">
                       <span>{getServiceIcon(task.serviceType || 'Translation')}</span>
                       <p className="font-medium">{task.serviceType || task.service}</p>
@@ -528,78 +611,88 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Assigned Vendor */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold">Assigned To</CardTitle>
-              </CardHeader>
-              <CardContent className="px-6 pb-6 pt-2">
-                {task.assignedVendor ? (
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                      <User className="h-5 w-5 text-primary" />
+            {/* Assigned Vendor - visible to Admin/PM only (vendors only see their own tasks) */}
+            {(isAdmin || isPM) && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-semibold">Assigned To</CardTitle>
+                </CardHeader>
+                <CardContent className="px-6 pb-6 pt-2">
+                  {task.assignedVendor ? (
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                        <User className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{task.assignedVendor}</p>
+                        <p className="text-sm text-muted-foreground">Vendor</p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-medium">{task.assignedVendor}</p>
-                      <p className="text-sm text-muted-foreground">Vendor</p>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-sm text-muted-foreground mb-3">Unassigned</p>
+                      {canEditTask && (
+                        <Button variant="outline" className="gap-2 w-full" onClick={() => setShowAssignDialog(true)}>
+                          <UserPlus className="h-4 w-4" />
+                          Assign Vendor
+                        </Button>
+                      )}
                     </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <p className="text-sm text-muted-foreground mb-3">Unassigned</p>
-                    {canEditTask && (
-                      <Button variant="outline" className="gap-2 w-full" onClick={() => setShowAssignDialog(true)}>
-                        <UserPlus className="h-4 w-4" />
-                        Assign Vendor
-                      </Button>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  )}
+                </CardContent>
+              </Card>
+            )}
 
-            {/* Task Info */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold">Task Info</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Price</span>
-                  <span className="font-medium">{formatCurrency(task.price)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Service</span>
-                  <span className="font-medium text-sm">{task.service}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Project</span>
-                  <Link href={`/projects/${task.projectId}`} className="font-medium text-sm text-primary hover:underline">
-                    {task.projectName}
-                  </Link>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+            </div>
+        </div>
+        
+        {/* Payment Section - at the bottom of the page per Update TASK-001 */}
+        <div className="mt-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">Payment</CardTitle>
+            </CardHeader>
+            <CardContent className="px-6 pb-6 pt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Amount</span>
+                <span className="font-semibold text-lg">{formatCurrency(task.price)}</span>
+              </div>
+              {isVendor && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  This is your payment for this task.
+                </p>
+              )}
+              {(isAdmin || isPM) && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Payment to assigned vendor for this task.
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <Dialog open={showDeleteDialog} onOpenChange={(open) => !isDeleting && setShowDeleteDialog(open)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Task</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this task? This action will archive the task. 
+              Are you sure you want to delete &quot;{task.name}&quot;? This action will archive the task. 
               An Admin can recover it within 30 days.
+              {currentStatus === 'open_for_offers' && (
+                <span className="block mt-2 text-amber-600">
+                  Note: This task has an active open offer which will be automatically withdrawn.
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteTask}>
-              Delete Task
+            <Button variant="destructive" onClick={handleDeleteTask} disabled={isDeleting}>
+              {isDeleting ? 'Deleting...' : 'Delete Task'}
             </Button>
           </DialogFooter>
         </DialogContent>

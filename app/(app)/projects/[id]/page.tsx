@@ -29,6 +29,8 @@ import {
   Copy,
   Split,
   AlertTriangle,
+  UserPlus,
+  Check,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,6 +42,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DropdownMenu,
@@ -141,6 +144,20 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false)
   const [newTaskService, setNewTaskService] = useState('')
   const [newTaskLanguage, setNewTaskLanguage] = useState('')
+  
+  // TASK-004: Multi-select state for tasks
+  const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
+  const [showBulkAssignDialog, setShowBulkAssignDialog] = useState(false)
+  const [bulkSelectedVendorId, setBulkSelectedVendorId] = useState<string | null>(null)
+  const [bulkVendorSearchQuery, setBulkVendorSearchQuery] = useState('')
+  const [isBulkAssigning, setIsBulkAssigning] = useState(false)
+  const [localTaskUpdates, setLocalTaskUpdates] = useState<Record<string, { status?: string; assignedVendor?: string }>>({})
+  
+  // Apply local updates to project tasks
+  const updatedProjectTasks = projectTasks.map(t => ({ ...t, ...localTaskUpdates[t.id] }))
+  const selectedTasks = updatedProjectTasks.filter(t => selectedTaskIds.includes(t.id))
+  const eligibleForAssign = selectedTasks.filter(t => t.status === 'unassigned')
+  const ineligibleCount = selectedTasks.length - eligibleForAssign.length
   
   // File replacement refs
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -458,6 +475,40 @@ const handleCancelEdit = () => {
   
   const handleRetryFailed = () => {
     handleSplitProject(true, splitResult.failedEpisodes)
+  }
+  
+  // TASK-004: Toggle task selection
+  const toggleTaskSelection = (taskId: string) => {
+    setSelectedTaskIds(prev => 
+      prev.includes(taskId) 
+        ? prev.filter(id => id !== taskId)
+        : [...prev, taskId]
+    )
+  }
+  
+  // TASK-004: Handle bulk vendor assignment
+  const handleBulkAssignVendor = async () => {
+    if (!bulkSelectedVendorId || eligibleForAssign.length === 0) return
+    setIsBulkAssigning(true)
+    await new Promise(r => setTimeout(r, 500))
+    
+    const vendor = mockVendors.find(v => v.id === bulkSelectedVendorId)
+    const updates: Record<string, { status: string; assignedVendor?: string }> = {}
+    eligibleForAssign.forEach(t => {
+      updates[t.id] = { status: 'assigned', assignedVendor: vendor?.name }
+    })
+    setLocalTaskUpdates(prev => ({ ...prev, ...updates }))
+    
+    toast({
+      title: `${vendor?.name} assigned to ${eligibleForAssign.length} tasks.`,
+      description: 'Vendor has been notified via a single consolidated notification.',
+    })
+    
+    setIsBulkAssigning(false)
+    setShowBulkAssignDialog(false)
+    setSelectedTaskIds([])
+    setBulkSelectedVendorId(null)
+    setBulkVendorSearchQuery('')
   }
 
   const handleAddTask = () => {
@@ -925,41 +976,70 @@ const handleCancelEdit = () => {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-base font-semibold">Task Pipeline</CardTitle>
-                {canEditStatus && project.status !== 'draft' && project.status !== 'quoted' && (
-                  <Button size="sm" className="gap-1.5" onClick={() => setShowAddTaskDialog(true)}>
-                    <Plus className="h-4 w-4" />
-                    Add Task
-                  </Button>
-                )}
-                {(project.status === 'draft' || project.status === 'quoted') && canEditStatus && (
-                  <Button size="sm" className="gap-1.5" disabled title="Approve quote to add tasks">
-                    <Plus className="h-4 w-4" />
-                    Add Task
-                  </Button>
-                )}
+                <div className="flex items-center gap-2">
+                  {/* TASK-004: Bulk action bar */}
+                  {(isAdmin || isPM) && selectedTaskIds.length > 0 && (
+                    <div className="flex items-center gap-2 mr-2">
+                      <span className="text-xs text-muted-foreground">{selectedTaskIds.length} selected</span>
+                      {selectedTaskIds.length <= 50 && eligibleForAssign.length > 0 && (
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" onClick={() => setShowBulkAssignDialog(true)}>
+                          <UserPlus className="h-3 w-3" />
+                          Assign ({eligibleForAssign.length})
+                        </Button>
+                      )}
+                      <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setSelectedTaskIds([])}>
+                        Clear
+                      </Button>
+                    </div>
+                  )}
+                  {canEditStatus && project.status !== 'draft' && project.status !== 'quoted' && (
+                    <Button size="sm" className="gap-1.5" onClick={() => setShowAddTaskDialog(true)}>
+                      <Plus className="h-4 w-4" />
+                      Add Task
+                    </Button>
+                  )}
+                  {(project.status === 'draft' || project.status === 'quoted') && canEditStatus && (
+                    <Button size="sm" className="gap-1.5" disabled title="Approve quote to add tasks">
+                      <Plus className="h-4 w-4" />
+                      Add Task
+                    </Button>
+                  )}
+                </div>
               </CardHeader>
               <CardContent className="px-6 pb-6 pt-2">
-                {projectTasks.length > 0 ? (
+                {updatedProjectTasks.length > 0 ? (
                   <div className="overflow-x-auto">
                     <div className="flex items-center min-w-max pb-6">
-                      {projectTasks.map((task, index) => (
+                      {updatedProjectTasks.map((task, index) => (
                         <div key={task.id} className="flex items-center">
                           {/* Connector line before card (except first) */}
                           {index > 0 && (
                             <div className="w-8 h-0.5 bg-gray-300" />
                           )}
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Link href={`/tasks/${task.id}`}>
-                                  <div className={cn(
-                                    'relative flex flex-col items-center justify-center p-4 rounded-lg border-2 w-[120px] h-[120px] cursor-pointer transition-all hover:shadow-md',
-                                    task.status === 'completed' ? 'border-emerald-500 bg-emerald-50' :
-                                    task.status === 'in_progress' ? 'border-blue-500 bg-blue-50' :
-                                    task.status === 'review' ? 'border-purple-500 bg-purple-50' :
-                                    task.status === 'assigned' ? 'border-amber-500 bg-amber-50' :
-                                    'border-gray-200 bg-gray-50'
-                                  )}>
+                          <div className="relative">
+                            {/* TASK-004: Checkbox for multi-select (Admin/PM only) */}
+                            {(isAdmin || isPM) && (
+                              <div className="absolute -top-2 -left-2 z-10">
+                                <Checkbox
+                                  checked={selectedTaskIds.includes(task.id)}
+                                  onCheckedChange={() => toggleTaskSelection(task.id)}
+                                  className="h-4 w-4 bg-background border-2"
+                                />
+                              </div>
+                            )}
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Link href={`/tasks/${task.id}?from=project&projectId=${project.id}`}>
+                                    <div className={cn(
+                                      'relative flex flex-col items-center justify-center p-4 rounded-lg border-2 w-[120px] h-[120px] cursor-pointer transition-all hover:shadow-md',
+                                      task.status === 'completed' ? 'border-emerald-500 bg-emerald-50' :
+                                      task.status === 'in_progress' ? 'border-blue-500 bg-blue-50' :
+                                      task.status === 'review' ? 'border-purple-500 bg-purple-50' :
+                                      task.status === 'assigned' ? 'border-amber-500 bg-amber-50' :
+                                      'border-gray-200 bg-gray-50',
+                                      selectedTaskIds.includes(task.id) && 'ring-2 ring-primary ring-offset-2'
+                                    )}>
                                     {/* Type Icon */}
                                     <div className={cn(
                                       'flex h-8 w-8 items-center justify-center rounded-full text-sm',
@@ -1030,7 +1110,8 @@ const handleCancelEdit = () => {
                                 <p className="text-xs text-muted-foreground">Due: {task.dueDate ? formatDate(task.dueDate) : 'Not set'}</p>
                               </TooltipContent>
                             </Tooltip>
-                          </TooltipProvider>
+                            </TooltipProvider>
+                          </div>
                         </div>
                       ))}
                       {canEditStatus && project.status !== 'draft' && project.status !== 'quoted' && (
@@ -1966,6 +2047,112 @@ const handleCancelEdit = () => {
                 </Button>
               </>
             )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* TASK-004: Bulk Assign Vendor Dialog */}
+      <Dialog open={showBulkAssignDialog} onOpenChange={(open) => {
+        setShowBulkAssignDialog(open)
+        if (!open) {
+          setBulkSelectedVendorId(null)
+          setBulkVendorSearchQuery('')
+        }
+      }}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Assign Vendor</DialogTitle>
+            <DialogDescription>
+              Select a vendor for {eligibleForAssign.length} task{eligibleForAssign.length !== 1 ? 's' : ''}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {/* Ineligible tasks banner */}
+            {ineligibleCount > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                <AlertTriangle className="inline h-4 w-4 mr-1.5 -mt-0.5" />
+                {ineligibleCount} of {selectedTasks.length} selected tasks aren&apos;t Unassigned and will be skipped.
+              </div>
+            )}
+            
+            {/* No eligible tasks warning */}
+            {eligibleForAssign.length === 0 && (
+              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertTriangle className="inline h-4 w-4 mr-1.5 -mt-0.5" />
+                No Unassigned tasks in selection. Select at least one Unassigned task to assign.
+              </div>
+            )}
+            
+            {/* Search */}
+            <Input
+              placeholder="Search vendors..."
+              value={bulkVendorSearchQuery}
+              onChange={(e) => setBulkVendorSearchQuery(e.target.value)}
+            />
+            
+            {/* Vendor List */}
+            <div className="max-h-80 overflow-y-auto space-y-2">
+              {mockVendors
+                .filter(v => v.name.toLowerCase().includes(bulkVendorSearchQuery.toLowerCase()))
+                .sort((a, b) => {
+                  const availOrder = { available: 0, limited: 1, unavailable: 2 }
+                  const aOrder = availOrder[a.availability as keyof typeof availOrder] ?? 2
+                  const bOrder = availOrder[b.availability as keyof typeof availOrder] ?? 2
+                  if (aOrder !== bOrder) return aOrder - bOrder
+                  return (b.onTimeRate || 0) - (a.onTimeRate || 0)
+                })
+                .map((vendor) => {
+                  const isUnavailable = vendor.availability === 'unavailable'
+                  const availabilityIcon = vendor.availability === 'available' ? '🟢' : vendor.availability === 'limited' ? '🟡' : '🔴'
+                  
+                  return (
+                    <div
+                      key={vendor.id}
+                      onClick={() => !isUnavailable && setBulkSelectedVendorId(vendor.id)}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                        bulkSelectedVendorId === vendor.id 
+                          ? "border-primary bg-primary/5" 
+                          : "border-border hover:border-primary/50",
+                        isUnavailable && "opacity-50 cursor-not-allowed hover:border-border"
+                      )}
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                        <User className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{vendor.name}</span>
+                          <span title={`${vendor.availability}`}>{availabilityIcon}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          <p>{vendor.tasksDelivered || 0} tasks delivered, {vendor.onTimeRate || 95}% on-time</p>
+                        </div>
+                      </div>
+                      {bulkSelectedVendorId === vendor.id && (
+                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          <Check className="h-3 w-3" />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowBulkAssignDialog(false)
+              setBulkSelectedVendorId(null)
+              setBulkVendorSearchQuery('')
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleBulkAssignVendor}
+              disabled={!bulkSelectedVendorId || isBulkAssigning || eligibleForAssign.length === 0}
+            >
+              {isBulkAssigning ? 'Assigning...' : `Assign to ${eligibleForAssign.length} Tasks`}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
