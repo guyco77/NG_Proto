@@ -31,6 +31,10 @@ import {
   AlertTriangle,
   UserPlus,
   Check,
+  ChevronRight,
+  ChevronDown,
+  Film,
+  Search,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -66,7 +70,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { mockProjects, mockTasks, mockQuotes, formatCurrency, formatDate, getPriorityColor, PROJECT_STATUSES, SERVICES_LIST } from '@/lib/mock-data'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import { mockProjects, mockTasks, mockQuotes, formatCurrency, formatDate, getPriorityColor, PROJECT_STATUSES, SERVICES_LIST, mockShows, mockClients } from '@/lib/mock-data'
 import { useRole } from '@/app/(app)/layout'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
@@ -114,6 +131,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const project = mockProjects.find((p) => p.id === id) || mockProjects[0]
   const projectTasks = mockTasks.filter((t) => t.projectId === project.id)
   const projectQuote = mockQuotes.find((q) => q.projectId === project.id)
+  
+  // Update PROJ-004: Get the Show for this project (Scene)
+  // For demo, assign Shows based on client - first matching Show for the client
+  const projectShow = mockShows.find(s => s.clientId === project.clientId) || mockShows[0]
+  const clientShows = mockShows.filter(s => s.clientId === project.clientId)
   
   const [activeTab, setActiveTab] = useState(initialTab)
   const [newNote, setNewNote] = useState('')
@@ -171,7 +193,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
   const [editedProject, setEditedProject] = useState({
-    name: project.name,
+    name: project.name, // This is the Scene name
+    showId: projectShow?.id || '',
     clientContact: project.clientContact || '',
     pm: project.pm,
     priority: project.priority,
@@ -179,6 +202,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     startDate: project.startDate,
     videoVolume: project.videoVolume || 45.5, // Mock video volume in minutes
   })
+  
+  // Update PROJ-004: Show selector state
+  const [showSearchOpen, setShowSearchOpen] = useState(false)
+  const selectedShow = mockShows.find(s => s.id === editedProject.showId) || projectShow
   
   const isAdmin = currentRole === 'admin'
   const isPM = currentRole === 'pm'
@@ -192,8 +219,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const canEditField = (field: string) => {
     if (!canEditStatus) return false
     
-    // Quote-locked fields: services, languages, videoVolume, priority, deadline, startDate, client
-    const quoteLockableFields = ['priority', 'deadline', 'startDate', 'videoVolume', 'services', 'languages', 'client']
+    // Update PROJ-004: Show is quote-locked (changing Show affects billing context)
+    // "name" (Scene) is NOT quote-locked - can be edited at any time
+    const quoteLockableFields = ['priority', 'deadline', 'startDate', 'videoVolume', 'services', 'languages', 'client', 'show']
     
     if (isQuoteLocked && quoteLockableFields.includes(field)) {
       return false // Fields are locked after quote approval
@@ -201,7 +229,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     
     // Admin can edit all fields before quote approval
     if (isAdmin) {
-      // After approval, admin can only edit: name, clientContact, pm
+      // After approval, admin can only edit: name (Scene), clientContact, pm
       if (isQuoteLocked) {
         return ['name', 'clientContact', 'pm'].includes(field)
       }
@@ -212,7 +240,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     if (isPM) {
       if (['client', 'clientContact', 'pm'].includes(field)) return false
       if (isQuoteLocked) {
-        return field === 'name' // PM can only edit name after approval
+        return field === 'name' // PM can only edit Scene name after approval
       }
       return true
     }
@@ -257,7 +285,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     setIsEditing(true)
     // Reset edited values to current project values
     setEditedProject({
-      name: project.name,
+      name: project.name, // Scene name
+      showId: projectShow?.id || '',
       clientContact: project.clientContact || '',
       pm: project.pm,
       priority: project.priority,
@@ -279,7 +308,8 @@ const handleCancelEdit = () => {
     setIsEditing(false)
     // Reset to original values
     setEditedProject({
-      name: project.name,
+      name: project.name, // Scene name
+      showId: projectShow?.id || '',
       clientContact: project.clientContact || '',
       pm: project.pm,
       priority: project.priority,
@@ -549,12 +579,25 @@ const handleCancelEdit = () => {
       <div className="border-b border-border bg-card px-6 py-4">
         <div className="flex items-start justify-between">
           <div>
+            {/* Update PROJ-004: Show › Scene breadcrumb header */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+              <Film className="h-4 w-4" />
+              <Link 
+                href={`/shows/${projectShow?.id}`} 
+                className="hover:text-foreground hover:underline transition-colors"
+              >
+                {selectedShow?.name || projectShow?.name || 'Unknown Show'}
+              </Link>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </div>
             <div className="flex items-center gap-3">
+              {/* Scene name (editable) */}
               {isEditing && canEditField('name') ? (
                 <Input
                   value={editedProject.name}
                   onChange={(e) => setEditedProject({ ...editedProject, name: e.target.value })}
                   className="text-2xl font-semibold h-auto py-0 px-2 w-64"
+                  placeholder="Scene name..."
                 />
               ) : (
                 <h1 className="text-2xl font-semibold text-foreground">{project.name}</h1>
@@ -751,10 +794,90 @@ const handleCancelEdit = () => {
             <div className="grid gap-6 md:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Project Details</CardTitle>
+                  <CardTitle className="text-base">Scene Details</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <TooltipProvider>
+                    {/* Update PROJ-004: Show field (editable before quote approval) */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                        Show
+                        {!canEditField('show') && isEditing && (
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Lock className="h-3 w-3 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>Locked — this field is tied to the approved quote.</TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
+                      {isEditing && canEditField('show') ? (
+                        <Popover open={showSearchOpen} onOpenChange={setShowSearchOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={showSearchOpen}
+                              className="w-48 h-7 text-sm justify-between font-normal"
+                            >
+                              {selectedShow?.name || 'Select Show...'}
+                              <ChevronDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[250px] p-0" align="end">
+                            <Command>
+                              <CommandInput placeholder="Search shows..." className="h-9" />
+                              <CommandList>
+                                <CommandEmpty>No shows found for this client.</CommandEmpty>
+                                <CommandGroup>
+                                  {clientShows.map((show) => (
+                                    <CommandItem
+                                      key={show.id}
+                                      value={show.name}
+                                      onSelect={() => {
+                                        setEditedProject({ ...editedProject, showId: show.id })
+                                        setShowSearchOpen(false)
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          editedProject.showId === show.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      {show.name}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      ) : (
+                        <Link 
+                          href={`/shows/${projectShow?.id}`}
+                          className="text-sm font-medium hover:text-primary hover:underline transition-colors"
+                        >
+                          {projectShow?.name || '-'}
+                        </Link>
+                      )}
+                    </div>
+                    
+                    {/* Update PROJ-004: Scene field (editable at any time - general field) */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Scene</span>
+                      {isEditing && canEditField('name') ? (
+                        <Input
+                          value={editedProject.name}
+                          onChange={(e) => setEditedProject({ ...editedProject, name: e.target.value })}
+                          className="w-48 h-7 text-sm"
+                          placeholder="Scene name..."
+                        />
+                      ) : (
+                        <span className="text-sm font-medium">{project.name}</span>
+                      )}
+                    </div>
+                    
                     {/* Client - hidden from client view (implicit from logged-in user) */}
                     {!isClient && (
                       <div className="flex items-center justify-between">
