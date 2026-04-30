@@ -1,7 +1,7 @@
 'use client'
 
 import { use, useState } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Calendar,
@@ -53,6 +53,7 @@ import {
 import { mockTasks, mockProjects, mockVendors, formatCurrency, formatDate, formatDateTime, TASK_STATUSES } from '@/lib/mock-data'
 import { Input } from '@/components/ui/input'
 import { useRole } from '../../layout'
+import { useToast } from '@/hooks/use-toast'
 import { cn } from '@/lib/utils'
 import type { TaskStatus } from '@/lib/types'
 
@@ -135,7 +136,9 @@ function getServiceIcon(serviceType: string): string {
 export default function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const searchParams = useSearchParams()
+  const router = useRouter()
   const { currentRole, userName } = useRole()
+  const { toast } = useToast()
   const task = mockTasks.find((t) => t.id === id) || mockTasks[0]
   const project = mockProjects.find((p) => p.id === task.projectId)
   
@@ -144,6 +147,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const originProjectId = searchParams.get('projectId')
   
   const [notes, setNotes] = useState(mockTaskNotes)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [newNote, setNewNote] = useState('')
   const [isBlocker, setIsBlocker] = useState(false)
   const [isSendingNote, setIsSendingNote] = useState(false)
@@ -196,10 +200,26 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
     // In a real app, this would call an API
   }
 
-  const handleDeleteTask = () => {
-    // In a real app, this would call an API for soft delete
+  const handleDeleteTask = async () => {
+    setIsDeleting(true)
+    // Simulate API call for soft delete
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // If task was open_for_offers, the offer is withdrawn as part of deletion
+    const wasOpenOffer = currentStatus === 'open_for_offers'
+    
     setShowDeleteDialog(false)
+    setIsDeleting(false)
+    
+    toast({
+      title: 'Task deleted',
+      description: wasOpenOffer 
+        ? 'Task deleted and open offer withdrawn. Admin can recover within 30 days.'
+        : 'Task has been soft-deleted. Admin can recover within 30 days.',
+    })
+    
     // Navigate back to tasks list
+    router.push('/tasks')
   }
 
   return (
@@ -610,21 +630,26 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       </div>
 
       {/* Delete Confirmation Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+      <Dialog open={showDeleteDialog} onOpenChange={(open) => !isDeleting && setShowDeleteDialog(open)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete Task</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete this task? This action will archive the task. 
+              Are you sure you want to delete &quot;{task.name}&quot;? This action will archive the task. 
               An Admin can recover it within 30 days.
+              {currentStatus === 'open_for_offers' && (
+                <span className="block mt-2 text-amber-600">
+                  Note: This task has an active open offer which will be automatically withdrawn.
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
+            <Button variant="outline" onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDeleteTask}>
-              Delete Task
+            <Button variant="destructive" onClick={handleDeleteTask} disabled={isDeleting}>
+              {isDeleting ? 'Deleting...' : 'Delete Task'}
             </Button>
           </DialogFooter>
         </DialogContent>

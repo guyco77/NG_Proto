@@ -28,9 +28,10 @@ interface OpenInEditorButtonProps {
 }
 
 // EDIT-001: Mock editor configuration (from SET-003)
+// Set to false to demo the "Editor unreachable" disabled state with tooltip
 const editorConfig = {
   apiUrl: 'https://editor.example.com',
-  isReachable: true, // Would be checked via SET-003 health check
+  isReachable: false, // Would be checked via SET-003 health check - set false to demo disabled state
 }
 
 /**
