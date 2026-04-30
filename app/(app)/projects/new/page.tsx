@@ -418,7 +418,17 @@ export default function NewProjectPage() {
   
   // Step 2 validation: different for client vs admin/PM
   // Client: at least one task type selected, all language pairs complete, deadline set
-  // Admin/PM: at least one service selected, all language pairs complete, deadline set
+  // Admin/PM: at least one service selected, all language pairs complete, deadline set, pipeline tasks valid
+  // Update PROJ-001: Pipeline task schedule validation - block if End before Start or in past
+  const hasPipelineBlockingErrors = pipelineTasks.some(t => {
+    const startDateTime = t.startDate && t.startTime ? new Date(`${t.startDate}T${t.startTime}`) : null
+    const endDateTime = t.endDate && t.endTime ? new Date(`${t.endDate}T${t.endTime}`) : null
+    const isEndBeforeStart = startDateTime && endDateTime && endDateTime <= startDateTime
+    const isStartInPast = startDateTime && startDateTime < new Date()
+    const isEndInPast = endDateTime && endDateTime < new Date()
+    return isEndBeforeStart || isStartInPast || isEndInPast
+  })
+  
   const canProceedStep2 = isClientRole
     ? (selectedTaskTypes.length > 0 && 
        selectedTaskTypes.every(st => 
@@ -427,7 +437,7 @@ export default function NewProjectPage() {
     : (selectedServices.length > 0 && 
        selectedServices.every(ss => 
          ss.languagePairs.length === 0 || ss.languagePairs.every(lp => lp.source && lp.target)
-       ) && deadline)
+       ) && deadline && !hasPipelineBlockingErrors)
   
   const handleSubmit = () => {
     // Update PROJ-001: Multi-video creates one Scene per video

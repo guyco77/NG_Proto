@@ -165,7 +165,7 @@ export const mockProjects: Project[] = [
     videoVolume: 92.5, // minutes
   },
   {
-    id: 'p5',
+    id: 'p7', // Fixed: was duplicate 'p5'
     name: 'Apple TV+ Drama Series',
     client: 'Apple Inc.',
     clientId: 'c5',
@@ -306,15 +306,16 @@ export const mockTasks: Task[] = [
   // Draft project tasks (p5: Apple TV+ Drama Series) - Service: Subtitles Transcription
   // Workflow: Transcription -> Timing -> PM Verification -> Client Review
   // Spanish (ES) tasks
-  { id: 't19', projectId: 'p5', projectName: 'Apple TV+ Drama Series', name: 'Transcription', service: 'Subtitles Transcription', serviceType: 'Transcription', status: 'unassigned', dueDate: '2026-06-01', price: 880, sourceLanguage: 'EN', targetLanguage: 'ES' },
-  { id: 't20', projectId: 'p5', projectName: 'Apple TV+ Drama Series', name: 'Timing', service: 'Subtitles Transcription', serviceType: 'Timing', status: 'unassigned', dueDate: '2026-06-15', price: 440, sourceLanguage: 'EN', targetLanguage: 'ES' },
-  { id: 't21', projectId: 'p5', projectName: 'Apple TV+ Drama Series', name: 'PM Verification', service: 'Subtitles Transcription', serviceType: 'PM Verification', status: 'unassigned', dueDate: '2026-06-25', price: 220, sourceLanguage: 'EN', targetLanguage: 'ES' },
-  { id: 't22', projectId: 'p5', projectName: 'Apple TV+ Drama Series', name: 'Client Review', service: 'Subtitles Transcription', serviceType: 'Client Review', status: 'unassigned', dueDate: '2026-07-05', price: 0, sourceLanguage: 'EN', targetLanguage: 'ES' },
-  // French (FR) tasks
-  { id: 't23', projectId: 'p5', projectName: 'Apple TV+ Drama Series', name: 'Transcription', service: 'Subtitles Transcription', serviceType: 'Transcription', status: 'unassigned', dueDate: '2026-06-01', price: 880, sourceLanguage: 'EN', targetLanguage: 'FR' },
-  { id: 't24', projectId: 'p5', projectName: 'Apple TV+ Drama Series', name: 'Timing', service: 'Subtitles Transcription', serviceType: 'Timing', status: 'unassigned', dueDate: '2026-06-15', price: 440, sourceLanguage: 'EN', targetLanguage: 'FR' },
-  { id: 't25', projectId: 'p5', projectName: 'Apple TV+ Drama Series', name: 'PM Verification', service: 'Subtitles Transcription', serviceType: 'PM Verification', status: 'unassigned', dueDate: '2026-06-25', price: 220, sourceLanguage: 'EN', targetLanguage: 'FR' },
-  { id: 't26', projectId: 'p5', projectName: 'Apple TV+ Drama Series', name: 'Client Review', service: 'Subtitles Transcription', serviceType: 'Client Review', status: 'unassigned', dueDate: '2026-07-05', price: 0, sourceLanguage: 'EN', targetLanguage: 'FR' },
+// Fixed: Changed projectId from 'p5' to 'p7' for Apple TV+ Drama Series
+  { id: 't19', projectId: 'p7', projectName: 'Apple TV+ Drama Series', name: 'Transcription', service: 'Subtitles Transcription', serviceType: 'Transcription', status: 'unassigned', dueDate: '2026-06-01', price: 880, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  { id: 't20', projectId: 'p7', projectName: 'Apple TV+ Drama Series', name: 'Timing', service: 'Subtitles Transcription', serviceType: 'Timing', status: 'unassigned', dueDate: '2026-06-15', price: 440, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  { id: 't21', projectId: 'p7', projectName: 'Apple TV+ Drama Series', name: 'PM Verification', service: 'Subtitles Transcription', serviceType: 'PM Verification', status: 'unassigned', dueDate: '2026-06-25', price: 220, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  { id: 't22', projectId: 'p7', projectName: 'Apple TV+ Drama Series', name: 'Client Review', service: 'Subtitles Transcription', serviceType: 'Client Review', status: 'unassigned', dueDate: '2026-07-05', price: 0, sourceLanguage: 'EN', targetLanguage: 'ES' },
+
+  { id: 't23', projectId: 'p7', projectName: 'Apple TV+ Drama Series', name: 'Transcription', service: 'Subtitles Transcription', serviceType: 'Transcription', status: 'unassigned', dueDate: '2026-06-01', price: 880, sourceLanguage: 'EN', targetLanguage: 'FR' },
+  { id: 't24', projectId: 'p7', projectName: 'Apple TV+ Drama Series', name: 'Timing', service: 'Subtitles Transcription', serviceType: 'Timing', status: 'unassigned', dueDate: '2026-06-15', price: 440, sourceLanguage: 'EN', targetLanguage: 'FR' },
+  { id: 't25', projectId: 'p7', projectName: 'Apple TV+ Drama Series', name: 'PM Verification', service: 'Subtitles Transcription', serviceType: 'PM Verification', status: 'unassigned', dueDate: '2026-06-25', price: 220, sourceLanguage: 'EN', targetLanguage: 'FR' },
+  { id: 't26', projectId: 'p7', projectName: 'Apple TV+ Drama Series', name: 'Client Review', service: 'Subtitles Transcription', serviceType: 'Client Review', status: 'unassigned', dueDate: '2026-07-05', price: 0, sourceLanguage: 'EN', targetLanguage: 'FR' },
 ]
 
 export const TASK_STATUSES: { value: string; label: string; color: string }[] = [
