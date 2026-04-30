@@ -1203,9 +1203,9 @@ export default function ProjectsPage() {
         </div>
       )}
 
-      {/* Projects Table/List */}
-      <div className="rounded-lg border border-border bg-background overflow-hidden">
-        <Table>
+{/* Projects Table/List */}
+  <div className="rounded-lg border border-border bg-background overflow-hidden p-4">
+  <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent bg-muted/50">
               {/* PROJ-005-Client: Different columns for clients vs admin/PM */}
