@@ -1418,6 +1418,14 @@ const handleCancelEdit = () => {
                                         </span>
                                       </div>
                                     )}
+                                    {/* Update PROJ-013: "From template" badge for template-assigned vendors */}
+                                    {task.fromTemplate && task.assignedVendor && !task.fromCreation && (
+                                      <div className="absolute top-1 right-1">
+                                        <span className="text-[8px] bg-purple-100 text-purple-700 px-1 py-0.5 rounded font-medium">
+                                          From template
+                                        </span>
+                                      </div>
+                                    )}
                                     {/* Assignee Badge - positioned at bottom with tooltip for full name */}
                                     <div className="absolute -bottom-3 left-1/2 -translate-x-1/2">
                                       <TooltipProvider>

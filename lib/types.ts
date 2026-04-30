@@ -117,6 +117,8 @@ export interface Task {
   // Update PROJ-001: Vendor pre-assigned from wizard
   fromCreation?: boolean // True if vendor was pre-assigned in Step 2 of wizard
   vendorNote?: string // Internal note for vendor from wizard pre-assignment
+  // Update PROJ-013: Vendor pre-assigned from template
+  fromTemplate?: boolean // True if vendor was pre-assigned from project template
 }
 
 export interface TaskNote {
