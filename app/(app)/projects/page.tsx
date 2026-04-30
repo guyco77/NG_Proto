@@ -21,6 +21,9 @@ import {
   FileStack,
   ArrowLeft,
   Loader2,
+  Film,
+  Layers,
+  Check,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/status-badge'
@@ -48,6 +51,14 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -63,7 +74,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { mockUsers, formatDate, getPriorityColor, PROJECT_STATUSES, SERVICES_LIST, mockProjectTemplates, type ProjectTemplate } from '@/lib/mock-data'
+import { mockUsers, formatDate, getPriorityColor, PROJECT_STATUSES, SERVICES_LIST, mockProjectTemplates, type ProjectTemplate, mockShows } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useRole } from '../layout'
@@ -448,6 +459,7 @@ export default function ProjectsPage() {
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
+  const [showFilters, setShowFilters] = useState<string[]>([]) // Update PROJ-005: Show filter
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [serviceFilters, setServiceFilters] = useState<string[]>([])
   const [taskTypeFilters, setTaskTypeFilters] = useState<string[]>([])
@@ -456,6 +468,8 @@ export default function ProjectsPage() {
   const [deadlineRange, setDeadlineRange] = useState<{ from: string; to: string }>({ from: '', to: '' })
   const [includeArchived, setIncludeArchived] = useState(false)
   const [sortBy, setSortBy] = useState<SortOption>('date_created')
+  const [groupByShow, setGroupByShow] = useState(false) // Update PROJ-005: Group by Show toggle
+  const [showFilterOpen, setShowFilterOpen] = useState(false) // Update PROJ-005: Show filter dropdown state
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -538,6 +552,30 @@ export default function ProjectsPage() {
   const [highlightedProjectId, setHighlightedProjectId] = useState<string | null>(null)
   
   const pms = mockUsers.filter(u => u.role === 'admin' || u.role === 'pm')
+  
+  // Update PROJ-005: Helper to get Show for a project (by clientId match)
+  const getProjectShow = (project: typeof seedProjects[0] | typeof clientSeedProjects[0]) => {
+    // In real app, project would have showId field. For demo, match by clientId.
+    return mockShows.find(s => s.clientId === project.clientId) || mockShows[0]
+  }
+  
+  // Update PROJ-005: Available Shows scoped by role
+  // Admin/Finance see all Shows, PM sees their Shows, Client sees their Shows
+  const availableShows = useMemo(() => {
+    if (currentRole === 'admin' || currentRole === 'finance') {
+      return mockShows
+    }
+    if (currentRole === 'pm') {
+      // PM sees Shows for projects they manage - for demo, show all
+      return mockShows
+    }
+    // Client roles see only their Shows
+    if (isClient) {
+      // For demo, filter by a mock clientId
+      return mockShows.filter(s => s.clientId === 'c1') // Acme Corp client shows
+    }
+    return mockShows
+  }, [currentRole, isClient])
   
   // PROJ-013: Filter templates by search query
   const filteredTemplates = useMemo(() => {
@@ -644,10 +682,18 @@ export default function ProjectsPage() {
   // Filter projects
   const filteredProjects = useMemo(() => {
     let result = projects.filter((project: typeof seedProjects[0] | typeof clientSeedProjects[0]) => {
-      // Search - PROJ-005-Client: clients search project name only, admin/PM searches name + client
+      // Update PROJ-005: Get the Show for this project
+      const projectShow = getProjectShow(project)
+      
+      // Update PROJ-005: Search now matches Show name in addition to Scene name and client
       const matchesSearch = !searchQuery || 
         project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (!isClient && project.client.toLowerCase().includes(searchQuery.toLowerCase()))
+        (!isClient && project.client.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (projectShow && projectShow.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      
+      // Update PROJ-005: Show filter
+      const matchesShow = showFilters.length === 0 || 
+        (projectShow && showFilters.includes(projectShow.id))
       
       // Status filter
       const matchesStatus = statusFilters.length === 0 || statusFilters.includes(project.status)
@@ -686,7 +732,7 @@ export default function ProjectsPage() {
       const isArchivedProject = project.status === 'closed'
       const matchesArchived = includeArchived || !isArchivedProject
       
-      return matchesSearch && matchesStatus && matchesService && matchesTaskType && matchesPM && matchesAssignee && matchesDeadline && matchesArchived
+      return matchesSearch && matchesShow && matchesStatus && matchesService && matchesTaskType && matchesPM && matchesAssignee && matchesDeadline && matchesArchived
     })
     
     // Sort - default is date_created (newest first) per PRD
@@ -710,7 +756,7 @@ export default function ProjectsPage() {
     })
     
     return result
-  }, [searchQuery, statusFilters, serviceFilters, taskTypeFilters, pmFilters, assigneeFilters, deadlineRange, includeArchived, sortBy, projects, isClient])
+  }, [searchQuery, showFilters, statusFilters, serviceFilters, taskTypeFilters, pmFilters, assigneeFilters, deadlineRange, includeArchived, sortBy, projects, isClient, getProjectShow])
   
   // Pagination
   const totalPages = Math.ceil(filteredProjects.length / ITEMS_PER_PAGE)
@@ -719,10 +765,18 @@ export default function ProjectsPage() {
     currentPage * ITEMS_PER_PAGE
   )
   
-  // Active filter count
-  const activeFilterCount = statusFilters.length + serviceFilters.length + taskTypeFilters.length + 
+  // Active filter count - Update PROJ-005: Include Show filters
+  const activeFilterCount = showFilters.length + statusFilters.length + serviceFilters.length + taskTypeFilters.length + 
     (isClient ? assigneeFilters.length : pmFilters.length) + 
     (deadlineRange.from ? 1 : 0) + (deadlineRange.to ? 1 : 0)
+  
+  // Update PROJ-005: Show filter toggle
+  const toggleShowFilter = (showId: string) => {
+    setShowFilters(prev => 
+      prev.includes(showId) ? prev.filter(s => s !== showId) : [...prev, showId]
+    )
+    setCurrentPage(1)
+  }
   
   const toggleStatusFilter = (status: string) => {
     setStatusFilters(prev => 
@@ -761,6 +815,7 @@ export default function ProjectsPage() {
   }
   
   const clearAllFilters = () => {
+    setShowFilters([]) // Update PROJ-005
     setStatusFilters([])
     setServiceFilters([])
     setTaskTypeFilters([])
@@ -1008,11 +1063,57 @@ export default function ProjectsPage() {
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1) }}
             className="h-9 w-64 rounded-lg border border-input bg-background pl-9 pr-4 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-        </div>
-        
-        {/* Status Filter */}
-        <Popover>
+/>
+  </div>
+  
+  {/* Update PROJ-005: Show Filter - first filter in the bar */}
+  <Popover open={showFilterOpen} onOpenChange={setShowFilterOpen}>
+    <PopoverTrigger asChild>
+      <Button variant="outline" size="sm" className="gap-1.5">
+        <Film className="h-3.5 w-3.5" />
+        Show
+        {showFilters.length > 0 && (
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+            {showFilters.length}
+          </span>
+        )}
+        <ChevronDown className="h-3 w-3" />
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent className="w-72 p-0" align="start">
+      <Command>
+        <CommandInput placeholder="Search shows..." className="h-9" />
+        <CommandList>
+          <CommandEmpty>No shows found.</CommandEmpty>
+          <CommandGroup>
+            {availableShows.map((show) => (
+              <CommandItem
+                key={show.id}
+                value={show.name}
+                onSelect={() => toggleShowFilter(show.id)}
+              >
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    showFilters.includes(show.id) ? "opacity-100" : "opacity-0"
+                  )}
+                />
+                <div className="flex-1 min-w-0">
+                  <span className="truncate">{show.name}</span>
+                  <span className="text-xs text-muted-foreground ml-2">
+                    {show.sceneCount} scene{show.sceneCount !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </Command>
+    </PopoverContent>
+  </Popover>
+  
+  {/* Status Filter */}
+  <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className="gap-1.5">
               Status
