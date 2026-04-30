@@ -91,9 +91,10 @@ export default function TasksPage() {
   const [selectedTasks, setSelectedTasks] = useState<string[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   
-  // TASK-003: Assign Vendor dialog state
+  // TASK-003 & TASK-004: Assign Vendor dialog state (single or bulk)
   const [showAssignDialog, setShowAssignDialog] = useState(false)
   const [assigningTaskId, setAssigningTaskId] = useState<string | null>(null)
+  const [assigningTaskIds, setAssigningTaskIds] = useState<string[]>([]) // TASK-004: bulk assign
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null)
   const [vendorSearchQuery, setVendorSearchQuery] = useState('')
   const [isAssigning, setIsAssigning] = useState(false)
@@ -248,28 +249,67 @@ export default function TasksPage() {
   const offeringTask = offeringTaskId ? filteredTasks.find(t => t.id === offeringTaskId) : null
   const deletingTask = deletingTaskId ? filteredTasks.find(t => t.id === deletingTaskId) : null
   
-  // TASK-003: Handle vendor assignment
+  // TASK-004: Get tasks being bulk assigned
+  const bulkAssignTasks = assigningTaskIds.length > 0 
+    ? assigningTaskIds.map(id => filteredTasks.find(t => t.id === id)).filter(Boolean) as typeof filteredTasks
+    : []
+  const eligibleBulkTasks = bulkAssignTasks.filter(t => t.status === 'unassigned')
+  const ineligibleCount = bulkAssignTasks.length - eligibleBulkTasks.length
+  const isBulkAssign = assigningTaskIds.length > 0
+  
+  // TASK-003 & TASK-004: Handle vendor assignment (single or bulk)
   const handleAssignVendor = async () => {
-    if (!assigningTaskId || !selectedVendorId) return
+    if (!selectedVendorId) return
+    
+    // Determine which tasks to assign
+    const taskIdsToAssign = isBulkAssign 
+      ? eligibleBulkTasks.map(t => t.id)
+      : (assigningTaskId ? [assigningTaskId] : [])
+    
+    if (taskIdsToAssign.length === 0) return
+    
     setIsAssigning(true)
     await new Promise(r => setTimeout(r, 500))
     
     const vendor = mockVendors.find(v => v.id === selectedVendorId)
-    setLocalTaskUpdates(prev => ({
-      ...prev,
-      [assigningTaskId]: { status: 'assigned', assignedVendor: vendor?.name, vendorId: selectedVendorId }
-    }))
     
-    toast({
-      title: `${vendor?.name} assigned to ${assigningTask?.name}.`,
-      description: 'Vendor has been notified via email and in-app notification.',
+    // Update all tasks
+    const updates: Record<string, { status: string; assignedVendor?: string; vendorId?: string }> = {}
+    taskIdsToAssign.forEach(id => {
+      updates[id] = { status: 'assigned', assignedVendor: vendor?.name, vendorId: selectedVendorId }
     })
+    setLocalTaskUpdates(prev => ({ ...prev, ...updates }))
+    
+    // Toast message
+    if (isBulkAssign) {
+      toast({
+        title: `${vendor?.name} assigned to ${taskIdsToAssign.length} tasks.`,
+        description: 'Vendor has been notified via a single consolidated notification.',
+      })
+      setSelectedTasks([]) // Clear selection after bulk assign
+    } else {
+      toast({
+        title: `${vendor?.name} assigned to ${assigningTask?.name}.`,
+        description: 'Vendor has been notified via email and in-app notification.',
+      })
+    }
     
     setIsAssigning(false)
     setShowAssignDialog(false)
     setAssigningTaskId(null)
+    setAssigningTaskIds([])
     setSelectedVendorId(null)
     setVendorSearchQuery('')
+  }
+  
+  // TASK-004: Open bulk assign modal
+  const handleOpenBulkAssign = () => {
+    const unassignedIds = selectedTasks.filter(id => {
+      const task = filteredTasks.find(t => t.id === id)
+      return task && task.status === 'unassigned'
+    })
+    setAssigningTaskIds(selectedTasks) // Include all selected, we'll filter in modal
+    setShowAssignDialog(true)
   }
   
   // TASK-009: Handle post as open offer
@@ -569,7 +609,7 @@ export default function TasksPage() {
             <span className="text-sm text-muted-foreground">Select up to 50 tasks at a time for bulk actions</span>
           ) : unassignedSelected > 0 ? (
             <>
-              <Button size="sm" className="gap-1.5">
+              <Button size="sm" className="gap-1.5" onClick={handleOpenBulkAssign}>
                 <UserPlus className="h-4 w-4" />
                 Assign Vendor to {unassignedSelected} Unassigned
               </Button>
@@ -787,11 +827,12 @@ export default function TasksPage() {
         </CardContent>
       </Card>
       
-      {/* TASK-003: Assign Vendor Modal */}
+      {/* TASK-003 & TASK-004: Assign Vendor Modal (single or bulk) */}
       <Dialog open={showAssignDialog} onOpenChange={(open) => {
         setShowAssignDialog(open)
         if (!open) {
           setAssigningTaskId(null)
+          setAssigningTaskIds([])
           setSelectedVendorId(null)
           setVendorSearchQuery('')
         }
@@ -800,12 +841,30 @@ export default function TasksPage() {
           <DialogHeader>
             <DialogTitle>Assign Vendor</DialogTitle>
             <DialogDescription>
-              {assigningTask && (
+              {isBulkAssign ? (
+                <>Select a vendor for {eligibleBulkTasks.length} task{eligibleBulkTasks.length !== 1 ? 's' : ''}</>
+              ) : assigningTask ? (
                 <>Select a vendor for {assigningTask.serviceType || assigningTask.service} ({assigningTask.sourceLanguage} → {assigningTask.targetLanguage})</>
-              )}
+              ) : null}
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
+            {/* TASK-004: Ineligible tasks banner */}
+            {isBulkAssign && ineligibleCount > 0 && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                <AlertTriangle className="inline h-4 w-4 mr-1.5 -mt-0.5" />
+                {ineligibleCount} of {bulkAssignTasks.length} selected tasks aren&apos;t Unassigned and will be skipped.
+              </div>
+            )}
+            
+            {/* TASK-004: No eligible tasks warning */}
+            {isBulkAssign && eligibleBulkTasks.length === 0 && (
+              <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+                <AlertTriangle className="inline h-4 w-4 mr-1.5 -mt-0.5" />
+                No Unassigned tasks in selection. Select at least one Unassigned task to assign.
+              </div>
+            )}
+            
             {/* Search */}
             <Input
               placeholder="Search vendors..."
@@ -852,7 +911,7 @@ export default function TasksPage() {
                         </div>
                         <div className="text-xs text-muted-foreground space-y-0.5">
                           <p>
-                            {vendor.tasksDelivered || 0} tasks delivered in {assigningTask?.serviceType || 'Translation'}, {vendor.onTimeRate || 95}% on-time
+                            {vendor.tasksDelivered || 0} tasks delivered in {isBulkAssign ? 'selected types' : (assigningTask?.serviceType || 'Translation')}, {vendor.onTimeRate || 95}% on-time
                           </p>
                           <p>{vendor.activeTasks || 0} active task{(vendor.activeTasks || 0) !== 1 ? 's' : ''} this week</p>
                         </div>
@@ -877,6 +936,7 @@ export default function TasksPage() {
             <Button variant="outline" onClick={() => {
               setShowAssignDialog(false)
               setAssigningTaskId(null)
+              setAssigningTaskIds([])
               setSelectedVendorId(null)
               setVendorSearchQuery('')
             }}>
@@ -884,9 +944,9 @@ export default function TasksPage() {
             </Button>
             <Button 
               onClick={handleAssignVendor}
-              disabled={!selectedVendorId || isAssigning}
+              disabled={!selectedVendorId || isAssigning || (isBulkAssign && eligibleBulkTasks.length === 0)}
             >
-              {isAssigning ? 'Assigning...' : 'Assign'}
+              {isAssigning ? 'Assigning...' : isBulkAssign ? `Assign to ${eligibleBulkTasks.length} Tasks` : 'Assign'}
             </Button>
           </DialogFooter>
         </DialogContent>
