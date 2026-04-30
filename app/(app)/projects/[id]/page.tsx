@@ -711,8 +711,8 @@ const handleCancelEdit = () => {
     setShowDuplicateWarning(false)
     setDuplicateTaskInfo(null)
     
-    // Build toast message
-    let toastMsg = `Follow-up task added after "${followupPredecessorTask.name}"`
+    // Update PROJ-011: Use Show › Scene format in follow-up task notification
+    let toastMsg = `Follow-up task added to ${projectShow?.name} › ${project.name} after "${followupPredecessorTask.name}"`
     if (needsAutoPMVerification) {
       toastMsg += ' + PM Verification'
     }
@@ -2088,10 +2088,11 @@ const handleCancelEdit = () => {
       </Dialog>
       
       {/* PROJ-014: Add Follow-up Task Dialog */}
+      {/* Update PROJ-011: Show › Scene in dialog header */}
       <Dialog open={showFollowupTaskDialog} onOpenChange={setShowFollowupTaskDialog}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Add Follow-up Task</DialogTitle>
+            <DialogTitle>Add Follow-up Task to {projectShow?.name} › {project.name}</DialogTitle>
             <DialogDescription>
               Add a task after the completed task. A PM Verification task will be auto-added unless you&apos;re adding PM Verification.
             </DialogDescription>
