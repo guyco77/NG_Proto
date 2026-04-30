@@ -413,8 +413,9 @@ export default function NewProjectPage() {
   }
   
   // Update PROJ-001: Scene + Show required, sourceFiles required
+  // Update PROJ-006: Block if >50 videos uploaded
   // For client role, clientId is auto-set so just check name and files
-  const canProceedStep1 = sceneName.trim() && (isClientRole || (clientId && showId)) && sourceFiles.length > 0
+  const canProceedStep1 = sceneName.trim() && (isClientRole || (clientId && showId)) && sourceFiles.length > 0 && videoFiles.length <= 50
   
   // Step 2 validation: different for client vs admin/PM
   // Client: at least one task type selected, all language pairs complete, deadline set
@@ -860,9 +861,21 @@ export default function NewProjectPage() {
                 </div>
               )}
               
+              {/* Update PROJ-006: 50-video limit validation error */}
+              {videoFiles.length > 50 && (
+                <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 p-3 mt-4">
+                  <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-800">
+                    You can upload up to 50 videos at once. Remove some files to continue.
+                  </p>
+                </div>
+              )}
+              
               {sourceFiles.length > 0 && (
                 <div className="mt-4 space-y-2">
-                  {sourceFiles.map((file) => (
+                  {sourceFiles.map((file) => {
+                    const isVideo = file.name.match(/\.(mp4|mov|mkv|avi|wmv|webm)$/i)
+                    return (
                     <div key={file.id} className="flex items-center justify-between rounded-lg border border-border p-3">
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <Video className="h-5 w-5 text-muted-foreground shrink-0" />
@@ -887,6 +900,12 @@ export default function NewProjectPage() {
                           )}
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <span>{formatFileSize(file.size)}</span>
+                            {/* Update PROJ-006: Show video badge and per-video duration */}
+                            {isVideo && (
+                              <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-xs">
+                                Video
+                              </span>
+                            )}
                             {file.isProcessing && (
                               <span className="flex items-center gap-1 text-amber-600">
                                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -906,7 +925,8 @@ export default function NewProjectPage() {
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
               
@@ -1957,22 +1977,47 @@ export default function NewProjectPage() {
                     {sceneName || '(not set)'}
                   </span>
                 </div>
-                {/* Update PROJ-001: Multi-video Scene preview */}
+                {/* Update PROJ-006: Multi-video Scene preview with per-video volume */}
                 {isMultiVideo && (
-                  <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 space-y-2">
+                  <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 space-y-3">
                     <div className="flex items-center gap-2 text-blue-800">
                       <Info className="h-4 w-4" />
                       <span className="font-medium text-sm">{videoFiles.length} Scenes will be created</span>
                     </div>
                     <p className="text-xs text-blue-700">One per uploaded video. Scene names will use the video file names:</p>
-                    <ul className="text-xs text-blue-800 space-y-0.5 ml-4 list-disc">
-                      {autoSceneNames.slice(0, 5).map((name, idx) => (
-                        <li key={idx}>{name}</li>
-                      ))}
-                      {autoSceneNames.length > 5 && (
-                        <li className="text-blue-600">...and {autoSceneNames.length - 5} more</li>
+                    <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                      {videoFiles.slice(0, 10).map((video, idx) => {
+                        const sceneName = video.name.replace(/\.[^/.]+$/, '')
+                        return (
+                          <div key={idx} className="flex items-center justify-between text-xs bg-white/50 rounded px-2 py-1">
+                            <span className="text-blue-800 truncate flex-1">{sceneName}</span>
+                            {video.duration && (
+                              <span className="text-blue-600 ml-2 flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {video.duration} min
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
+                      {videoFiles.length > 10 && (
+                        <p className="text-xs text-blue-600 pl-2">...and {videoFiles.length - 10} more scenes</p>
                       )}
-                    </ul>
+                    </div>
+                    {/* Reference files sharing notice */}
+                    {referenceFiles.length > 0 && (
+                      <div className="pt-2 border-t border-blue-200">
+                        <p className="text-xs text-blue-700">
+                          <strong>{referenceFiles.length} reference file(s)</strong> will be shared across all {videoFiles.length} scenes.
+                        </p>
+                      </div>
+                    )}
+                    {/* Per-scene cost notice */}
+                    <div className="pt-2 border-t border-blue-200">
+                      <p className="text-xs text-blue-700">
+                        Tasks and quotes will be generated <strong>per scene</strong> based on each video&apos;s duration.
+                      </p>
+                    </div>
                   </div>
                 )}
                 {/* Client and PM only shown for Admin/PM */}
@@ -2006,8 +2051,19 @@ export default function NewProjectPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Source Files</span>
-                  <span className="font-medium">{sourceFiles.length} file(s)</span>
+                  <span className="font-medium">
+                    {videoFiles.length} video{videoFiles.length !== 1 ? 's' : ''}
+                    {sourceFiles.length - videoFiles.length > 0 && (
+                      <>, {sourceFiles.length - videoFiles.length} other</>
+                    )}
+                  </span>
                 </div>
+                {/* Update PROJ-006: Non-video assets attach to first Scene notice */}
+                {isMultiVideo && sourceFiles.length - videoFiles.length > 0 && (
+                  <p className="text-xs text-muted-foreground -mt-2 ml-auto max-w-[200px] text-right">
+                    Non-video files will be attached to the first Scene by default
+                  </p>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{isClientRole ? 'Tasks' : 'Services'}</span>
                   <span className="font-medium">

@@ -470,6 +470,7 @@ export default function ProjectsPage() {
   const [sortBy, setSortBy] = useState<SortOption>('date_created')
   const [groupByShow, setGroupByShow] = useState(false) // Update PROJ-005: Group by Show toggle
   const [showFilterOpen, setShowFilterOpen] = useState(false) // Update PROJ-005: Show filter dropdown state
+  const [collapsedShows, setCollapsedShows] = useState<Set<string>>(new Set()) // Update PROJ-005: Collapsed Show sections
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -764,6 +765,39 @@ export default function ProjectsPage() {
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   )
+  
+  // Update PROJ-005: Group projects by Show
+  const groupedProjects = useMemo(() => {
+    if (!groupByShow) return null
+    
+    const groups = new Map<string, { show: typeof mockShows[0]; projects: typeof paginatedProjects }>()
+    
+    paginatedProjects.forEach(project => {
+      const show = getProjectShow(project)
+      if (!show) return
+      
+      if (!groups.has(show.id)) {
+        groups.set(show.id, { show, projects: [] })
+      }
+      groups.get(show.id)!.projects.push(project)
+    })
+    
+    // Sort groups by Show name
+    return Array.from(groups.values()).sort((a, b) => a.show.name.localeCompare(b.show.name))
+  }, [groupByShow, paginatedProjects, getProjectShow])
+  
+  // Update PROJ-005: Toggle Show section collapse
+  const toggleShowCollapse = (showId: string) => {
+    setCollapsedShows(prev => {
+      const next = new Set(prev)
+      if (next.has(showId)) {
+        next.delete(showId)
+      } else {
+        next.add(showId)
+      }
+      return next
+    })
+  }
   
   // Active filter count - Update PROJ-005: Include Show filters
   const activeFilterCount = showFilters.length + statusFilters.length + serviceFilters.length + taskTypeFilters.length + 
@@ -1332,6 +1366,17 @@ export default function ProjectsPage() {
           </PopoverContent>
         </Popover>
         
+        {/* Update PROJ-005: Group by Show toggle */}
+        <Button
+          variant={groupByShow ? "secondary" : "outline"}
+          size="sm"
+          className="gap-1.5"
+          onClick={() => setGroupByShow(!groupByShow)}
+        >
+          <Layers className="h-3.5 w-3.5" />
+          Group by Show
+        </Button>
+        
         {/* Sort - PROJ-005-Client: no Client Name sort for clients, add Scene Name A-Z */}
         {/* Update PROJ-001: "Project Name" renamed to "Scene Name" in user-facing labels */}
         <Select value={sortBy} onValueChange={(v: SortOption) => setSortBy(v)}>
@@ -1446,9 +1491,10 @@ export default function ProjectsPage() {
   <div className="rounded-lg border border-border bg-background overflow-hidden p-4">
   <Table>
           <TableHeader>
-            <TableRow className="hover:bg-transparent bg-muted/50">
-              {/* PROJ-005-Client: Different columns for clients vs admin/PM */}
-              <TableHead className={isClient ? "w-[300px]" : "w-[280px]"}>Project</TableHead>
+<TableRow className="hover:bg-transparent bg-muted/50">
+                {/* PROJ-005-Client: Different columns for clients vs admin/PM */}
+                {/* Update PROJ-005: "Project" renamed to "Show / Scene" */}
+                <TableHead className={isClient ? "w-[300px]" : "w-[280px]"}>Show / Scene</TableHead>
               {!isClient && <TableHead className="w-[140px]">Client</TableHead>}
               <TableHead className="w-[160px]">Status</TableHead>
               {isClient ? (
@@ -1464,7 +1510,201 @@ export default function ProjectsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedProjects.map((project) => {
+            {/* Update PROJ-005: Render grouped or ungrouped view */}
+            {groupByShow && groupedProjects ? (
+              // Grouped view - Show sections with collapsible rows
+              groupedProjects.map((group) => {
+                const isCollapsed = collapsedShows.has(group.show.id)
+                return (
+                  <React.Fragment key={group.show.id}>
+                    {/* Show section header */}
+                    <TableRow 
+                      className="bg-muted/70 hover:bg-muted cursor-pointer border-t-2 border-border"
+                      onClick={() => toggleShowCollapse(group.show.id)}
+                    >
+                      <TableCell colSpan={isClient ? 6 : 8} className="py-2">
+                        <div className="flex items-center gap-2">
+                          <ChevronDown className={cn(
+                            "h-4 w-4 transition-transform",
+                            isCollapsed && "-rotate-90"
+                          )} />
+                          <Film className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-semibold">{group.show.name}</span>
+                          <span className="text-xs text-muted-foreground px-2 py-0.5 bg-background rounded-full">
+                            {group.projects.length} scene{group.projects.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {/* Scene rows within the Show (hidden when collapsed) */}
+                    {!isCollapsed && group.projects.map((project) => {
+                      const isArchived = project.status === 'closed'
+                      const canCancel = CANCELLABLE_STATUSES.includes(project.status)
+                      const isHighlighted = highlightedProjectId === project.id
+                      
+                      return (
+                        <TableRow
+                          key={project.id}
+                          className={cn(
+                            "cursor-pointer bg-background hover:bg-muted/50 transition-colors duration-500",
+                            isArchived && "opacity-60",
+                            isHighlighted && "animate-pulse bg-emerald-50 ring-2 ring-emerald-500 ring-inset"
+                          )}
+                          onClick={() => router.push(`/projects/${project.id}`)}
+                        >
+                          {/* Scene name only (Show is in section header) */}
+                          <TableCell>
+                            <div className="pl-6">
+                              <p className="font-medium text-foreground">{project.name}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {project.services.join(', ')}
+                              </p>
+                            </div>
+                          </TableCell>
+                          {!isClient && (
+                            <TableCell>
+                              <span className="text-sm">{project.client}</span>
+                            </TableCell>
+                          )}
+                          <TableCell>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <StatusBadge status={project.status} />
+                              {isClient && 'needsTeamAssignment' in project && project.needsTeamAssignment && (
+                                <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-700">
+                                  Assign your team
+                                </span>
+                              )}
+                              {project.isUnassigned && !('needsTeamAssignment' in project && project.needsTeamAssignment) && (
+                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                                  Unassigned
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          {isClient ? (
+                            <TableCell>
+                              {'assignees' in project && project.assignees && project.assignees.length > 0 ? (
+                                <div className="flex items-center gap-1">
+                                  <TooltipProvider>
+                                    {project.assignees.slice(0, 3).map((assignee) => (
+                                      <Tooltip key={assignee.id}>
+                                        <TooltipTrigger asChild>
+                                          {assignee.type === 'ng' ? (
+                                            <div className="h-6 w-6 flex items-center justify-center rounded-full bg-blue-100 text-[10px] font-medium text-blue-700">
+                                              NG
+                                            </div>
+                                          ) : (
+                                            <Avatar className="h-6 w-6">
+                                              <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                                                {assignee.initials}
+                                              </AvatarFallback>
+                                            </Avatar>
+                                          )}
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          {assignee.type === 'ng' ? 'Handled by NG' : assignee.name}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    ))}
+                                    {project.assignees.length > 3 && (
+                                      <span className="text-xs text-muted-foreground ml-1">
+                                        +{project.assignees.length - 3}
+                                      </span>
+                                    )}
+                                  </TooltipProvider>
+                                </div>
+                              ) : (
+                                <div className="h-6 w-6 flex items-center justify-center rounded-full bg-gray-100 text-[10px] font-medium text-gray-500">
+                                  ?
+                                </div>
+                              )}
+                            </TableCell>
+                          ) : (
+                            <TableCell>
+                              <span className="text-sm">{project.pm}</span>
+                            </TableCell>
+                          )}
+                          <TableCell>
+                            <span className="text-sm">{formatDate(project.deadline)}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', getPriorityColor(project.priority))}>
+                              {project.priority.charAt(0).toUpperCase() + project.priority.slice(1)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="text-sm font-medium">{project.progress}%</span>
+                          </TableCell>
+                          {!isClient && (
+                            <TableCell>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {!isArchived && (
+                                      <DropdownMenuItem onClick={() => handleDuplicateProject(project.id)}>
+                                        <Copy className="mr-2 h-4 w-4" />
+                                        Duplicate Scene
+                                      </DropdownMenuItem>
+                                    )}
+                                    {!isArchived && (
+                                      <DropdownMenuItem onClick={() => handleSplitProject(project.id)}>
+                                        <Split className="mr-2 h-4 w-4" />
+                                        Split Scene
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem 
+                                      onClick={() => setArchiveDialog({ 
+                                        open: true, 
+                                        projectId: project.id, 
+                                        projectName: project.name,
+                                        isArchived 
+                                      })}
+                                    >
+                                      {isArchived ? (
+                                        <>
+                                          <ArchiveRestore className="mr-2 h-4 w-4" />
+                                          Unarchive Scene
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Archive className="mr-2 h-4 w-4" />
+                                          Archive Scene
+                                        </>
+                                      )}
+                                    </DropdownMenuItem>
+                                    {canCancel && (
+                                      <DropdownMenuItem 
+                                        className="text-destructive"
+                                        onClick={() => setCancelDialog({ 
+                                          open: true, 
+                                          projectId: project.id, 
+                                          projectName: project.name 
+                                        })}
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Cancel Scene
+                                      </DropdownMenuItem>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      )
+                    })}
+                  </React.Fragment>
+                )
+              })
+            ) : (
+              // Ungrouped view - flat list
+              paginatedProjects.map((project) => {
               const isArchived = project.status === 'closed'
               const canCancel = CANCELLABLE_STATUSES.includes(project.status)
               // PROJ-013: Highlight newly created project from template
@@ -1480,9 +1720,16 @@ export default function ProjectsPage() {
                   )}
                   onClick={() => router.push(`/projects/${project.id}`)}
                 >
-                  {/* Project Name + Service */}
+                  {/* Update PROJ-005: Show > Scene display */}
                   <TableCell>
                     <div>
+                      {/* Show breadcrumb */}
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground mb-0.5">
+                        <Film className="h-3 w-3" />
+                        <span>{getProjectShow(project)?.name || 'Unknown Show'}</span>
+                        <ChevronRight className="h-3 w-3" />
+                      </div>
+                      {/* Scene name */}
                       <p className="font-medium text-foreground">{project.name}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {project.services.join(', ')}
