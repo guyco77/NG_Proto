@@ -1754,24 +1754,25 @@ const handleCancelEdit = () => {
           <DialogHeader>
             <DialogTitle>Duplicate &quot;{project.name}&quot;?</DialogTitle>
             <DialogDescription>
-              Create a new project with the same settings. Source files are not duplicated — you&apos;ll upload a new video after creation.
+              Create a new scene with the same settings. Source files are not duplicated — you&apos;ll upload a new video after creation.
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
+            {/* Update PROJ-001: "Project name" renamed to "Scene name" */}
             <div className="space-y-2">
               <Label htmlFor="duplicate-name" className="text-sm font-medium">
-                New project name <span className="text-destructive">*</span>
+                New scene name <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="duplicate-name"
                 value={duplicateName}
                 onChange={(e) => setDuplicateName(e.target.value)}
-                placeholder="Enter project name..."
+                placeholder="Enter scene name..."
                 autoFocus
               />
               {!duplicateName.trim() && (
-                <p className="text-xs text-destructive">Project name is required.</p>
+                <p className="text-xs text-destructive">Scene name is required.</p>
               )}
             </div>
             

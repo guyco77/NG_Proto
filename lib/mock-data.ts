@@ -1015,6 +1015,29 @@ export const PRICING_MODELS: { value: string; label: string }[] = [
   { value: 'custom', label: 'Custom (manual price per project)' },
 ]
 
+// Update PROJ-001: Shows (top-level entity that groups Scenes/Projects)
+export interface Show {
+  id: string
+  name: string
+  clientId: string
+  clientName: string
+  description?: string
+  createdAt: string
+  sceneCount: number
+}
+
+export const mockShows: Show[] = [
+  { id: 'show-1', name: 'Stranger Things', clientId: 'c1', clientName: 'Netflix Inc.', description: 'Sci-fi horror drama series', createdAt: '2025-01-15T10:00:00Z', sceneCount: 12 },
+  { id: 'show-2', name: 'The Crown', clientId: 'c1', clientName: 'Netflix Inc.', description: 'Historical drama series', createdAt: '2025-02-20T14:00:00Z', sceneCount: 8 },
+  { id: 'show-3', name: 'Moana 2', clientId: 'c2', clientName: 'Disney Studios', description: 'Animated feature film', createdAt: '2025-03-10T09:00:00Z', sceneCount: 3 },
+  { id: 'show-4', name: 'The Bear', clientId: 'c1', clientName: 'Netflix Inc.', description: 'Drama comedy series', createdAt: '2025-04-01T11:00:00Z', sceneCount: 6 },
+  { id: 'show-5', name: 'House of the Dragon', clientId: 'c3', clientName: 'HBO Max', description: 'Fantasy drama series', createdAt: '2025-04-15T08:00:00Z', sceneCount: 10 },
+  { id: 'show-6', name: 'Foundation', clientId: 'c-apple', clientName: 'Apple Inc.', description: 'Sci-fi drama series', createdAt: '2025-05-01T10:00:00Z', sceneCount: 4 },
+  { id: 'show-7', name: 'Severance', clientId: 'c-apple', clientName: 'Apple Inc.', description: 'Thriller drama series', createdAt: '2025-05-10T12:00:00Z', sceneCount: 7 },
+  { id: 'show-8', name: 'The Mandalorian', clientId: 'c2', clientName: 'Disney Studios', description: 'Star Wars series', createdAt: '2025-06-01T10:00:00Z', sceneCount: 16 },
+  { id: 'show-9', name: 'True Detective', clientId: 'c3', clientName: 'HBO Max', description: 'Crime drama anthology', createdAt: '2025-07-15T09:00:00Z', sceneCount: 8 },
+]
+
 // PROJ-013: Project Templates
 export interface ProjectTemplate {
   id: string

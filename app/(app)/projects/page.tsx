@@ -1231,7 +1231,8 @@ export default function ProjectsPage() {
           </PopoverContent>
         </Popover>
         
-        {/* Sort - PROJ-005-Client: no Client Name sort for clients, add Project Name A-Z */}
+        {/* Sort - PROJ-005-Client: no Client Name sort for clients, add Scene Name A-Z */}
+        {/* Update PROJ-001: "Project Name" renamed to "Scene Name" in user-facing labels */}
         <Select value={sortBy} onValueChange={(v: SortOption) => setSortBy(v)}>
           <SelectTrigger className="w-40 h-9">
             <ArrowUpDown className="h-3 w-3 mr-2" />
@@ -1241,7 +1242,7 @@ export default function ProjectsPage() {
             <SelectItem value="date_created">Date Created</SelectItem>
             <SelectItem value="deadline">Deadline</SelectItem>
             <SelectItem value="priority">Priority</SelectItem>
-            <SelectItem value="project_name">Project Name (A-Z)</SelectItem>
+            <SelectItem value="project_name">Scene Name (A-Z)</SelectItem>
             {!isClient && <SelectItem value="client_name">Client Name</SelectItem>}
           </SelectContent>
         </Select>
@@ -1731,25 +1732,25 @@ export default function ProjectsPage() {
           <DialogHeader>
             <DialogTitle>Duplicate &quot;{duplicateDialog.originalName}&quot;?</DialogTitle>
             <DialogDescription>
-              Create a new project with the same settings. Source files are not duplicated — you&apos;ll upload a new video after creation.
+              Create a new scene with the same settings. Source files are not duplicated — you&apos;ll upload a new video after creation.
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
-            {/* New Project Name */}
+            {/* Update PROJ-001: "Project Name" renamed to "Scene name" */}
             <div className="space-y-2">
               <Label htmlFor="duplicate-name" className="text-sm font-medium">
-                New project name <span className="text-destructive">*</span>
+                New scene name <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="duplicate-name"
                 value={duplicateName}
                 onChange={(e) => setDuplicateName(e.target.value)}
-                placeholder="Enter project name..."
+                placeholder="Enter scene name..."
                 autoFocus
               />
               {!duplicateName.trim() && (
-                <p className="text-xs text-destructive">Project name is required.</p>
+                <p className="text-xs text-destructive">Scene name is required.</p>
               )}
             </div>
             
