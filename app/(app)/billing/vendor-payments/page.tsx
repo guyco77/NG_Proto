@@ -11,6 +11,11 @@ import {
   Languages,
   CheckCircle,
   History,
+  Calendar,
+  LayoutGrid,
+  List,
+  DollarSign,
+  Send,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -74,18 +79,20 @@ interface VendorPayable {
   amount: number
   originalCurrency?: string
   originalAmount?: number
+  period: string // UPDATE-004: YYYY-MM format
+  completedDate: string // Task completion date
 }
 
-// Realistic mock data with project AND episode names
+// Realistic mock data with project AND episode names - UPDATE-004: Added period and completedDate
 const vendorPayables: VendorPayable[] = [
-  { id: 'vp1', vendorName: 'Dana Cohen', projectId: 'p1', projectName: 'Channel 12 Drama', episodeName: 'Episodes 44–47', jobType: 'translation', status: 'pending', amount: 1840 },
-  { id: 'vp2', vendorName: 'Roni Levi', projectId: 'p2', projectName: 'Weekly News', episodeName: 'April 21–27 Package', jobType: 'transcription', status: 'pending', amount: 620 },
-  { id: 'vp3', vendorName: 'Amir Shahar', projectId: 'p3', projectName: 'Documentary S2', episodeName: 'Episode 5 QA', jobType: 'review', status: 'approved', amount: 980 },
-  { id: 'vp4', vendorName: 'Dana Cohen', projectId: 'p4', projectName: 'Channel 12 Drama', episodeName: 'Episodes 40–43', jobType: 'translation', status: 'paid', amount: 1840 },
-  { id: 'vp5', vendorName: 'Yael Mizrahi', projectId: 'p5', projectName: 'Keshet Monthly', episodeName: 'April Package', jobType: 'transcription', status: 'paid', amount: 1200 },
-  { id: 'vp6', vendorName: 'Roni Levi', projectId: 'p6', projectName: 'Channel 12 Drama', episodeName: 'Ep 38–39 Special', jobType: 'review', status: 'paid', amount: 440 },
-  { id: 'vp7', vendorName: 'Tal Ben-David', projectId: 'p7', projectName: 'Corporate Training', episodeName: 'Onboarding Video', jobType: 'subtitling', status: 'pending', amount: 750, originalCurrency: 'USD', originalAmount: 200 },
-  { id: 'vp8', vendorName: 'Noa Katz', projectId: 'p8', projectName: 'Training Series', episodeName: 'Module 3–4', jobType: 'translation', status: 'approved', amount: 1560 },
+  { id: 'vp1', vendorName: 'Dana Cohen', projectId: 'p1', projectName: 'Channel 12 Drama', episodeName: 'Episodes 44–47', jobType: 'translation', status: 'pending', amount: 1840, period: '2026-04', completedDate: '2026-04-20' },
+  { id: 'vp2', vendorName: 'Roni Levi', projectId: 'p2', projectName: 'Weekly News', episodeName: 'April 21–27 Package', jobType: 'transcription', status: 'pending', amount: 620, period: '2026-04', completedDate: '2026-04-27' },
+  { id: 'vp3', vendorName: 'Amir Shahar', projectId: 'p3', projectName: 'Documentary S2', episodeName: 'Episode 5 QA', jobType: 'review', status: 'approved', amount: 980, period: '2026-04', completedDate: '2026-04-15' },
+  { id: 'vp4', vendorName: 'Dana Cohen', projectId: 'p4', projectName: 'Channel 12 Drama', episodeName: 'Episodes 40–43', jobType: 'translation', status: 'paid', amount: 1840, period: '2026-03', completedDate: '2026-03-25' },
+  { id: 'vp5', vendorName: 'Yael Mizrahi', projectId: 'p5', projectName: 'Keshet Monthly', episodeName: 'April Package', jobType: 'transcription', status: 'paid', amount: 1200, period: '2026-04', completedDate: '2026-04-30' },
+  { id: 'vp6', vendorName: 'Roni Levi', projectId: 'p6', projectName: 'Channel 12 Drama', episodeName: 'Ep 38–39 Special', jobType: 'review', status: 'paid', amount: 440, period: '2026-03', completedDate: '2026-03-15' },
+  { id: 'vp7', vendorName: 'Tal Ben-David', projectId: 'p7', projectName: 'Corporate Training', episodeName: 'Onboarding Video', jobType: 'subtitling', status: 'pending', amount: 750, originalCurrency: 'USD', originalAmount: 200, period: '2026-04', completedDate: '2026-04-22' },
+  { id: 'vp8', vendorName: 'Noa Katz', projectId: 'p8', projectName: 'Training Series', episodeName: 'Module 3–4', jobType: 'translation', status: 'approved', amount: 1560, period: '2026-04', completedDate: '2026-04-18' },
 ]
 
 const jobTypeConfig = {
@@ -108,11 +115,13 @@ export default function VendorPaymentsPage() {
   const { currentRole } = useRole()
   const { toast } = useToast()
   
-  // Filters
+  // Filters - UPDATE-004: Added period filter
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [vendorFilter, setVendorFilter] = useState<string>('all')
   const [jobTypeFilter, setJobTypeFilter] = useState<string>('all')
+  const [periodFilter, setPeriodFilter] = useState<string>('all')
   const [vendorPopoverOpen, setVendorPopoverOpen] = useState(false)
+  const [viewMode, setViewMode] = useState<'list' | 'grouped'>('grouped') // UPDATE-004: Default to grouped view
   
   // Table state
   const [payables, setPayables] = useState(vendorPayables)
@@ -122,6 +131,10 @@ export default function VendorPaymentsPage() {
   
   // Dialog state
   const [showBulkDialog, setShowBulkDialog] = useState(false)
+  
+  // UPDATE-005: Mark-as-Paid confirmation dialog
+  const [showMarkPaidDialog, setShowMarkPaidDialog] = useState(false)
+  const [markPaidGroup, setMarkPaidGroup] = useState<{ vendorName: string; period: string; total: number; count: number; ids: string[] } | null>(null)
   
   // Payment History state - tracks approved items that disappear from main list
   const [paymentHistory, setPaymentHistory] = useState<Array<{
@@ -143,8 +156,14 @@ export default function VendorPaymentsPage() {
     Array.from(new Set(payables.map(p => p.vendorName))).sort(),
     [payables]
   )
+  
+  // UPDATE-004: Get unique periods for filter
+  const periods = useMemo(() => 
+    Array.from(new Set(payables.map(p => p.period))).sort().reverse(),
+    [payables]
+  )
 
-  // Filter and sort payables
+  // Filter and sort payables - UPDATE-004: Added period filter
   const filteredPayables = useMemo(() => {
     let filtered = [...payables]
     
@@ -156,6 +175,9 @@ export default function VendorPaymentsPage() {
     }
     if (jobTypeFilter !== 'all') {
       filtered = filtered.filter(p => p.jobType === jobTypeFilter)
+    }
+    if (periodFilter !== 'all') {
+      filtered = filtered.filter(p => p.period === periodFilter)
     }
     
     // Sort
@@ -172,7 +194,46 @@ export default function VendorPaymentsPage() {
     })
     
     return filtered
-  }, [payables, statusFilter, vendorFilter, jobTypeFilter, sortBy, sortDir])
+  }, [payables, statusFilter, vendorFilter, jobTypeFilter, periodFilter, sortBy, sortDir])
+  
+  // UPDATE-004: Group payables by vendor and period
+  const groupedPayables = useMemo(() => {
+    const groups: Record<string, {
+      vendorName: string
+      period: string
+      items: VendorPayable[]
+      totalAmount: number
+      taskCount: number
+      status: PayableStatus
+    }> = {}
+    
+    filteredPayables.forEach(p => {
+      const key = `${p.vendorName}__${p.period}`
+      if (!groups[key]) {
+        groups[key] = {
+          vendorName: p.vendorName,
+          period: p.period,
+          items: [],
+          totalAmount: 0,
+          taskCount: 0,
+          status: p.status,
+        }
+      }
+      groups[key].items.push(p)
+      groups[key].totalAmount += p.amount
+      groups[key].taskCount += 1
+      // Use lowest status in group (pending < approved < paid)
+      if (statusOrder[p.status] < statusOrder[groups[key].status]) {
+        groups[key].status = p.status
+      }
+    })
+    
+    return Object.values(groups).sort((a, b) => {
+      // Sort by period desc, then vendor name
+      if (a.period !== b.period) return b.period.localeCompare(a.period)
+      return a.vendorName.localeCompare(b.vendorName)
+    })
+  }, [filteredPayables])
 
   // Get selected payables that can be advanced
   const selectedPayables = useMemo(() => 
@@ -244,6 +305,38 @@ export default function VendorPaymentsPage() {
       title: `Bulk action completed`,
       description: `${toUpdate.length} payments marked as ${newStatus}`,
     })
+  }
+  
+  // UPDATE-005: Handle mark group as paid with confirmation
+  const handleOpenMarkPaidDialog = (group: typeof groupedPayables[0]) => {
+    setMarkPaidGroup({
+      vendorName: group.vendorName,
+      period: group.period,
+      total: group.totalAmount,
+      count: group.taskCount,
+      ids: group.items.map(i => i.id),
+    })
+    setShowMarkPaidDialog(true)
+  }
+  
+  // UPDATE-005: Confirm mark as paid
+  const handleConfirmMarkPaid = () => {
+    if (!markPaidGroup) return
+    
+    // Update status to paid
+    setPayables(prev => prev.map(p => {
+      if (!markPaidGroup.ids.includes(p.id)) return p
+      return { ...p, status: 'paid' as PayableStatus }
+    }))
+    
+    // Simulate vendor notification
+    toast({
+      title: 'Payments marked as paid',
+      description: `Payment of ₪${markPaidGroup.total.toLocaleString()} processed. Vendor notification sent.`,
+    })
+    
+    setShowMarkPaidDialog(false)
+    setMarkPaidGroup(null)
   }
 
   // Select all visible (non-paid only)
@@ -336,6 +429,40 @@ export default function VendorPaymentsPage() {
             ))}
           </SelectContent>
         </Select>
+        
+        {/* UPDATE-004: Period Filter */}
+        <Select value={periodFilter} onValueChange={setPeriodFilter}>
+          <SelectTrigger className="w-[140px]">
+            <Calendar className="mr-2 h-4 w-4" />
+            <SelectValue placeholder="Period" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Periods</SelectItem>
+            {periods.map((period) => (
+              <SelectItem key={period} value={period}>{period}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        
+        {/* UPDATE-004: View Toggle */}
+        <div className="flex items-center gap-1 border rounded-md p-1">
+          <Button
+            variant={viewMode === 'grouped' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-7 px-2"
+            onClick={() => setViewMode('grouped')}
+          >
+            <LayoutGrid className="h-4 w-4" />
+          </Button>
+          <Button
+            variant={viewMode === 'list' ? 'secondary' : 'ghost'}
+            size="sm"
+            className="h-7 px-2"
+            onClick={() => setViewMode('list')}
+          >
+            <List className="h-4 w-4" />
+          </Button>
+        </div>
 
         {/* Bulk Action Button */}
         {canManagePayments && selectedIds.length > 0 && (
@@ -357,159 +484,243 @@ export default function VendorPaymentsPage() {
         )}
       </div>
 
-      {/* Table */}
-      <Card>
-        <CardContent className="px-4 py-2">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {canManagePayments && (
-                  <TableHead className="w-12">
-                    <Checkbox
-                      checked={allSelected}
-                      onCheckedChange={toggleSelectAll}
-                      aria-label="Select all"
-                    />
-                  </TableHead>
-                )}
-                <TableHead>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="gap-1 -ml-3 h-8"
-                    onClick={() => toggleSort('vendor')}
-                  >
-                    Vendor
-                    <ArrowUpDown className="h-3 w-3" />
-                  </Button>
-                </TableHead>
-                <TableHead>Project</TableHead>
-                <TableHead>Job Type</TableHead>
-                <TableHead>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="gap-1 -ml-3 h-8"
-                    onClick={() => toggleSort('status')}
-                  >
-                    Status
-                    <ArrowUpDown className="h-3 w-3" />
-                  </Button>
-                </TableHead>
-                <TableHead>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="gap-1 -ml-3 h-8"
-                    onClick={() => toggleSort('amount')}
-                  >
-                    Amount
-                    <ArrowUpDown className="h-3 w-3" />
-                  </Button>
-                </TableHead>
-                {canManagePayments && <TableHead className="w-24">Action</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredPayables.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={canManagePayments ? 7 : 5} className="py-8 text-center text-muted-foreground">
-                    No payables found.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredPayables.map((payable) => {
-                  const JobIcon = jobTypeConfig[payable.jobType].icon
-                  const statusCfg = statusConfig[payable.status]
-                  
-                  return (
-                    <TableRow 
-                      key={payable.id}
-                      className={cn(
-                        'transition-all duration-300',
-                        animatingOutId === payable.id && 'opacity-0 -translate-x-4'
-                      )}
-                    >
-                      {canManagePayments && (
-                        <TableCell>
-                          {payable.status !== 'paid' && (
-                            <Checkbox
-                              checked={selectedIds.includes(payable.id)}
-                              onCheckedChange={() => toggleSelect(payable.id)}
-                              aria-label={`Select ${payable.vendorName}`}
-                            />
-                          )}
-                        </TableCell>
-                      )}
-                      <TableCell className="font-medium">{payable.vendorName}</TableCell>
-                      <TableCell>
+      {/* UPDATE-004: Grouped View */}
+      {viewMode === 'grouped' && (
+        <div className="space-y-4">
+          {groupedPayables.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground">
+                No payables found.
+              </CardContent>
+            </Card>
+          ) : (
+            groupedPayables.map((group) => {
+              const statusCfg = statusConfig[group.status]
+              return (
+                <Card key={`${group.vendorName}__${group.period}`}>
+                  <CardContent className="p-4">
+                    {/* UPDATE-004: Group Summary Header with Period and Task Count */}
+                    <div className="flex items-center justify-between mb-3 pb-3 border-b">
+                      <div className="flex items-center gap-4">
                         <div>
-                          <Link 
-                            href={`/projects/${payable.projectId}`}
-                            className="text-primary hover:underline"
+                          <p className="font-semibold text-lg">{group.vendorName}</p>
+                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <Calendar className="h-3.5 w-3.5" />
+                              {group.period}
+                            </span>
+                            <span>{group.taskCount} task{group.taskCount !== 1 ? 's' : ''}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="font-bold text-lg">₪{group.totalAmount.toLocaleString()}</p>
+                          <span className={cn('rounded px-2 py-0.5 text-xs font-medium', statusCfg.className)}>
+                            {statusCfg.label}
+                          </span>
+                        </div>
+                        {/* UPDATE-005: Mark as Paid button for approved groups */}
+                        {canManagePayments && group.status === 'approved' && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleOpenMarkPaidDialog(group)}
+                            className="gap-1.5"
                           >
-                            {payable.projectName}
-                          </Link>
-                          <p className="text-xs text-muted-foreground">{payable.episodeName}</p>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <JobIcon className="h-4 w-4 text-muted-foreground" />
-                          <span>{jobTypeConfig[payable.jobType].label}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <span className={cn('rounded px-2 py-0.5 text-xs font-medium', statusCfg.className)}>
-                          {statusCfg.label}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="font-semibold cursor-default">
-                                ₪{payable.amount.toLocaleString()}
-                              </span>
-                            </TooltipTrigger>
-                            {payable.originalCurrency && (
-                              <TooltipContent>
-                                Original: {payable.originalCurrency === 'USD' ? '$' : '€'}{payable.originalAmount?.toLocaleString()}
-                              </TooltipContent>
-                            )}
-                          </Tooltip>
-                        </TooltipProvider>
-                      </TableCell>
-                      {canManagePayments && (
-                        <TableCell>
-                          {payable.status === 'paid' ? (
-                            <Check className="h-5 w-5 text-emerald-600" />
-                          ) : (
-                            <Button 
-                              size="sm" 
-                              variant="outline"
-                              onClick={() => handleApprove(payable.id)}
-                            >
-                              Approve
-                            </Button>
-                          )}
-                        </TableCell>
-                      )}
-                    </TableRow>
-                  )
-                })
-              )}
-            </TableBody>
-          </Table>
+                            <DollarSign className="h-4 w-4" />
+                            Mark Paid
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {/* Task list within group */}
+                    <div className="space-y-2">
+                      {group.items.map((payable) => {
+                        const JobIcon = jobTypeConfig[payable.jobType].icon
+                        return (
+                          <div key={payable.id} className="flex items-center justify-between py-2 px-3 bg-muted/30 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <JobIcon className="h-4 w-4 text-muted-foreground" />
+                              <div>
+                                <Link 
+                                  href={`/projects/${payable.projectId}`}
+                                  className="text-sm font-medium text-primary hover:underline"
+                                >
+                                  {payable.projectName}
+                                </Link>
+                                <p className="text-xs text-muted-foreground">{payable.episodeName}</p>
+                              </div>
+                            </div>
+                            <span className="font-medium">₪{payable.amount.toLocaleString()}</span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </CardContent>
+                </Card>
+              )
+            })
+          )}
+        </div>
+      )}
 
-          {/* Footer */}
-          <div className="border-t border-border p-4">
-            <p className="text-sm text-muted-foreground">
-              {filteredPayables.length} payable{filteredPayables.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      {/* List View (original table) */}
+      {viewMode === 'list' && (
+        <Card>
+          <CardContent className="px-4 py-2">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  {canManagePayments && (
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={allSelected}
+                        onCheckedChange={toggleSelectAll}
+                        aria-label="Select all"
+                      />
+                    </TableHead>
+                  )}
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="gap-1 -ml-3 h-8"
+                      onClick={() => toggleSort('vendor')}
+                    >
+                      Vendor
+                      <ArrowUpDown className="h-3 w-3" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>Project</TableHead>
+                  <TableHead>Period</TableHead>
+                  <TableHead>Job Type</TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="gap-1 -ml-3 h-8"
+                      onClick={() => toggleSort('status')}
+                    >
+                      Status
+                      <ArrowUpDown className="h-3 w-3" />
+                    </Button>
+                  </TableHead>
+                  <TableHead>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="gap-1 -ml-3 h-8"
+                      onClick={() => toggleSort('amount')}
+                    >
+                      Amount
+                      <ArrowUpDown className="h-3 w-3" />
+                    </Button>
+                  </TableHead>
+                  {canManagePayments && <TableHead className="w-24">Action</TableHead>}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredPayables.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={canManagePayments ? 8 : 6} className="py-8 text-center text-muted-foreground">
+                      No payables found.
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredPayables.map((payable) => {
+                    const JobIcon = jobTypeConfig[payable.jobType].icon
+                    const statusCfg = statusConfig[payable.status]
+                    
+                    return (
+                      <TableRow 
+                        key={payable.id}
+                        className={cn(
+                          'transition-all duration-300',
+                          animatingOutId === payable.id && 'opacity-0 -translate-x-4'
+                        )}
+                      >
+                        {canManagePayments && (
+                          <TableCell>
+                            {payable.status !== 'paid' && (
+                              <Checkbox
+                                checked={selectedIds.includes(payable.id)}
+                                onCheckedChange={() => toggleSelect(payable.id)}
+                                aria-label={`Select ${payable.vendorName}`}
+                              />
+                            )}
+                          </TableCell>
+                        )}
+                        <TableCell className="font-medium">{payable.vendorName}</TableCell>
+                        <TableCell>
+                          <div>
+                            <Link 
+                              href={`/projects/${payable.projectId}`}
+                              className="text-primary hover:underline"
+                            >
+                              {payable.projectName}
+                            </Link>
+                            <p className="text-xs text-muted-foreground">{payable.episodeName}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">{payable.period}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <JobIcon className="h-4 w-4 text-muted-foreground" />
+                            <span>{jobTypeConfig[payable.jobType].label}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <span className={cn('rounded px-2 py-0.5 text-xs font-medium', statusCfg.className)}>
+                            {statusCfg.label}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span className="font-semibold cursor-default">
+                                  ₪{payable.amount.toLocaleString()}
+                                </span>
+                              </TooltipTrigger>
+                              {payable.originalCurrency && (
+                                <TooltipContent>
+                                  Original: {payable.originalCurrency === 'USD' ? '$' : '€'}{payable.originalAmount?.toLocaleString()}
+                                </TooltipContent>
+                              )}
+                            </Tooltip>
+                          </TooltipProvider>
+                        </TableCell>
+                        {canManagePayments && (
+                          <TableCell>
+                            {payable.status === 'paid' ? (
+                              <Check className="h-5 w-5 text-emerald-600" />
+                            ) : (
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                onClick={() => handleApprove(payable.id)}
+                              >
+                                Approve
+                              </Button>
+                            )}
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    )
+                  })
+                )}
+              </TableBody>
+            </Table>
+
+            {/* Footer */}
+            <div className="border-t border-border p-4">
+              <p className="text-sm text-muted-foreground">
+                {filteredPayables.length} payable{filteredPayables.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Payment History Section */}
       {paymentHistory.length > 0 && (
@@ -575,6 +786,55 @@ export default function VendorPaymentsPage() {
             <Button onClick={handleBulkApprove}>
               <Check className="mr-2 h-4 w-4" />
               Confirm
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* UPDATE-005: Mark as Paid Confirmation Dialog */}
+      <Dialog open={showMarkPaidDialog} onOpenChange={setShowMarkPaidDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Mark Payments as Paid</DialogTitle>
+            <DialogDescription>
+              {markPaidGroup && (
+                <>Mark {markPaidGroup.count} payment{markPaidGroup.count !== 1 ? 's' : ''} (₪{markPaidGroup.total.toLocaleString()}) for {markPaidGroup.vendorName} as paid?</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {markPaidGroup && (
+            <div className="py-4 space-y-2">
+              <p className="text-sm">
+                <span className="text-muted-foreground">Vendor:</span>{' '}
+                <span className="font-medium">{markPaidGroup.vendorName}</span>
+              </p>
+              <p className="text-sm">
+                <span className="text-muted-foreground">Period:</span>{' '}
+                <span className="font-medium">{markPaidGroup.period}</span>
+              </p>
+              <p className="text-sm">
+                <span className="text-muted-foreground">Tasks:</span>{' '}
+                <span className="font-medium">{markPaidGroup.count}</span>
+              </p>
+              <p className="text-sm">
+                <span className="text-muted-foreground">Total:</span>{' '}
+                <span className="font-semibold">₪{markPaidGroup.total.toLocaleString()}</span>
+              </p>
+              <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  <Send className="inline h-4 w-4 mr-1" />
+                  Vendor will receive notification: &quot;Payment of ₪{markPaidGroup.total.toLocaleString()} processed.&quot;
+                </p>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowMarkPaidDialog(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleConfirmMarkPaid}>
+              <DollarSign className="mr-2 h-4 w-4" />
+              Confirm Payment
             </Button>
           </DialogFooter>
         </DialogContent>

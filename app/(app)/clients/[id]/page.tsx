@@ -370,6 +370,24 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                         onChange={(e) => setEditForm({ ...editForm, timezone: e.target.value })}
                       />
                     </div>
+                    {/* UPDATE-008: Default Currency in Company Details */}
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Default Currency</label>
+                      <Select
+                        value={editForm.defaultCurrency}
+                        onValueChange={(value) => setEditForm({ ...editForm, defaultCurrency: value as typeof editForm.defaultCurrency })}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ILS">ILS (Israeli Shekel)</SelectItem>
+                          <SelectItem value="USD">USD (US Dollar)</SelectItem>
+                          <SelectItem value="EUR">EUR (Euro)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground">Used as default for quotes and invoices</p>
+                    </div>
                   </>
                 ) : (
                   <>
@@ -385,6 +403,11 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                     <div className="flex items-center gap-3">
                       <Clock className="h-4 w-4 text-muted-foreground" />
                       <p className="text-sm">{client.timezone}</p>
+                    </div>
+                    {/* UPDATE-008: Show Default Currency in read mode */}
+                    <div className="flex items-center gap-3">
+                      <CreditCard className="h-4 w-4 text-muted-foreground" />
+                      <p className="text-sm">Default: {client.defaultCurrency}</p>
                     </div>
                   </>
                 )}
