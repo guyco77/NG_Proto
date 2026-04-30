@@ -280,31 +280,34 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               isAssignedVendor={isAssignedVendor}
               canView={canEditTask}
             />
-            {currentStatus === 'assigned' && isAssignedVendor && (
+            {/* Vendor actions - hidden when task is complete (read-only state) */}
+            {!isTaskComplete && currentStatus === 'assigned' && isAssignedVendor && (
               <Button variant="outline" className="gap-1.5" onClick={() => handleStatusChange('in_progress')}>
                 <Play className="h-4 w-4" />
                 Start Task
               </Button>
             )}
-            {currentStatus === 'in_progress' && isAssignedVendor && (
+            {!isTaskComplete && currentStatus === 'in_progress' && isAssignedVendor && (
               <Button variant="outline" className="gap-1.5" onClick={() => handleStatusChange('submitted')}>
                 <FileCheck className="h-4 w-4" />
                 Submit for Review
               </Button>
             )}
-            {!task.assignedVendor && canEditTask && (
+            {/* PM/Admin actions - hidden when task is complete (read-only state) */}
+            {!isTaskComplete && !task.assignedVendor && canEditTask && (
               <Button variant="outline" className="gap-1.5" onClick={() => setShowAssignDialog(true)}>
                 <UserPlus className="h-4 w-4" />
                 Assign Vendor
               </Button>
             )}
-            {task.assignedVendor && canEditTask && currentStatus !== 'complete' && (
+            {!isTaskComplete && task.assignedVendor && canEditTask && (
               <Button variant="outline" className="gap-1.5" onClick={() => setShowReassignDialog(true)}>
                 <RefreshCw className="h-4 w-4" />
                 Reassign
               </Button>
             )}
-            {canEditTask && (
+            {/* Actions menu - hidden for complete tasks (fully read-only) */}
+            {canEditTask && !isTaskComplete && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon">
@@ -333,15 +336,13 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                     </>
                   )}
                   <DropdownMenuSeparator />
-                  {!isTaskComplete && (
-                    <DropdownMenuItem 
-                      className="text-destructive"
-                      onClick={() => setShowDeleteDialog(true)}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete Task
-                    </DropdownMenuItem>
-                  )}
+                  <DropdownMenuItem 
+                    className="text-destructive"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Task
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
