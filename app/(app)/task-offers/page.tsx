@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Search,
@@ -33,13 +34,15 @@ import { formatDate, TASK_SERVICE_TYPES } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 
 // Mock task offers (tasks with status 'open_for_offers')
+// Task names use the canonical 16 Task Step Types (per Update TASK-008/TASK-010)
+// All deadlines are future dates in May 2026 (no same-day or past dates)
 const taskOffers = [
   {
     id: 'to1',
-    name: 'Pilot - Voice Recording',
+    name: 'QC', // Canonical Task Type
     project: 'Disney+ Series Adaptation',
     projectId: 'p2',
-    deadline: '2024-02-20',
+    deadline: '2026-05-08',
     service: 'Dubbing with AI Transcript',
     serviceType: 'QC',
     sourceLanguage: 'EN',
@@ -49,10 +52,10 @@ const taskOffers = [
   },
   {
     id: 'to2',
-    name: 'Episode 3 - Subtitling PT',
+    name: 'Translation', // Canonical Task Type
     project: 'Netflix Q1 Localization',
     projectId: 'p1',
-    deadline: '2024-02-25',
+    deadline: '2026-05-12',
     service: 'Subtitles Transcription AI',
     serviceType: 'Translation',
     sourceLanguage: 'EN',
@@ -62,16 +65,42 @@ const taskOffers = [
   },
   {
     id: 'to3',
-    name: 'Documentary - Timing',
+    name: 'Timing', // Canonical Task Type
     project: 'HBO Max Documentary',
     projectId: 'p3',
-    deadline: '2024-02-18',
+    deadline: '2026-05-05',
     service: 'Subtitles Transcription AI',
     serviceType: 'Timing',
     sourceLanguage: 'EN',
     targetLanguage: 'ES',
     duration: '90 min',
     pmDescription: 'Please follow Netflix timing guidelines for this project.',
+  },
+  {
+    id: 'to4',
+    name: 'Transcription AI', // Canonical Task Type
+    project: 'Amazon Prime Feature Film',
+    projectId: 'p4',
+    deadline: '2026-05-15',
+    service: 'Subtitles Transcription AI',
+    serviceType: 'Transcription AI',
+    sourceLanguage: 'EN',
+    targetLanguage: 'FR',
+    duration: '120 min',
+    pmDescription: 'Use the AI transcription model for initial pass.',
+  },
+  {
+    id: 'to5',
+    name: 'Proofread', // Canonical Task Type
+    project: 'HBO Max Documentary',
+    projectId: 'p3',
+    deadline: '2026-05-20',
+    service: 'QC Pass',
+    serviceType: 'Proofread',
+    sourceLanguage: 'ES',
+    targetLanguage: 'ES',
+    duration: '90 min',
+    pmDescription: 'Final proofread before client delivery.',
   },
 ]
 
@@ -91,19 +120,31 @@ function getDaysUntilDeadline(dateString: string): { days: number; isUrgent: boo
 }
 
 function getServiceIcon(serviceType: string): string {
+  // Icons for all 16 canonical Task Step Types
   const icons: Record<string, string> = {
     'Transcription': '🎙️',
+    'Transcription AI': '🤖',
     'Timing': '⏱️',
+    'Timing AI': '⏰',
     'Translation': '🌐',
+    'Translation from Audio': '🎧',
+    'Upload TT': '📤',
+    'Upload Text File': '📄',
     'QC': '✅',
     'PM Verification': '📋',
+    'Proofread': '📝',
     'Client Review': '👤',
+    'Upload Client Asset': '📁',
+    'Upload Rough Cut': '🎬',
+    'New Cut': '✂️',
+    'Project Creation': '🆕',
   }
   return icons[serviceType] || '📄'
 }
 
 export default function TaskOffersPage() {
   const { currentRole } = useRole()
+  const router = useRouter()
   const [serviceFilter, setServiceFilter] = useState<string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [acceptedOffers, setAcceptedOffers] = useState<string[]>([])
@@ -147,8 +188,12 @@ export default function TaskOffersPage() {
     setConfirmOffer(null)
     setShowSuccess(true)
     
-    // Hide success animation after 2 seconds
-    setTimeout(() => setShowSuccess(false), 2000)
+    // Redirect to tasks list after brief success animation
+    // Pass the accepted offer ID to highlight the new task
+    setTimeout(() => {
+      setShowSuccess(false)
+      router.push(`/tasks?accepted=${confirmOffer.id}`)
+    }, 1500)
   }
 
   return (

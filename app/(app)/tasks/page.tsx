@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   Search,
@@ -63,13 +64,24 @@ import type { TaskStatus } from '@/lib/types'
 const ITEMS_PER_PAGE = 50
 
 function getServiceIcon(serviceType: string): string {
+  // Icons for all 16 canonical Task Step Types
   const icons: Record<string, string> = {
     'Transcription': '🎙️',
+    'Transcription AI': '🤖',
     'Timing': '⏱️',
+    'Timing AI': '⏰',
     'Translation': '🌐',
+    'Translation from Audio': '🎧',
+    'Upload TT': '📤',
+    'Upload Text File': '📄',
     'QC': '✅',
     'PM Verification': '📋',
+    'Proofread': '📝',
     'Client Review': '👤',
+    'Upload Client Asset': '📁',
+    'Upload Rough Cut': '🎬',
+    'New Cut': '✂️',
+    'Project Creation': '🆕',
   }
   return icons[serviceType] || '📄'
 }
@@ -81,6 +93,22 @@ function isOverdue(dateString: string): boolean {
 export default function TasksPage() {
   const { currentRole } = useRole()
   const { toast } = useToast()
+  const searchParams = useSearchParams()
+  const acceptedTaskId = searchParams.get('accepted')
+  
+  // State for highlighting just-accepted task
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null)
+  
+  // Show highlight animation when task is just accepted from offers
+  useEffect(() => {
+    if (acceptedTaskId) {
+      setHighlightedTaskId(acceptedTaskId)
+      // Remove highlight after 3 seconds
+      const timer = setTimeout(() => setHighlightedTaskId(null), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [acceptedTaskId])
+  
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [projectFilters, setProjectFilters] = useState<string[]>([])
@@ -662,12 +690,14 @@ export default function TasksPage() {
             <tbody className="divide-y divide-border">
               {paginatedTasks.map((task) => {
                 const taskOverdue = isOverdue(task.dueDate) && task.status !== 'complete'
+                const isHighlighted = highlightedTaskId === task.id
                 return (
                   <tr 
                     key={task.id} 
                     className={cn(
-                      "hover:bg-muted/50",
-                      taskOverdue && "bg-red-50/50"
+                      "hover:bg-muted/50 transition-colors duration-500",
+                      taskOverdue && "bg-red-50/50",
+                      isHighlighted && "animate-pulse bg-emerald-50 ring-2 ring-emerald-500 ring-inset"
                     )}
                   >
                     {/* Checkbox column hidden for vendors */}

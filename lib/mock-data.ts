@@ -239,15 +239,40 @@ export const mockProjects: Project[] = [
   },
 ]
 
+// Mock tasks with realistic spread of deadlines across April-June 2026
+// Mix of past (for overdue demo), current, and future dates
+// Task names use canonical Task Step Types
 export const mockTasks: Task[] = [
-  { id: 't1', projectId: 'p1', projectName: 'Netflix Q1 Localization', name: 'Episode 1 - Subtitling ES', service: 'Subtitles Transcription AI', serviceType: 'Translation', status: 'complete', assignedVendor: 'Lisa Translator', vendorId: 'v1', dueDate: '2024-02-01', price: 450, sourceLanguage: 'EN', targetLanguage: 'ES' },
-  { id: 't2', projectId: 'p1', projectName: 'Netflix Q1 Localization', name: 'Episode 1 - Subtitling FR', service: 'Subtitles Transcription AI', serviceType: 'Translation', status: 'in_progress', assignedVendor: 'Pierre Dubois', vendorId: 'v2', dueDate: '2024-02-05', price: 450, sourceLanguage: 'EN', targetLanguage: 'FR' },
-  { id: 't3', projectId: 'p1', projectName: 'Netflix Q1 Localization', name: 'Episode 1 - Dubbing DE', service: 'Dubbing with AI Transcript', serviceType: 'Transcription', status: 'unassigned', dueDate: '2024-02-10', price: 2500, sourceLanguage: 'EN', targetLanguage: 'DE' },
-  { id: 't4', projectId: 'p2', projectName: 'Disney+ Series Adaptation', name: 'Pilot - Script Adaptation', service: 'Translation from Audio', serviceType: 'Translation', status: 'submitted', assignedVendor: 'Maria Garcia', vendorId: 'v3', dueDate: '2024-02-15', price: 800, sourceLanguage: 'EN', targetLanguage: 'ES' },
-  { id: 't5', projectId: 'p2', projectName: 'Disney+ Series Adaptation', name: 'Pilot - Voice Recording', service: 'Dubbing with AI Transcript', serviceType: 'QC', status: 'open_for_offers', dueDate: '2024-02-20', price: 3500, sourceLanguage: 'EN', targetLanguage: 'ES' },
-  { id: 't6', projectId: 'p3', projectName: 'HBO Max Documentary', name: 'Final QC Review', service: 'QC Pass', serviceType: 'QC', status: 'in_progress', assignedVendor: 'Quality Team', vendorId: 'v4', dueDate: '2024-02-25', price: 600, sourceLanguage: 'EN', targetLanguage: 'ES' },
-  { id: 't7', projectId: 'p1', projectName: 'Netflix Q1 Localization', name: 'Episode 2 - Timing', service: 'Subtitles Transcription AI', serviceType: 'Timing', status: 'assigned', assignedVendor: 'Lisa Translator', vendorId: 'v1', dueDate: '2024-02-08', price: 300, sourceLanguage: 'EN', targetLanguage: 'ES' },
-  { id: 't8', projectId: 'p1', projectName: 'Netflix Q1 Localization', name: 'Episode 2 - PM Verification', service: 'Subtitles Transcription AI', serviceType: 'PM Verification', status: 'unassigned', dueDate: '2024-02-12', price: 150, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  // Completed tasks (past dates OK)
+  { id: 't1', projectId: 'p1', projectName: 'Netflix Q1 Localization', name: 'Translation', service: 'Subtitles Transcription AI', serviceType: 'Translation', status: 'complete', assignedVendor: 'Lisa Translator', vendorId: 'v1', dueDate: '2026-04-15', price: 450, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  { id: 't2', projectId: 'p1', projectName: 'Netflix Q1 Localization', name: 'Translation', service: 'Subtitles Transcription AI', serviceType: 'Translation', status: 'complete', assignedVendor: 'Pierre Dubois', vendorId: 'v2', dueDate: '2026-04-20', price: 450, sourceLanguage: 'EN', targetLanguage: 'FR' },
+  
+  // In progress tasks (mix of near-term and future)
+  { id: 't3', projectId: 'p1', projectName: 'Netflix Q1 Localization', name: 'Transcription', service: 'Dubbing with AI Transcript', serviceType: 'Transcription', status: 'in_progress', assignedVendor: 'Lisa Translator', vendorId: 'v1', dueDate: '2026-05-05', price: 2500, sourceLanguage: 'EN', targetLanguage: 'DE' },
+  { id: 't6', projectId: 'p3', projectName: 'HBO Max Documentary', name: 'QC', service: 'QC Pass', serviceType: 'QC', status: 'in_progress', assignedVendor: 'Quality Team', vendorId: 'v4', dueDate: '2026-05-10', price: 600, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  
+  // Assigned tasks (future dates)
+  { id: 't7', projectId: 'p1', projectName: 'Netflix Q1 Localization', name: 'Timing', service: 'Subtitles Transcription AI', serviceType: 'Timing', status: 'assigned', assignedVendor: 'Lisa Translator', vendorId: 'v1', dueDate: '2026-05-08', price: 300, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  { id: 't9', projectId: 'p2', projectName: 'Disney+ Series Adaptation', name: 'Timing AI', service: 'Subtitles Transcription AI', serviceType: 'Timing AI', status: 'assigned', assignedVendor: 'Pierre Dubois', vendorId: 'v2', dueDate: '2026-05-15', price: 250, sourceLanguage: 'EN', targetLanguage: 'FR' },
+  
+  // Submitted tasks (future dates)
+  { id: 't4', projectId: 'p2', projectName: 'Disney+ Series Adaptation', name: 'Translation from Audio', service: 'Translation from Audio', serviceType: 'Translation from Audio', status: 'submitted', assignedVendor: 'Maria Garcia', vendorId: 'v3', dueDate: '2026-05-12', price: 800, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  
+  // Unassigned tasks (future dates - ready for assignment)
+  { id: 't8', projectId: 'p1', projectName: 'Netflix Q1 Localization', name: 'PM Verification', service: 'Subtitles Transcription AI', serviceType: 'PM Verification', status: 'unassigned', dueDate: '2026-05-18', price: 150, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  { id: 't10', projectId: 'p3', projectName: 'HBO Max Documentary', name: 'Proofread', service: 'QC Pass', serviceType: 'Proofread', status: 'unassigned', dueDate: '2026-05-22', price: 200, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  { id: 't11', projectId: 'p4', projectName: 'Amazon Prime Feature Film', name: 'Transcription AI', service: 'Subtitles Transcription AI', serviceType: 'Transcription AI', status: 'unassigned', dueDate: '2026-05-25', price: 350, sourceLanguage: 'EN', targetLanguage: 'DE' },
+  
+  // Open for offers tasks (future May dates)
+  { id: 't5', projectId: 'p2', projectName: 'Disney+ Series Adaptation', name: 'QC', service: 'Dubbing with AI Transcript', serviceType: 'QC', status: 'open_for_offers', dueDate: '2026-05-08', price: 3500, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  { id: 't12', projectId: 'p1', projectName: 'Netflix Q1 Localization', name: 'Client Review', service: 'QC Pass', serviceType: 'Client Review', status: 'open_for_offers', dueDate: '2026-05-20', price: 500, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  
+  // A couple overdue tasks (past dates - for demo of overdue state)
+  { id: 't13', projectId: 'p3', projectName: 'HBO Max Documentary', name: 'Translation', service: 'Subtitles Transcription AI', serviceType: 'Translation', status: 'in_progress', assignedVendor: 'Maria Garcia', vendorId: 'v3', dueDate: '2026-04-25', price: 400, sourceLanguage: 'EN', targetLanguage: 'PT' },
+  
+  // Future tasks in June
+  { id: 't14', projectId: 'p4', projectName: 'Amazon Prime Feature Film', name: 'Translation', service: 'Subtitles Transcription AI', serviceType: 'Translation', status: 'assigned', assignedVendor: 'Lisa Translator', vendorId: 'v1', dueDate: '2026-06-05', price: 600, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  { id: 't15', projectId: 'p4', projectName: 'Amazon Prime Feature Film', name: 'Timing', service: 'Subtitles Transcription AI', serviceType: 'Timing', status: 'unassigned', dueDate: '2026-06-10', price: 280, sourceLanguage: 'EN', targetLanguage: 'FR' },
 ]
 
 export const TASK_STATUSES: { value: string; label: string; color: string }[] = [
