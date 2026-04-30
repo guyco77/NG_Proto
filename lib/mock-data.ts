@@ -351,23 +351,29 @@ export const TASK_STEP_TYPES = [
 // Alias for backwards compatibility
 export const TASK_SERVICE_TYPES = TASK_STEP_TYPES
 
+// Update 01: mockQuotes with name field (required), projectId optional, price replaces totalAmount
 export const mockQuotes: Quote[] = [
   {
     id: 'q1',
     quoteNumber: 'Q-2024-001',
+    name: 'Amazon Feature Film Localization',
+    description: 'Full localization services for upcoming feature film release.',
     projectId: 'p4',
     projectName: 'Amazon Prime Feature Film',
     clientId: 'c4',
     clientName: 'Amazon Studios',
     status: 'sent',
+    services: ['Translation from Audio', 'Subtitles Transcription AI', 'Extra QC'],
+    sourceLanguage: 'EN',
+    targetLanguages: ['ES', 'DE', 'FR'],
     currency: 'USD',
-    totalAmount: 158400,
+    price: 158400,
     createdAt: '2024-02-01',
     sentAt: '2024-02-02',
     notesToClient: 'Thank you for choosing NG Broadcast. This quote covers full localization services for your feature film.',
     internalNotes: 'High priority client. Consider 5% discount on next project.',
     items: [
-      { id: 'qi1', service: 'Dubbing with AI Transcript', description: 'Full dubbing ES + DE', quantity: 120, unitRate: 1000, lineTotal: 120000 },
+      { id: 'qi1', service: 'Translation from Audio', description: 'Full dubbing ES + DE', quantity: 120, unitRate: 1000, lineTotal: 120000 },
       { id: 'qi2', service: 'Subtitles Transcription AI', description: 'Subtitling FR', quantity: 120, unitRate: 300, lineTotal: 36000 },
       { id: 'qi3', service: 'Extra QC', description: 'Quality control all deliverables', quantity: 20, unitRate: 120, lineTotal: 2400 },
     ],
@@ -378,13 +384,18 @@ export const mockQuotes: Quote[] = [
   {
     id: 'q2',
     quoteNumber: 'Q-2024-002',
+    name: 'Netflix Q1 Localization Package',
+    description: 'Q1 localization for 10 episodes including subtitling and dubbing.',
     projectId: 'p1',
     projectName: 'Netflix Q1 Localization',
     clientId: 'c1',
     clientName: 'Netflix Inc.',
     status: 'approved',
+    services: ['Subtitles Transcription AI', 'Translation from Audio', 'Extra QC'],
+    sourceLanguage: 'EN',
+    targetLanguages: ['ES', 'FR', 'DE'],
     currency: 'USD',
-    totalAmount: 125000,
+    price: 125000,
     createdAt: '2024-01-10',
     sentAt: '2024-01-10',
     approvedAt: '2024-01-12',
@@ -393,7 +404,7 @@ export const mockQuotes: Quote[] = [
     notesToClient: 'We look forward to working on your Q1 localization project.',
     items: [
       { id: 'qi4', service: 'Subtitles Transcription AI', description: 'Subtitling - 10 episodes (ES, FR)', quantity: 200, unitRate: 250, lineTotal: 50000 },
-      { id: 'qi5', service: 'Dubbing with AI Transcript', description: 'Dubbing - 10 episodes (DE)', quantity: 100, unitRate: 700, lineTotal: 70000 },
+      { id: 'qi5', service: 'Translation from Audio', description: 'Dubbing - 10 episodes (DE)', quantity: 100, unitRate: 700, lineTotal: 70000 },
       { id: 'qi6', service: 'Extra QC', description: 'Final QC pass', quantity: 50, unitRate: 100, lineTotal: 5000 },
     ],
     pmId: '2',
@@ -403,13 +414,15 @@ export const mockQuotes: Quote[] = [
   {
     id: 'q3',
     quoteNumber: 'Q-2024-003',
+    name: 'Paramount Reality Show Subtitling',
     projectId: 'p6',
     projectName: 'Paramount+ Reality Show',
     clientId: 'c6',
     clientName: 'Paramount Global',
     status: 'unsent',
+    services: ['Subtitles Transcription AI'],
     currency: 'USD',
-    totalAmount: 45000,
+    price: 45000,
     createdAt: '2024-02-15',
     items: [
       { id: 'qi7', service: 'Subtitles Transcription AI', description: 'Subtitling - 12 episodes', quantity: 120, unitRate: 375, lineTotal: 45000 },
@@ -420,19 +433,24 @@ export const mockQuotes: Quote[] = [
   {
     id: 'q4',
     quoteNumber: 'Q-2024-004',
+    name: 'Disney Series Full Adaptation',
+    description: 'Complete adaptation package for the new animated series.',
     projectId: 'p2',
     projectName: 'Disney+ Series Adaptation',
     clientId: 'c2',
     clientName: 'Disney Streaming',
     status: 'changes_requested',
+    services: ['Translation from Audio', 'Subtitles Transcription AI', 'Extra QC'],
+    sourceLanguage: 'EN',
+    targetLanguages: ['ES', 'PT'],
     currency: 'USD',
-    totalAmount: 250000,
+    price: 250000,
     createdAt: '2024-01-25',
     sentAt: '2024-01-26',
     notesToClient: 'Complete adaptation package for your new series.',
     internalNotes: 'Client asked for breakdown by episode. Need to revise line items.',
     items: [
-      { id: 'qi8', service: 'Dubbing with AI Transcript', description: 'Dubbing ES', quantity: 200, unitRate: 800, lineTotal: 160000 },
+      { id: 'qi8', service: 'Translation from Audio', description: 'Dubbing ES', quantity: 200, unitRate: 800, lineTotal: 160000 },
       { id: 'qi9', service: 'Subtitles Transcription AI', description: 'Subtitling PT', quantity: 200, unitRate: 350, lineTotal: 70000 },
       { id: 'qi10', service: 'Extra QC', description: 'QC all deliverables', quantity: 200, unitRate: 100, lineTotal: 20000 },
     ],
@@ -442,13 +460,18 @@ export const mockQuotes: Quote[] = [
   {
     id: 'q5',
     quoteNumber: 'Q-2024-005',
+    name: 'HBO Documentary Subtitling',
+    description: 'Subtitling services for award-winning documentary series.',
     projectId: 'p3',
     projectName: 'HBO Max Documentary',
     clientId: 'c3',
     clientName: 'Warner Bros.',
-    status: 'moved_to_project',
+    status: 'moved_to_show', // Update 02: changed from moved_to_project
+    services: ['Subtitles Transcription AI', 'Extra QC'],
+    sourceLanguage: 'EN',
+    targetLanguages: ['ES', 'FR'],
     currency: 'USD',
-    totalAmount: 85000,
+    price: 85000,
     createdAt: '2023-11-20',
     sentAt: '2023-11-20',
     approvedAt: '2023-11-22',
@@ -461,8 +484,28 @@ export const mockQuotes: Quote[] = [
     pmId: '1',
     pmName: 'Sarah Admin',
   },
+  // Update 01: Example standalone quote (no project linked)
+  {
+    id: 'q6',
+    quoteNumber: 'Q-2024-006',
+    name: 'Verbal Request - Corporate Training Videos',
+    description: 'Client called to discuss subtitling for internal training materials. No files submitted yet.',
+    clientId: 'c1',
+    clientName: 'Netflix Inc.',
+    status: 'draft',
+    services: ['Subtitles Transcription', 'Text Translation'],
+    sourceLanguage: 'EN',
+    targetLanguages: ['ES', 'FR', 'DE', 'JA'],
+    currency: 'USD',
+    price: 12000,
+    createdAt: '2024-02-20',
+    internalNotes: 'Estimate based on 60 minutes of content. Waiting for client to send files.',
+    pmId: '2',
+    pmName: 'Mike Manager',
+  },
 ]
 
+// Update 02: Changed moved_to_project → moved_to_show
 export const QUOTE_STATUSES: { value: string; label: string }[] = [
   { value: 'unsent', label: 'Unsent' },
   { value: 'draft', label: 'Draft' },
@@ -471,8 +514,39 @@ export const QUOTE_STATUSES: { value: string; label: string }[] = [
   { value: 'approved', label: 'Approved' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'superseded', label: 'Superseded' },
-  { value: 'moved_to_project', label: 'Moved to Project' },
+  { value: 'moved_to_show', label: 'Moved to Show' },
 ]
+
+// Update 01: Canonical 17 services grouped by category (Epic 14 - SERV-001)
+export const SERVICES_BY_CATEGORY = {
+  'Transcription Services': [
+    'Subtitles Transcription',
+    'Subtitles Transcription AI',
+  ],
+  'Translation Services': [
+    'Translation from Audio + Template',
+    'Translation from Audio',
+    'Translation from Audio + Template AI',
+    'Translation from Template AI',
+    'Text Translation',
+    'Translation Pivot Language',
+  ],
+  'Editing & Quality Control': [
+    'Proofread',
+    'Extra QC',
+  ],
+  'Technical & Special Services': [
+    'Timing',
+    'Client Corrections',
+    'New Version (Re-conforming)',
+    'Convert Files',
+    'Other',
+  ],
+  'Administrative / Billing Only': [
+    'Raw Materials',
+    'Translation On-Site',
+  ],
+} as const
 
 export const SERVICES_LIST = [
   'Subtitles Transcription',
@@ -1568,7 +1642,8 @@ export function getStatusColor(status: string): string {
     changes_requested: 'bg-amber-100 text-amber-800 border border-amber-200',
     rejected: 'bg-red-100 text-red-800 border border-red-200',
     superseded: 'bg-gray-200 text-gray-700 border border-gray-300',
-    moved_to_project: 'bg-teal-100 text-teal-800 border border-teal-200',
+    // Update 02: Changed from moved_to_project to moved_to_show
+    moved_to_show: 'bg-teal-100 text-teal-800 border border-teal-200',
     // Invoice statuses (BILL-002)
     paid: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
     sent: 'bg-blue-100 text-blue-800 border border-blue-200',
