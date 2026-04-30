@@ -755,15 +755,23 @@ export default function TasksPage() {
                       <div className="flex items-center gap-2">
                         <StatusBadge status={task.status} />
                         {taskOverdue && (
-                          <AlertTriangle className="h-4 w-4 text-red-500" />
+                          <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                            <AlertTriangle className="h-3 w-3" />
+                            Overdue
+                          </span>
                         )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <Calendar className={cn("h-4 w-4", taskOverdue ? "text-red-500" : "text-muted-foreground")} />
                         <span className={cn(taskOverdue && "text-red-600 font-medium")}>
                           {formatDate(task.dueDate)}
+                          {taskOverdue && (
+                            <span className="ml-1 text-red-500">
+                              ({Math.ceil((new Date().getTime() - new Date(task.dueDate).getTime()) / (1000 * 60 * 60 * 24))}d overdue)
+                            </span>
+                          )}
                         </span>
                       </div>
                     </td>

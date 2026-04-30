@@ -267,8 +267,12 @@ export const mockTasks: Task[] = [
   { id: 't5', projectId: 'p2', projectName: 'Disney+ Series Adaptation', name: 'QC', service: 'Dubbing with AI Transcript', serviceType: 'QC', status: 'open_for_offers', dueDate: '2026-05-08', price: 3500, sourceLanguage: 'EN', targetLanguage: 'ES' },
   { id: 't12', projectId: 'p1', projectName: 'Netflix Q1 Localization', name: 'Client Review', service: 'QC Pass', serviceType: 'Client Review', status: 'open_for_offers', dueDate: '2026-05-20', price: 500, sourceLanguage: 'EN', targetLanguage: 'ES' },
   
-  // A couple overdue tasks (past dates - for demo of overdue state)
+  // OVERDUE TASKS - Today is 4/30/2026, these are clearly past due
+  // These demonstrate the overdue state with red styling and warning icon
   { id: 't13', projectId: 'p3', projectName: 'HBO Max Documentary', name: 'Translation', service: 'Subtitles Transcription AI', serviceType: 'Translation', status: 'in_progress', assignedVendor: 'Maria Garcia', vendorId: 'v3', dueDate: '2026-04-25', price: 400, sourceLanguage: 'EN', targetLanguage: 'PT' },
+  { id: 't16', projectId: 'p1', projectName: 'Netflix Q1 Localization', name: 'QC', service: 'QC Pass', serviceType: 'QC', status: 'assigned', assignedVendor: 'Lisa Translator', vendorId: 'v1', dueDate: '2026-04-20', price: 200, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  { id: 't17', projectId: 'p2', projectName: 'Disney+ Series Adaptation', name: 'Timing', service: 'Subtitles Transcription AI', serviceType: 'Timing', status: 'in_progress', assignedVendor: 'Pierre Dubois', vendorId: 'v2', dueDate: '2026-04-15', price: 350, sourceLanguage: 'EN', targetLanguage: 'FR' },
+  { id: 't18', projectId: 'p3', projectName: 'HBO Max Documentary', name: 'Proofread', service: 'QC Pass', serviceType: 'Proofread', status: 'assigned', assignedVendor: 'Quality Team', vendorId: 'v4', dueDate: '2026-04-28', price: 180, sourceLanguage: 'EN', targetLanguage: 'ES' },
   
   // Future tasks in June
   { id: 't14', projectId: 'p4', projectName: 'Amazon Prime Feature Film', name: 'Translation', service: 'Subtitles Transcription AI', serviceType: 'Translation', status: 'assigned', assignedVendor: 'Lisa Translator', vendorId: 'v1', dueDate: '2026-06-05', price: 600, sourceLanguage: 'EN', targetLanguage: 'ES' },
