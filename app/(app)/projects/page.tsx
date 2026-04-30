@@ -1509,22 +1509,23 @@ export default function ProjectsPage() {
   <Table>
           <TableHeader>
 <TableRow className="hover:bg-transparent bg-muted/50">
-                {/* PROJ-005-Client: Different columns for clients vs admin/PM */}
-                {/* Update PROJ-005: "Project" renamed to "Show / Scene" */}
-                <TableHead className={isClient ? "w-[300px]" : "w-[280px]"}>Show / Scene</TableHead>
-              {!isClient && <TableHead className="w-[140px]">Client</TableHead>}
-              <TableHead className="w-[160px]">Status</TableHead>
-              {isClient ? (
-                <TableHead className="w-[140px]">Assignee</TableHead>
-              ) : (
-                <TableHead className="w-[100px]">PM</TableHead>
-              )}
-              <TableHead className="w-[110px]">Deadline</TableHead>
-              <TableHead className="w-[90px]">Priority</TableHead>
-              <TableHead className="w-[80px] text-right">Progress</TableHead>
-              {/* PROJ-005-Client: No actions menu for clients */}
-              {!isClient && <TableHead className="w-[50px]"></TableHead>}
-            </TableRow>
+  {/* Update 02: Show, Scene, and Services as three separate columns */}
+  <TableHead className="w-[140px]">Show</TableHead>
+  <TableHead className="w-[160px]">Scene</TableHead>
+  <TableHead className="w-[140px]">Services</TableHead>
+  {!isClient && <TableHead className="w-[120px]">Client</TableHead>}
+  <TableHead className="w-[140px]">Status</TableHead>
+  {isClient ? (
+  <TableHead className="w-[120px]">Assignee</TableHead>
+  ) : (
+  <TableHead className="w-[100px]">PM</TableHead>
+  )}
+  <TableHead className="w-[100px]">Deadline</TableHead>
+  <TableHead className="w-[80px]">Priority</TableHead>
+  <TableHead className="w-[70px] text-right">Progress</TableHead>
+  {/* PROJ-005-Client: No actions menu for clients */}
+  {!isClient && <TableHead className="w-[50px]"></TableHead>}
+  </TableRow>
           </TableHeader>
           <TableBody>
             {/* Update PROJ-005: Render grouped or ungrouped view */}
@@ -1539,7 +1540,8 @@ export default function ProjectsPage() {
                       className="bg-muted/70 hover:bg-muted cursor-pointer border-t-2 border-border"
                       onClick={() => toggleShowCollapse(group.show.id)}
                     >
-                      <TableCell colSpan={isClient ? 6 : 8} className="py-2">
+                      {/* Update 02: colspan updated for 3 separate columns (Show, Scene, Services) + other columns */}
+                      <TableCell colSpan={isClient ? 8 : 10} className="py-2">
                         <div className="flex items-center gap-2">
                           <ChevronDown className={cn(
                             "h-4 w-4 transition-transform",
@@ -1569,14 +1571,18 @@ export default function ProjectsPage() {
                           )}
                           onClick={() => router.push(`/projects/${project.id}`)}
                         >
-                          {/* Scene name only (Show is in section header) */}
+                          {/* Update 02: In grouped view, Show column is empty (header shows it), Scene and Services separate */}
                           <TableCell>
-                            <div className="pl-6">
-                              <p className="font-medium text-foreground">{project.name}</p>
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                {project.services.join(', ')}
-                              </p>
-                            </div>
+                            {/* Empty - Show is in section header */}
+                            <div className="pl-4 text-muted-foreground text-sm">—</div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-medium text-foreground">{project.name}</span>
+                          </TableCell>
+                          <TableCell>
+                            <p className="text-sm text-muted-foreground truncate max-w-[140px]" title={project.services.join(', ')}>
+                              {project.services.join(', ')}
+                            </p>
                           </TableCell>
                           {!isClient && (
                             <TableCell>
@@ -1737,21 +1743,22 @@ export default function ProjectsPage() {
                   )}
                   onClick={() => router.push(`/projects/${project.id}`)}
                 >
-                  {/* Update PROJ-005: Show > Scene display */}
+                  {/* Update 02: Show, Scene, and Services as three separate columns */}
                   <TableCell>
-                    <div>
-                      {/* Show breadcrumb */}
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground mb-0.5">
-                        <Film className="h-3 w-3" />
-                        <span>{getProjectShow(project)?.name || 'Unknown Show'}</span>
-                        <ChevronRight className="h-3 w-3" />
-                      </div>
-                      {/* Scene name */}
-                      <p className="font-medium text-foreground">{project.name}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {project.services.join(', ')}
-                      </p>
+                    <div className="flex items-center gap-1.5">
+                      <Film className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="text-sm font-medium truncate">{getProjectShow(project)?.name || 'Unknown Show'}</span>
                     </div>
+                  </TableCell>
+                  
+                  <TableCell>
+                    <span className="font-medium text-foreground">{project.name}</span>
+                  </TableCell>
+                  
+                  <TableCell>
+                    <p className="text-sm text-muted-foreground truncate max-w-[140px]" title={project.services.join(', ')}>
+                      {project.services.join(', ')}
+                    </p>
                   </TableCell>
                   
                   {/* Client - only for admin/PM */}
