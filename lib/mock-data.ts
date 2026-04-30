@@ -165,6 +165,31 @@ export const mockProjects: Project[] = [
     videoVolume: 92.5, // minutes
   },
   {
+    id: 'p5',
+    name: 'Apple TV+ Drama Series',
+    client: 'Apple Inc.',
+    clientId: 'c5',
+    clientContact: 'Tim Cook Jr.',
+    status: 'draft',
+    priority: 'high',
+    startDate: '2026-05-15',
+    deadline: '2026-07-30',
+    budget: 180000,
+    spent: 0,
+    currency: 'USD',
+    progress: 0,
+    pm: 'Mike Manager',
+    pmId: '2',
+    services: ['Subtitles Transcription'],
+    languages: [
+      { source: 'EN', target: 'ES', service: 'Subtitles Transcription' },
+      { source: 'EN', target: 'FR', service: 'Subtitles Transcription' },
+    ],
+    taskCount: 8,
+    completedTasks: 0,
+    videoVolume: 220.0, // minutes
+  },
+  {
     id: 'p4',
     name: 'Amazon Prime Feature Film',
     client: 'Amazon Studios',
@@ -277,6 +302,19 @@ export const mockTasks: Task[] = [
   // Future tasks in June
   { id: 't14', projectId: 'p4', projectName: 'Amazon Prime Feature Film', name: 'Translation', service: 'Subtitles Transcription AI', serviceType: 'Translation', status: 'assigned', assignedVendor: 'Lisa Translator', vendorId: 'v1', dueDate: '2026-06-05', price: 600, sourceLanguage: 'EN', targetLanguage: 'ES' },
   { id: 't15', projectId: 'p4', projectName: 'Amazon Prime Feature Film', name: 'Timing', service: 'Subtitles Transcription AI', serviceType: 'Timing', status: 'unassigned', dueDate: '2026-06-10', price: 280, sourceLanguage: 'EN', targetLanguage: 'FR' },
+  
+  // Draft project tasks (p5: Apple TV+ Drama Series) - Service: Subtitles Transcription
+  // Workflow: Transcription -> Timing -> PM Verification -> Client Review
+  // Spanish (ES) tasks
+  { id: 't19', projectId: 'p5', projectName: 'Apple TV+ Drama Series', name: 'Transcription', service: 'Subtitles Transcription', serviceType: 'Transcription', status: 'unassigned', dueDate: '2026-06-01', price: 880, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  { id: 't20', projectId: 'p5', projectName: 'Apple TV+ Drama Series', name: 'Timing', service: 'Subtitles Transcription', serviceType: 'Timing', status: 'unassigned', dueDate: '2026-06-15', price: 440, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  { id: 't21', projectId: 'p5', projectName: 'Apple TV+ Drama Series', name: 'PM Verification', service: 'Subtitles Transcription', serviceType: 'PM Verification', status: 'unassigned', dueDate: '2026-06-25', price: 220, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  { id: 't22', projectId: 'p5', projectName: 'Apple TV+ Drama Series', name: 'Client Review', service: 'Subtitles Transcription', serviceType: 'Client Review', status: 'unassigned', dueDate: '2026-07-05', price: 0, sourceLanguage: 'EN', targetLanguage: 'ES' },
+  // French (FR) tasks
+  { id: 't23', projectId: 'p5', projectName: 'Apple TV+ Drama Series', name: 'Transcription', service: 'Subtitles Transcription', serviceType: 'Transcription', status: 'unassigned', dueDate: '2026-06-01', price: 880, sourceLanguage: 'EN', targetLanguage: 'FR' },
+  { id: 't24', projectId: 'p5', projectName: 'Apple TV+ Drama Series', name: 'Timing', service: 'Subtitles Transcription', serviceType: 'Timing', status: 'unassigned', dueDate: '2026-06-15', price: 440, sourceLanguage: 'EN', targetLanguage: 'FR' },
+  { id: 't25', projectId: 'p5', projectName: 'Apple TV+ Drama Series', name: 'PM Verification', service: 'Subtitles Transcription', serviceType: 'PM Verification', status: 'unassigned', dueDate: '2026-06-25', price: 220, sourceLanguage: 'EN', targetLanguage: 'FR' },
+  { id: 't26', projectId: 'p5', projectName: 'Apple TV+ Drama Series', name: 'Client Review', service: 'Subtitles Transcription', serviceType: 'Client Review', status: 'unassigned', dueDate: '2026-07-05', price: 0, sourceLanguage: 'EN', targetLanguage: 'FR' },
 ]
 
 export const TASK_STATUSES: { value: string; label: string; color: string }[] = [
