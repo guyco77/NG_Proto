@@ -643,24 +643,32 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               </Card>
             )}
 
-            {/* Payment Section - moved from Task Info card */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold">Payment</CardTitle>
-              </CardHeader>
-              <CardContent className="px-6 pb-6 pt-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Amount</span>
-                  <span className="font-semibold text-lg">{formatCurrency(task.price)}</span>
-                </div>
-                {isVendor && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    This is your payment for this task.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+            </div>
+        </div>
+        
+        {/* Payment Section - at the bottom of the page per Update TASK-001 */}
+        <div className="mt-6">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base font-semibold">Payment</CardTitle>
+            </CardHeader>
+            <CardContent className="px-6 pb-6 pt-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Amount</span>
+                <span className="font-semibold text-lg">{formatCurrency(task.price)}</span>
+              </div>
+              {isVendor && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  This is your payment for this task.
+                </p>
+              )}
+              {(isAdmin || isPM) && (
+                <p className="text-xs text-muted-foreground mt-2">
+                  Payment to assigned vendor for this task.
+                </p>
+              )}
+            </CardContent>
+          </Card>
         </div>
       </div>
 
