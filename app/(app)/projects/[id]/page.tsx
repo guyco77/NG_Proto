@@ -275,9 +275,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   ]
 
   const handleStatusChange = (newStatus: string) => {
+    // Update PROJ-011: Use Show › Scene format
     toast({
       title: 'Status Updated',
-      description: `Project status changed to ${newStatus.replace('_', ' ')}`,
+      description: `${projectShow?.name} › ${project.name} status changed to ${newStatus.replace('_', ' ')}`,
     })
   }
 
@@ -297,9 +298,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const handleSaveProject = () => {
+    // Update PROJ-011: Use Show › Scene format
     toast({
-      title: 'Project Updated',
-      description: 'Project details have been saved successfully.',
+      title: 'Scene Updated',
+      description: `${projectShow?.name} › ${project.name} details saved.`,
     })
     setIsEditing(false)
   }
@@ -396,9 +398,10 @@ const handleCancelEdit = () => {
       })
     } else {
       // Admin/PM actually cancelling
+      // Update PROJ-011: Use Show › Scene format
       toast({
-        title: 'Project Cancelled',
-        description: `Project has been cancelled. Reason: ${cancelReason}`,
+        title: 'Scene Cancelled',
+        description: `${projectShow?.name} › ${project.name} cancelled. Reason: ${cancelReason}`,
       })
     }
     setShowCancelDialog(false)
@@ -406,9 +409,10 @@ const handleCancelEdit = () => {
   }
 
   const handleArchiveProject = () => {
+    // Update PROJ-011: Use Show › Scene format
     toast({
-      title: 'Project Archived',
-      description: `"${project.name}" has been moved to the archive.`,
+      title: 'Scene Archived',
+      description: `${projectShow?.name} › ${project.name} moved to archive.`,
     })
     setShowArchiveDialog(false)
   }
@@ -427,9 +431,10 @@ const handleCancelEdit = () => {
       setShowDuplicateDialog(false)
       setDuplicateName(`${project.name} (Copy)`)
       
+      // Update PROJ-011: Use Show › Scene format
       toast({
-        title: 'Project duplicated. Upload your source files to continue.',
-        description: `"${duplicateName}" created in Draft status.`,
+        title: 'Scene duplicated. Upload your source files to continue.',
+        description: `${projectShow?.name} › ${duplicateName} created in Draft status.`,
       })
       
 // Redirect to new project detail with highlight flag
@@ -529,10 +534,11 @@ const handleCancelEdit = () => {
     })
     setLocalTaskUpdates(prev => ({ ...prev, ...updates }))
     
-    toast({
-      title: `${vendor?.name} assigned to ${eligibleForAssign.length} tasks.`,
-      description: 'Vendor has been notified via a single consolidated notification.',
-    })
+// Update PROJ-011: Use Show › Scene format
+      toast({
+        title: `${vendor?.name} assigned to ${eligibleForAssign.length} tasks`,
+        description: `Tasks in ${projectShow?.name} › ${project.name}. Vendor notified.`,
+      })
     
     setIsBulkAssigning(false)
     setShowBulkAssignDialog(false)
@@ -543,9 +549,10 @@ const handleCancelEdit = () => {
 
   const handleAddTask = () => {
     if (!newTaskService) return
+    // Update PROJ-011: Use Show › Scene format in notification
     toast({
       title: 'Task Created',
-      description: `New ${newTaskService} task has been added to the project.`,
+      description: `New ${newTaskService} task added to ${projectShow?.name} › ${project.name}.`,
     })
     setShowAddTaskDialog(false)
     setNewTaskService('')
@@ -1774,12 +1781,13 @@ const handleCancelEdit = () => {
       </Dialog>
 
       {/* Add Task Dialog - Individual task types only, no Service-level addition */}
+      {/* Update PROJ-011: Show › Scene in dialog header */}
       <Dialog open={showAddTaskDialog} onOpenChange={setShowAddTaskDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Task</DialogTitle>
+            <DialogTitle>Add Task to {projectShow?.name} › {project.name}</DialogTitle>
             <DialogDescription>
-              Select a task type to add to this project. Individual tasks only.
+              Select a task type to add to this scene. Individual tasks only.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
