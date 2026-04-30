@@ -246,11 +246,20 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   
   // Determine which fields can be edited based on role and quote status
   const canEditField = (field: string) => {
-    if (!canEditStatus) return false
-    
     // Update PROJ-004: Show is quote-locked (changing Show affects billing context)
     // "name" (Scene) is NOT quote-locked - can be edited at any time
     const quoteLockableFields = ['priority', 'deadline', 'startDate', 'videoVolume', 'services', 'languages', 'client', 'show']
+    
+    // Update PROJ-004: Client Admin can edit Show and Scene while In Progress (non-pricing edits)
+    // Show must remain within the same client
+    if (isClient && isProjectActive) {
+      // Client Admin can only edit 'name' (Scene) and 'show' (within same client) during In Progress
+      if (field === 'name') return true // Scene is always editable by Client Admin during In Progress
+      if (field === 'show') return true // Show is editable by Client Admin during In Progress (same client enforced in UI)
+      return false // All other fields are not editable by Client
+    }
+    
+    if (!canEditStatus) return false
     
     if (isQuoteLocked && quoteLockableFields.includes(field)) {
       return false // Fields are locked after quote approval
@@ -874,8 +883,8 @@ const handleCancelEdit = () => {
                 </Button>
               </Link>
             )}
-            {/* Edit button - Admin/PM only, hidden from clients */}
-            {canEditStatus && !isEditing && (
+            {/* Edit button - Admin/PM always, Client Admin during In Progress (PROJ-004) */}
+            {(canEditStatus || (isClient && isProjectActive)) && !isEditing && (
               <Button variant="outline" className="gap-1.5" onClick={handleEditClick}>
                 <Edit className="h-4 w-4" />
                 Edit
