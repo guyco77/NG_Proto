@@ -1,6 +1,6 @@
 'use client'
 
-import { Building2, Server, Mail, User, CreditCard, Bell, ChevronRight, FileText } from 'lucide-react'
+import { Building2, Server, Mail, User, CreditCard, Bell, ChevronRight, FileText, FileStack } from 'lucide-react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { useRole } from '../layout'
@@ -41,6 +41,13 @@ const settingsLinks: SettingsLink[] = [
     icon: FileText,
     title: 'Services Catalog',
     description: 'Manage service definitions, workflows, and pricing',
+    roles: ['admin', 'pm'],
+  },
+  {
+    href: '/settings/project-templates',
+    icon: FileStack,
+    title: 'Project Templates',
+    description: 'Create and manage reusable project configurations',
     roles: ['admin', 'pm'],
   },
   {

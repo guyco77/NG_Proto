@@ -18,6 +18,9 @@ import {
   Split,
   Trash2,
   AlertTriangle,
+  FileStack,
+  ArrowLeft,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/status-badge'
@@ -60,7 +63,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { mockUsers, formatDate, getPriorityColor, PROJECT_STATUSES, SERVICES_LIST } from '@/lib/mock-data'
+import { mockUsers, formatDate, getPriorityColor, PROJECT_STATUSES, SERVICES_LIST, mockProjectTemplates, type ProjectTemplate } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useRole } from '../layout'
@@ -526,10 +529,117 @@ export default function ProjectsPage() {
     failedEpisodes: number[] // episode numbers that failed
   }>({ show: false, created: 0, failed: 0, failedEpisodes: [] })
   
+  // PROJ-013: New Project Modal with template support (Admin/PM only)
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false)
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
+  const [templateSearchQuery, setTemplateSearchQuery] = useState('')
+  const [isCreatingFromTemplate, setIsCreatingFromTemplate] = useState(false)
+  const [templateError, setTemplateError] = useState('')
+  const [highlightedProjectId, setHighlightedProjectId] = useState<string | null>(null)
+  
   const pms = mockUsers.filter(u => u.role === 'admin' || u.role === 'pm')
   
+  // PROJ-013: Filter templates by search query
+  const filteredTemplates = useMemo(() => {
+    if (!templateSearchQuery.trim()) {
+      // Sort by most recently used first
+      return [...mockProjectTemplates].sort((a, b) => {
+        const aTime = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0
+        const bTime = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0
+        return bTime - aTime
+      })
+    }
+    const query = templateSearchQuery.toLowerCase()
+    return mockProjectTemplates.filter(t => 
+      t.name.toLowerCase().includes(query) ||
+      t.clientName.toLowerCase().includes(query) ||
+      (t.showName && t.showName.toLowerCase().includes(query))
+    ).sort((a, b) => {
+      const aTime = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0
+      const bTime = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0
+      return bTime - aTime
+    })
+  }, [templateSearchQuery])
+  
+  // PROJ-013: Handle creating project from template
+  const handleCreateFromTemplate = async (template: ProjectTemplate) => {
+    setIsCreatingFromTemplate(true)
+    setTemplateError('')
+    
+    try {
+      // Simulate API call
+      await new Promise(r => setTimeout(r, 800))
+      
+      // Generate new project data from template
+      const today = new Date()
+      const newProjectId = `proj-tpl-${Date.now()}`
+      const sceneName = `${template.name} - ${today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+      
+      // Create new project (in real app, this would be an API call)
+      const newProject = {
+        id: newProjectId,
+        name: sceneName,
+        client: template.clientName,
+        clientId: template.clientId,
+        status: 'draft' as const,
+        services: template.workflow.map(w => w.serviceType),
+        pm: userName,
+        pmId: currentRole === 'admin' ? '1' : '2',
+        priority: template.priority || 'medium',
+        deadline: '', // User fills this after opening
+        progress: 0,
+        createdAt: today.toISOString(),
+        isUnassigned: true,
+        // Template metadata
+        fromTemplate: template.name,
+        templateId: template.id,
+        languages: template.languages.map(l => `${l.source} → ${l.target}`),
+        showName: template.showName,
+      }
+      
+      // Add to projects (in real app, would update via mutation)
+      // For now, we'll use local state
+      setProjects(prev => [newProject, ...prev])
+      
+      // Close modals
+      setShowTemplatePicker(false)
+      setShowNewProjectModal(false)
+      setTemplateSearchQuery('')
+      
+      // Highlight the new project
+      setHighlightedProjectId(newProjectId)
+      setTimeout(() => setHighlightedProjectId(null), 3000)
+      
+      // Audit log
+      console.log('[Audit] Project created from template:', {
+        projectId: newProjectId,
+        templateId: template.id,
+        templateName: template.name,
+        actor: userName,
+        timestamp: new Date().toISOString(),
+      })
+      
+      // Show success toast
+      toast({
+        title: 'Project created from template',
+        description: `"${sceneName}" has been created from template "${template.name}".`,
+      })
+    } catch {
+      setTemplateError('Failed to create project from template. Please try again.')
+    } finally {
+      setIsCreatingFromTemplate(false)
+    }
+  }
+  
+  // PROJ-013: Add local projects state for demo
+  const [localProjects, setLocalProjects] = useState<typeof seedProjects>([])
+  const setProjects = (updater: (prev: typeof seedProjects) => typeof seedProjects) => {
+    setLocalProjects(updater)
+  }
+  
   // Use seed projects - client sees client-specific projects, admin/PM sees all projects
-  const projects = isClient ? clientSeedProjects : seedProjects
+  // PROJ-013: Include locally created projects from templates
+  const projects = isClient ? clientSeedProjects : [...localProjects, ...seedProjects]
   
   // Filter projects
   const filteredProjects = useMemo(() => {
@@ -864,17 +974,27 @@ export default function ProjectsPage() {
             {filteredProjects.length} of {projects.length} projects
           </p>
         </div>
-        {/* PROJ-005-Client: + New Project only visible to Client Admin (or admin/PM) */}
-        {(!isClient || isClientAdmin) && (
-          <div className="flex items-center gap-2 mt-4 sm:mt-0">
-            <Link href="/projects/new" prefetch={true}>
-              <Button className="gap-1.5">
-                <Plus className="h-4 w-4" />
-                New Project
-              </Button>
-            </Link>
-          </div>
-        )}
+{/* PROJ-005-Client: + New Project only visible to Client Admin (or admin/PM) */}
+  {/* PROJ-013: Admin/PM see modal with template option; Client Admin goes directly to wizard */}
+  {(!isClient || isClientAdmin) && (
+  <div className="flex items-center gap-2 mt-4 sm:mt-0">
+  {isClient ? (
+    // Client Admin: Direct link to wizard (no template option)
+    <Link href="/projects/new" prefetch={true}>
+      <Button className="gap-1.5">
+        <Plus className="h-4 w-4" />
+        New Project
+      </Button>
+    </Link>
+  ) : (
+    // Admin/PM: Open New Project Modal with template option
+    <Button className="gap-1.5" onClick={() => setShowNewProjectModal(true)}>
+      <Plus className="h-4 w-4" />
+      New Project
+    </Button>
+  )}
+  </div>
+  )}
       </div>
       
       {/* Filters Row - Order: Status · Service · Task Type · PM · Deadline per PRD */}
@@ -1245,13 +1365,16 @@ export default function ProjectsPage() {
             {paginatedProjects.map((project) => {
               const isArchived = project.status === 'closed'
               const canCancel = CANCELLABLE_STATUSES.includes(project.status)
+              // PROJ-013: Highlight newly created project from template
+              const isHighlighted = highlightedProjectId === project.id
               
               return (
                 <TableRow
                   key={project.id}
                   className={cn(
-                    "cursor-pointer bg-background hover:bg-muted/50",
-                    isArchived && "opacity-60"
+                    "cursor-pointer bg-background hover:bg-muted/50 transition-colors duration-500",
+                    isArchived && "opacity-60",
+                    isHighlighted && "animate-pulse bg-emerald-50 ring-2 ring-emerald-500 ring-inset"
                   )}
                   onClick={() => router.push(`/projects/${project.id}`)}
                 >
@@ -1942,6 +2065,170 @@ export default function ProjectsPage() {
               </>
             )}
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* PROJ-013: New Project Modal (Admin/PM only) */}
+      <Dialog open={showNewProjectModal} onOpenChange={(open) => {
+        setShowNewProjectModal(open)
+        if (!open) {
+          setShowTemplatePicker(false)
+          setTemplateSearchQuery('')
+          setTemplateError('')
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          {!showTemplatePicker ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>New Project</DialogTitle>
+                <DialogDescription>
+                  Create a new project from scratch or use a pre-configured template.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="grid gap-3 py-4">
+                <Link href="/projects/new" onClick={() => setShowNewProjectModal(false)}>
+                  <Button variant="outline" className="w-full justify-start gap-3 h-auto py-4 px-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                      <Plus className="h-5 w-5" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-medium">Create New</p>
+                      <p className="text-xs text-muted-foreground">Start from scratch with the project wizard</p>
+                    </div>
+                  </Button>
+                </Link>
+                
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start gap-3 h-auto py-4 px-4"
+                  onClick={() => setShowTemplatePicker(true)}
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                    <FileStack className="h-5 w-5" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium">Create from a Template</p>
+                    <p className="text-xs text-muted-foreground">Use a pre-configured project setup</p>
+                  </div>
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8"
+                    onClick={() => {
+                      setShowTemplatePicker(false)
+                      setTemplateSearchQuery('')
+                    }}
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  <DialogTitle>Choose a template</DialogTitle>
+                </div>
+                <DialogDescription>
+                  Select a template to instantly create a project with pre-configured settings.
+                </DialogDescription>
+              </DialogHeader>
+              
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search templates by name, client, or Show..."
+                  value={templateSearchQuery}
+                  onChange={(e) => setTemplateSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              
+              {/* Error message */}
+              {templateError && (
+                <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 p-3">
+                  <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-800">{templateError}</p>
+                </div>
+              )}
+              
+              {/* Template list */}
+              <div className="max-h-[300px] overflow-y-auto space-y-2">
+                {filteredTemplates.length === 0 ? (
+                  <div className="text-center py-8">
+                    {mockProjectTemplates.length === 0 ? (
+                      <>
+                        <FileStack className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">No templates yet.</p>
+                        <Link href="/settings/project-templates" onClick={() => setShowNewProjectModal(false)}>
+                          <Button variant="link" className="text-sm mt-1">
+                            Create one in Settings → Project Templates
+                          </Button>
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        <Search className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">No templates match your search.</p>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  filteredTemplates.map((template) => (
+                    <button
+                      key={template.id}
+                      className="w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => handleCreateFromTemplate(template)}
+                      disabled={isCreatingFromTemplate}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">{template.name}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {template.clientName}
+                            {template.showName && ` · ${template.showName}`}
+                          </p>
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            <span className="text-xs px-1.5 py-0.5 bg-muted rounded">
+                              {template.languages.map(l => `${l.source}→${l.target}`).join(', ')}
+                            </span>
+                            <span className="text-xs px-1.5 py-0.5 bg-muted rounded">
+                              {template.workflow.length} tasks
+                            </span>
+                          </div>
+                        </div>
+                        {isCreatingFromTemplate && (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+              
+              <div className="flex justify-between items-center pt-2 border-t">
+                <Link href="/settings/project-templates" onClick={() => setShowNewProjectModal(false)}>
+                  <Button variant="link" size="sm" className="text-xs px-0">
+                    Manage templates
+                  </Button>
+                </Link>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    setShowTemplatePicker(false)
+                    setTemplateSearchQuery('')
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

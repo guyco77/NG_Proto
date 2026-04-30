@@ -1015,6 +1015,147 @@ export const PRICING_MODELS: { value: string; label: string }[] = [
   { value: 'custom', label: 'Custom (manual price per project)' },
 ]
 
+// PROJ-013: Project Templates
+export interface ProjectTemplate {
+  id: string
+  name: string
+  clientId: string
+  clientName: string
+  showId?: string
+  showName?: string
+  languages: { source: string; target: string }[]
+  workflow: { serviceType: string; order: number }[]
+  preferredVendors: { serviceType: string; language: string; vendorId: string; vendorName: string }[]
+  priority?: 'low' | 'medium' | 'high' | 'urgent'
+  internalNotes?: string
+  createdAt: string
+  updatedAt: string
+  ownerId: string
+  ownerName: string
+  usageCount: number
+  lastUsedAt?: string
+}
+
+export const mockProjectTemplates: ProjectTemplate[] = [
+  {
+    id: 'tpl-1',
+    name: 'Netflix Series - Standard Subtitles',
+    clientId: 'c1',
+    clientName: 'Netflix Inc.',
+    showId: 'show-1',
+    showName: 'Stranger Things',
+    languages: [
+      { source: 'EN', target: 'ES' },
+      { source: 'EN', target: 'FR' },
+      { source: 'EN', target: 'DE' },
+    ],
+    workflow: [
+      { serviceType: 'Transcription', order: 1 },
+      { serviceType: 'Timing', order: 2 },
+      { serviceType: 'Translation', order: 3 },
+      { serviceType: 'QC', order: 4 },
+      { serviceType: 'PM Verification', order: 5 },
+    ],
+    preferredVendors: [
+      { serviceType: 'Transcription', language: 'ES', vendorId: 'v1', vendorName: 'Lisa Translator' },
+      { serviceType: 'Translation', language: 'ES', vendorId: 'v1', vendorName: 'Lisa Translator' },
+      { serviceType: 'Translation', language: 'FR', vendorId: 'v2', vendorName: 'Pierre Dubois' },
+    ],
+    priority: 'high',
+    internalNotes: 'Standard workflow for Netflix series. Always use qualified vendors.',
+    createdAt: '2026-01-15T10:00:00Z',
+    updatedAt: '2026-04-20T14:30:00Z',
+    ownerId: '1',
+    ownerName: 'Sarah L.',
+    usageCount: 24,
+    lastUsedAt: '2026-04-28T09:15:00Z',
+  },
+  {
+    id: 'tpl-2',
+    name: 'Disney+ Feature Film',
+    clientId: 'c2',
+    clientName: 'Disney Studios',
+    languages: [
+      { source: 'EN', target: 'ES' },
+      { source: 'EN', target: 'PT' },
+    ],
+    workflow: [
+      { serviceType: 'Transcription AI', order: 1 },
+      { serviceType: 'QC', order: 2 },
+      { serviceType: 'Translation', order: 3 },
+      { serviceType: 'Proofread', order: 4 },
+      { serviceType: 'PM Verification', order: 5 },
+      { serviceType: 'Client Review', order: 6 },
+    ],
+    preferredVendors: [
+      { serviceType: 'QC', language: 'ES', vendorId: 'v3', vendorName: 'Maria Garcia' },
+      { serviceType: 'Translation', language: 'PT', vendorId: 'v2', vendorName: 'Pierre Dubois' },
+    ],
+    priority: 'urgent',
+    createdAt: '2026-02-10T08:00:00Z',
+    updatedAt: '2026-04-15T11:00:00Z',
+    ownerId: '2',
+    ownerName: 'Mike Manager',
+    usageCount: 8,
+    lastUsedAt: '2026-04-25T16:45:00Z',
+  },
+  {
+    id: 'tpl-3',
+    name: 'HBO Documentary - Hebrew',
+    clientId: 'c3',
+    clientName: 'HBO Max',
+    showId: 'show-3',
+    showName: 'Documentary Collection',
+    languages: [
+      { source: 'EN', target: 'HE' },
+    ],
+    workflow: [
+      { serviceType: 'Transcription', order: 1 },
+      { serviceType: 'Timing', order: 2 },
+      { serviceType: 'Translation', order: 3 },
+      { serviceType: 'QC', order: 4 },
+    ],
+    preferredVendors: [],
+    priority: 'medium',
+    internalNotes: 'Hebrew localization requires specific timing guidelines.',
+    createdAt: '2026-03-01T12:00:00Z',
+    updatedAt: '2026-03-01T12:00:00Z',
+    ownerId: '1',
+    ownerName: 'Sarah L.',
+    usageCount: 3,
+  },
+  {
+    id: 'tpl-4',
+    name: 'Apple TV+ Drama - Multi-Language',
+    clientId: 'c-apple',
+    clientName: 'Apple Inc.',
+    languages: [
+      { source: 'EN', target: 'ES' },
+      { source: 'EN', target: 'FR' },
+      { source: 'EN', target: 'DE' },
+      { source: 'EN', target: 'IT' },
+      { source: 'EN', target: 'PT' },
+    ],
+    workflow: [
+      { serviceType: 'Transcription', order: 1 },
+      { serviceType: 'Timing', order: 2 },
+      { serviceType: 'Translation', order: 3 },
+      { serviceType: 'PM Verification', order: 4 },
+      { serviceType: 'Client Review', order: 5 },
+    ],
+    preferredVendors: [
+      { serviceType: 'Transcription', language: 'ES', vendorId: 'v1', vendorName: 'Lisa Translator' },
+    ],
+    priority: 'high',
+    createdAt: '2026-04-01T09:00:00Z',
+    updatedAt: '2026-04-28T10:00:00Z',
+    ownerId: '1',
+    ownerName: 'Sarah L.',
+    usageCount: 5,
+    lastUsedAt: '2026-04-29T08:30:00Z',
+  },
+]
+
 export const mockServices: Service[] = [
   // Transcription Services
   {
