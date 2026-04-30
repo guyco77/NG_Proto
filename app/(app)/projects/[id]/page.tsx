@@ -188,6 +188,9 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   // Track follow-up tasks for badges
   const [followupTaskIds, setFollowupTaskIds] = useState<Set<string>>(new Set())
   const [autoAddedTaskIds, setAutoAddedTaskIds] = useState<Set<string>>(new Set())
+  // Duplicate task warning
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false)
+  const [duplicateTaskInfo, setDuplicateTaskInfo] = useState<string | null>(null)
   
   // TASK-004: Multi-select state for tasks
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
@@ -628,12 +631,19 @@ const handleCancelEdit = () => {
       return
     }
     
-    // Check for duplicate task warning
+    // Check for duplicate task warning (non-blocking)
     const existingDuplicate = updatedProjectTasks.find(
       t => t.serviceType === followupServiceType && 
            t.sourceLanguage === followupSourceLang && 
            t.targetLanguage === followupTargetLang
     )
+    
+    // Show duplicate warning if exists and not already confirmed
+    if (existingDuplicate && !showDuplicateWarning) {
+      setDuplicateTaskInfo(`${followupServiceType} — ${followupSourceLang} → ${followupTargetLang}`)
+      setShowDuplicateWarning(true)
+      return // User must confirm to continue
+    }
     
     setIsAddingFollowup(true)
     
@@ -672,10 +682,34 @@ const handleCancelEdit = () => {
       targetLanguage: followupTargetLang,
     }
     
+    // Create auto PM Verification task if needed
+    const autoPMTask = needsAutoPMVerification && autoPMTaskId ? {
+      id: autoPMTaskId,
+      projectId: project.id,
+      projectName: project.name,
+      name: 'PM Verification',
+      service: 'PM Verification',
+      serviceType: 'PM Verification',
+      status: followupVerifierAssignNow && followupVerifierId ? 'assigned' : 'unassigned',
+      assignedVendor: followupVerifierAssignNow && followupVerifierId
+        ? mockVendors.find(v => v.id === followupVerifierId)?.name
+        : undefined,
+      vendorId: followupVerifierAssignNow ? followupVerifierId || undefined : undefined,
+      dueDate: followupDeadline,
+      price: 100, // Mock price for PM Verification
+      sourceLanguage: followupSourceLang,
+      targetLanguage: followupTargetLang,
+    } : null
+    
     setLocalTaskUpdates(prev => ({
       ...prev,
-      [newTaskId]: newFollowupTask
+      [newTaskId]: newFollowupTask,
+      ...(autoPMTask ? { [autoPMTask.id]: autoPMTask } : {})
     }))
+    
+    // Reset duplicate warning state
+    setShowDuplicateWarning(false)
+    setDuplicateTaskInfo(null)
     
     // Build toast message
     let toastMsg = `Follow-up task added after "${followupPredecessorTask.name}"`
@@ -2082,27 +2116,58 @@ const handleCancelEdit = () => {
               </div>
             </div>
             
-            {/* Service type */}
+            {/* Service type - using canonical 17 services from SET-002 */}
             <div className="space-y-2">
               <Label htmlFor="followup-service">Service Type <span className="text-destructive">*</span></Label>
-              <Select value={followupServiceType} onValueChange={setFollowupServiceType}>
+              <Select value={followupServiceType} onValueChange={(v) => {
+                setFollowupServiceType(v)
+                setShowDuplicateWarning(false) // Reset warning when changing service
+              }}>
                 <SelectTrigger id="followup-service">
                   <SelectValue placeholder="Select task type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Transcription">Transcription</SelectItem>
-                  <SelectItem value="Translation">Translation</SelectItem>
+                  <SelectItem value="Subtitles Transcription">Subtitles Transcription</SelectItem>
+                  <SelectItem value="Subtitles Transcription AI">Subtitles Transcription AI</SelectItem>
+                  <SelectItem value="Translation from Audio + Template">Translation from Audio + Template</SelectItem>
                   <SelectItem value="Translation from Audio">Translation from Audio</SelectItem>
-                  <SelectItem value="QC">QC</SelectItem>
+                  <SelectItem value="Translation from Audio + Template AI">Translation from Audio + Template AI</SelectItem>
+                  <SelectItem value="Translation from Template AI">Translation from Template AI</SelectItem>
+                  <SelectItem value="Text Translation">Text Translation</SelectItem>
+                  <SelectItem value="Translation Pivot Language">Translation Pivot Language</SelectItem>
                   <SelectItem value="Proofread">Proofread</SelectItem>
-                  <SelectItem value="PM Verification">PM Verification</SelectItem>
+                  <SelectItem value="Extra QC">Extra QC</SelectItem>
                   <SelectItem value="Timing">Timing</SelectItem>
+                  <SelectItem value="Client Corrections">Client Corrections</SelectItem>
+                  <SelectItem value="New Version (Re-conforming)">New Version (Re-conforming)</SelectItem>
+                  <SelectItem value="Convert Files">Convert Files</SelectItem>
+                  <SelectItem value="Other">Other</SelectItem>
+                  <SelectItem value="PM Verification">PM Verification</SelectItem>
                 </SelectContent>
               </Select>
               {followupServiceType && followupServiceType !== 'PM Verification' && (
                 <p className="text-xs text-muted-foreground">
                   A PM Verification task will be auto-added after this task.
                 </p>
+              )}
+              {/* Duplicate task warning */}
+              {showDuplicateWarning && duplicateTaskInfo && (
+                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200">
+                  <p className="text-sm text-amber-800">
+                    A <strong>{duplicateTaskInfo}</strong> task already exists on this project. Add anyway?
+                  </p>
+                  <div className="flex gap-2 mt-2">
+                    <Button size="sm" variant="outline" onClick={() => {
+                      setShowDuplicateWarning(false)
+                      setDuplicateTaskInfo(null)
+                    }}>
+                      Cancel
+                    </Button>
+                    <Button size="sm" onClick={() => handleAddFollowupTask()}>
+                      Add Anyway
+                    </Button>
+                  </div>
+                </div>
               )}
             </div>
             
@@ -2157,6 +2222,56 @@ const handleCancelEdit = () => {
                 value={followupDeadline}
                 onChange={(e) => setFollowupDeadline(e.target.value)}
               />
+            </div>
+            
+            {/* Files (optional) */}
+            <div className="space-y-2">
+              <Label>Files (optional)</Label>
+              <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                {followupFiles.length === 0 ? (
+                  <div className="text-sm text-muted-foreground">
+                    <Upload className="h-6 w-6 mx-auto mb-2 opacity-50" />
+                    <p>Drag files here or click to upload</p>
+                    <p className="text-xs">Source files scoped to this follow-up task only</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {followupFiles.map(file => (
+                      <div key={file.id} className="flex items-center justify-between text-sm bg-muted/50 rounded p-2">
+                        <span className="truncate">{file.name}</span>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-6 w-6"
+                          onClick={() => setFollowupFiles(prev => prev.filter(f => f.id !== file.id))}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <input 
+                  type="file" 
+                  multiple 
+                  className="hidden" 
+                  id="followup-files-input"
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || [])
+                    const newFiles = files.map(f => ({
+                      id: `file-${Date.now()}-${Math.random()}`,
+                      name: f.name,
+                      size: f.size
+                    }))
+                    setFollowupFiles(prev => [...prev, ...newFiles])
+                  }}
+                />
+                <label htmlFor="followup-files-input" className="cursor-pointer">
+                  <Button variant="outline" size="sm" className="mt-2" asChild>
+                    <span>Select Files</span>
+                  </Button>
+                </label>
+              </div>
             </div>
             
             {/* Internal note */}
