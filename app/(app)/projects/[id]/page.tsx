@@ -85,7 +85,7 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
-import { mockProjects, mockTasks, mockQuotes, formatCurrency, formatDate, getPriorityColor, PROJECT_STATUSES, SERVICES_LIST, mockShows, mockClients } from '@/lib/mock-data'
+import { mockProjects, mockTasks, mockQuotes, mockVendors, formatCurrency, formatDate, getPriorityColor, PROJECT_STATUSES, SERVICES_LIST, mockShows, mockClients } from '@/lib/mock-data'
 import { useRole } from '@/app/(app)/layout'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
@@ -1845,15 +1845,16 @@ const handleCancelEdit = () => {
                   </CardHeader>
                   <CardContent className="px-6 pb-6 pt-2">
                     <div className="flex items-center justify-between">
+                      {/* Update 01: Quote name is primary, expiresAt removed, totalAmount renamed to price */}
                       <div>
-                        <p className="font-medium">Quote #{projectQuote.id.toUpperCase()}</p>
+                        <p className="font-medium">{projectQuote.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          Created {formatDate(projectQuote.createdAt)} - Expires {formatDate(projectQuote.expiresAt)}
+                          {projectQuote.quoteNumber} &middot; Created {formatDate(projectQuote.createdAt)}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
                         <StatusBadge status={projectQuote.status} />
-                        <p className="text-xl font-semibold">{formatCurrency(projectQuote.totalAmount, project.currency)}</p>
+                        <p className="text-xl font-semibold">{projectQuote.price ? formatCurrency(projectQuote.price, project.currency) : '—'}</p>
                         <Link href={`/quotes/${projectQuote.id}`}>
                           <Button variant="outline" size="sm">
                             <Eye className="h-4 w-4 mr-1" />

@@ -160,7 +160,8 @@ export default function QuotesPage() {
         case 'date_created':
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         case 'amount':
-          return b.totalAmount - a.totalAmount
+          // Update 01: totalAmount renamed to price
+          return (b.price || 0) - (a.price || 0)
         case 'client':
           return a.clientName.localeCompare(b.clientName)
         case 'status':

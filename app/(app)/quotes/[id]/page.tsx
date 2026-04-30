@@ -706,7 +706,8 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
               />
             </div>
             <div className="rounded-lg bg-muted p-3 text-sm">
-              <p className="font-medium">Total Amount: {formatCurrency(quote.totalAmount)} {quote.currency}</p>
+              {/* Update 01: totalAmount renamed to price */}
+              <p className="font-medium">Total: {quote.price ? `${formatCurrency(quote.price)} ${quote.currency || ''}` : 'Price not set'}</p>
             </div>
           </div>
           <DialogFooter>
@@ -789,8 +790,9 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
           <div className="py-4 space-y-4">
             <div className="rounded-lg bg-muted p-3 text-sm">
               <p><span className="text-muted-foreground">Quote:</span> <span className="font-medium">{quote.quoteNumber}</span></p>
-              <p><span className="text-muted-foreground">Amount:</span> <span className="font-medium">{formatCurrency(quote.totalAmount)} {quote.currency}</span></p>
-              <p><span className="text-muted-foreground">Project:</span> <span className="font-medium">{quote.projectName}</span></p>
+              {/* Update 01: totalAmount renamed to price, projectName optional */}
+              <p><span className="text-muted-foreground">Amount:</span> <span className="font-medium">{quote.price ? `${formatCurrency(quote.price)} ${quote.currency || ''}` : '—'}</span></p>
+              {quote.projectName && <p><span className="text-muted-foreground">Project:</span> <span className="font-medium">{quote.projectName}</span></p>}
             </div>
             
             <div className="space-y-3">
