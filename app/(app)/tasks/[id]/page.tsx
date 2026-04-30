@@ -212,10 +212,21 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               )}
             </div>
             {project && (
-              <Link href={`/projects/${project.id}`} className="mt-1 flex items-center gap-1 text-muted-foreground hover:text-foreground">
-                <FolderKanban className="h-4 w-4" />
-                {project.name}
-              </Link>
+              <div className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+                <span className="font-medium text-foreground">{project.client}</span>
+                <span>·</span>
+                <Link href={`/projects/${project.id}`} className="flex items-center gap-1 hover:text-foreground">
+                  <FolderKanban className="h-4 w-4" />
+                  {project.name}
+                </Link>
+                {/* Service name visible to Admin/PM only */}
+                {(isAdmin || isPM) && task.service && (
+                  <>
+                    <span>·</span>
+                    <span className="text-muted-foreground">{task.service}</span>
+                  </>
+                )}
+              </div>
             )}
           </div>
           <div className="flex items-center gap-2">
@@ -313,7 +324,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               <CardContent className="px-6 pb-6 pt-2">
                 <div className="grid gap-4 md:grid-cols-2">
                   <div className="space-y-1">
-                    <p className="text-sm text-muted-foreground">Service Type</p>
+                    <p className="text-sm text-muted-foreground">Task Type</p>
                     <div className="flex items-center gap-2">
                       <span>{getServiceIcon(task.serviceType || 'Translation')}</span>
                       <p className="font-medium">{task.serviceType || task.service}</p>
@@ -528,56 +539,53 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Assigned Vendor */}
+            {/* Assigned Vendor - visible to Admin/PM only (vendors only see their own tasks) */}
+            {(isAdmin || isPM) && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base font-semibold">Assigned To</CardTitle>
+                </CardHeader>
+                <CardContent className="px-6 pb-6 pt-2">
+                  {task.assignedVendor ? (
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                        <User className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{task.assignedVendor}</p>
+                        <p className="text-sm text-muted-foreground">Vendor</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <p className="text-sm text-muted-foreground mb-3">Unassigned</p>
+                      {canEditTask && (
+                        <Button variant="outline" className="gap-2 w-full" onClick={() => setShowAssignDialog(true)}>
+                          <UserPlus className="h-4 w-4" />
+                          Assign Vendor
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Payment Section - moved from Task Info card */}
             <Card>
               <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold">Assigned To</CardTitle>
+                <CardTitle className="text-base font-semibold">Payment</CardTitle>
               </CardHeader>
               <CardContent className="px-6 pb-6 pt-2">
-                {task.assignedVendor ? (
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                      <User className="h-5 w-5 text-primary" />
-                    </div>
-                    <div>
-                      <p className="font-medium">{task.assignedVendor}</p>
-                      <p className="text-sm text-muted-foreground">Vendor</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-center py-4">
-                    <p className="text-sm text-muted-foreground mb-3">Unassigned</p>
-                    {canEditTask && (
-                      <Button variant="outline" className="gap-2 w-full" onClick={() => setShowAssignDialog(true)}>
-                        <UserPlus className="h-4 w-4" />
-                        Assign Vendor
-                      </Button>
-                    )}
-                  </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Amount</span>
+                  <span className="font-semibold text-lg">{formatCurrency(task.price)}</span>
+                </div>
+                {isVendor && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    This is your payment for this task.
+                  </p>
                 )}
-              </CardContent>
-            </Card>
-
-            {/* Task Info */}
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base font-semibold">Task Info</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Price</span>
-                  <span className="font-medium">{formatCurrency(task.price)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Service</span>
-                  <span className="font-medium text-sm">{task.service}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Project</span>
-                  <Link href={`/projects/${task.projectId}`} className="font-medium text-sm text-primary hover:underline">
-                    {task.projectName}
-                  </Link>
-                </div>
               </CardContent>
             </Card>
           </div>
