@@ -274,6 +274,23 @@ const clientSeedProjects = [
 // Seed data covering every status per PRD Update PROJ-005
 const seedProjects = [
   {
+    id: 'seed-apple',
+    name: 'Apple TV+ Drama Series',
+    client: 'Apple Inc.',
+    clientId: 'c-apple',
+    status: 'draft',
+    services: ['Subtitles Transcription'],
+    pm: 'Sarah L.',
+    pmId: '1',
+    priority: 'high',
+    deadline: '2026-07-30',
+    progress: 0,
+    createdAt: '2026-04-30T08:00:00Z', // Newest - appears at top
+    isUnassigned: true, // All tasks unassigned (Transcription, Timing, PM Verification, Client Review per service workflow)
+    taskCount: 8, // 4 tasks x 2 languages (ES, FR)
+    languages: ['ES', 'FR'],
+  },
+  {
     id: 'seed-1',
     name: 'Brand Refresh Transcription',
     client: 'Acme Corp',
@@ -285,7 +302,7 @@ const seedProjects = [
     priority: 'medium',
     deadline: '2026-05-15',
     progress: 0,
-    createdAt: '2026-04-29T10:00:00Z', // Newest - appears at top
+    createdAt: '2026-04-29T10:00:00Z',
     isUnassigned: true, // All tasks unassigned
   },
   {
