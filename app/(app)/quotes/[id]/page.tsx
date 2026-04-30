@@ -202,8 +202,9 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
       <div>
         <div className="flex items-start justify-between">
           <div>
+            {/* Update 01/02: Show quote name as primary title */}
             <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-semibold text-foreground">{quote.quoteNumber}</h1>
+              <h1 className="text-2xl font-semibold text-foreground">{quote.name}</h1>
               <StatusBadge status={quote.status} />
               {/* BILL-008: Repair Badge */}
               {isRepairQuote && (
@@ -214,7 +215,10 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
               )}
             </div>
             <p className="mt-1 text-muted-foreground">
-              For <Link href={`/projects/${quote.projectId}`} className="hover:underline">{quote.projectName}</Link>
+              {quote.quoteNumber}
+              {quote.projectId && quote.projectName && (
+                <> &middot; <Link href={`/projects/${quote.projectId}`} className="hover:underline">{quote.projectName}</Link></>
+              )}
             </p>
           </div>
           
@@ -336,12 +340,17 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Main Content */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Quote Info */}
+          {/* Update 01/04: Quote Info - only show populated fields */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-base font-semibold">Quote Details</CardTitle>
             </CardHeader>
-            <CardContent className="px-6 pb-6 pt-2">
+            <CardContent className="px-6 pb-6 pt-2 space-y-4">
+              {/* Description (if present) */}
+              {quote.description && (
+                <p className="text-muted-foreground">{quote.description}</p>
+              )}
+              
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="flex items-center gap-3">
                   <Building2 className="h-4 w-4 text-muted-foreground" />
@@ -350,13 +359,16 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
                     <p className="font-medium">{quote.clientName}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <FileText className="h-4 w-4 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground">Project</p>
-                    <Link href={`/projects/${quote.projectId}`} className="font-medium hover:underline">{quote.projectName}</Link>
+                {/* Update 01: Project is optional */}
+                {quote.projectId && quote.projectName && (
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-4 w-4 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">Project</p>
+                      <Link href={`/projects/${quote.projectId}`} className="font-medium hover:underline">{quote.projectName}</Link>
+                    </div>
                   </div>
-                </div>
+                )}
                 <div className="flex items-center gap-3">
                   <User className="h-4 w-4 text-muted-foreground" />
                   <div>
@@ -372,52 +384,103 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
                   </div>
                 </div>
               </div>
+              
+              {/* Update 01: Services (if present) */}
+              {quote.services && quote.services.length > 0 && (
+                <div className="border-t pt-4">
+                  <p className="text-xs text-muted-foreground mb-2">Services</p>
+                  <div className="flex flex-wrap gap-2">
+                    {quote.services.map((service) => (
+                      <span key={service} className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-xs font-medium">
+                        {service}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Update 01: Languages (if present) */}
+              {(quote.sourceLanguage || (quote.targetLanguages && quote.targetLanguages.length > 0)) && (
+                <div className="border-t pt-4">
+                  <p className="text-xs text-muted-foreground mb-2">Languages</p>
+                  <div className="flex items-center gap-2 text-sm">
+                    {quote.sourceLanguage && (
+                      <span className="font-medium">{quote.sourceLanguage}</span>
+                    )}
+                    {quote.sourceLanguage && quote.targetLanguages && quote.targetLanguages.length > 0 && (
+                      <span className="text-muted-foreground">→</span>
+                    )}
+                    {quote.targetLanguages && quote.targetLanguages.length > 0 && (
+                      <span>{quote.targetLanguages.join(', ')}</span>
+                    )}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
           
-          {/* Line Items */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold">Line Items</CardTitle>
-            </CardHeader>
-            <CardContent className="px-4 pb-0 pt-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Service</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead className="text-right">Qty</TableHead>
-                    <TableHead className="text-right">Unit Rate</TableHead>
-                    <TableHead className="text-right">Line Total</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {quote.items.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-medium">{item.service}</TableCell>
-                      <TableCell className="text-muted-foreground">{item.description}</TableCell>
-                      <TableCell className="text-right">{item.quantity}</TableCell>
-                      <TableCell className="text-right">
-                        {formatCurrency(item.unitRate)}
-                        {item.isRateOverridden && (
-                          <span className="ml-1 text-xs text-amber-600" title="Rate overridden">*</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right font-medium">{formatCurrency(item.lineTotal)}</TableCell>
+          {/* Update 01: Line Items (only show if present) */}
+          {quote.items && quote.items.length > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold">Line Items</CardTitle>
+              </CardHeader>
+              <CardContent className="px-4 pb-0 pt-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Service</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead className="text-right">Qty</TableHead>
+                      <TableHead className="text-right">Unit Rate</TableHead>
+                      <TableHead className="text-right">Line Total</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-              
-              {/* Total */}
-              <div className="border-t border-border p-4">
-                <div className="flex items-center justify-end gap-8">
-                  <span className="text-muted-foreground">Total ({quote.currency})</span>
-                  <span className="text-2xl font-bold">{formatCurrency(quote.totalAmount)}</span>
+                  </TableHeader>
+                  <TableBody>
+                    {quote.items.map((item) => (
+                      <TableRow key={item.id}>
+                        <TableCell className="font-medium">{item.service}</TableCell>
+                        <TableCell className="text-muted-foreground">{item.description}</TableCell>
+                        <TableCell className="text-right">{item.quantity}</TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(item.unitRate)}
+                          {item.isRateOverridden && (
+                            <span className="ml-1 text-xs text-amber-600" title="Rate overridden">*</span>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right font-medium">{formatCurrency(item.lineTotal)}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                
+                {/* Line Items Total */}
+                <div className="border-t border-border p-4">
+                  <div className="flex items-center justify-end gap-8">
+                    <span className="text-muted-foreground">Line Items Total {quote.currency && `(${quote.currency})`}</span>
+                    <span className="text-2xl font-bold">{formatCurrency(quote.items.reduce((sum, item) => sum + item.lineTotal, 0))}</span>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
+          
+          {/* Update 01: Price display (only show if price is set) */}
+          {quote.price !== undefined && quote.price !== null && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base font-semibold">Price</CardTitle>
+              </CardHeader>
+              <CardContent className="px-6 pb-6 pt-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Total Price</span>
+                  <span className="text-2xl font-bold">
+                    {formatCurrency(quote.price)} {quote.currency}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
           
           {/* Notes to Client */}
           {quote.notesToClient && (
@@ -643,7 +706,8 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
               />
             </div>
             <div className="rounded-lg bg-muted p-3 text-sm">
-              <p className="font-medium">Total Amount: {formatCurrency(quote.totalAmount)} {quote.currency}</p>
+              {/* Update 01: totalAmount renamed to price */}
+              <p className="font-medium">Total: {quote.price ? `${formatCurrency(quote.price)} ${quote.currency || ''}` : 'Price not set'}</p>
             </div>
           </div>
           <DialogFooter>
@@ -726,8 +790,9 @@ export default function QuoteDetailPage({ params }: { params: Promise<{ id: stri
           <div className="py-4 space-y-4">
             <div className="rounded-lg bg-muted p-3 text-sm">
               <p><span className="text-muted-foreground">Quote:</span> <span className="font-medium">{quote.quoteNumber}</span></p>
-              <p><span className="text-muted-foreground">Amount:</span> <span className="font-medium">{formatCurrency(quote.totalAmount)} {quote.currency}</span></p>
-              <p><span className="text-muted-foreground">Project:</span> <span className="font-medium">{quote.projectName}</span></p>
+              {/* Update 01: totalAmount renamed to price, projectName optional */}
+              <p><span className="text-muted-foreground">Amount:</span> <span className="font-medium">{quote.price ? `${formatCurrency(quote.price)} ${quote.currency || ''}` : '—'}</span></p>
+              {quote.projectName && <p><span className="text-muted-foreground">Project:</span> <span className="font-medium">{quote.projectName}</span></p>}
             </div>
             
             <div className="space-y-3">

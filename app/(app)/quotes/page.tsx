@@ -117,12 +117,12 @@ export default function QuotesPage() {
   const filteredQuotes = useMemo(() => {
     let quotes = [...scopedQuotes]
     
-    // Search
+    // Update 02: Search matches quote number, quote name, and client name (not project name)
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       quotes = quotes.filter(q => 
         q.quoteNumber.toLowerCase().includes(query) ||
-        q.projectName.toLowerCase().includes(query) ||
+        q.name.toLowerCase().includes(query) ||
         q.clientName.toLowerCase().includes(query)
       )
     }
@@ -160,7 +160,8 @@ export default function QuotesPage() {
         case 'date_created':
           return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
         case 'amount':
-          return b.totalAmount - a.totalAmount
+          // Update 01: totalAmount renamed to price
+          return (b.price || 0) - (a.price || 0)
         case 'client':
           return a.clientName.localeCompare(b.clientName)
         case 'status':
@@ -553,20 +554,32 @@ export default function QuotesPage() {
                     />
                   </TableHead>
                 )}
+                {/* Update 02: Name column replaces Project column */}
                 <TableHead>Quote</TableHead>
-                <TableHead>Project</TableHead>
+                <TableHead>Name</TableHead>
                 <TableHead>Client</TableHead>
-                <TableHead>Total</TableHead>
+                <TableHead>Price</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead className="w-12"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
+              {/* Update 02: Entire row is clickable */}
               {visibleQuotes.map((quote) => (
                 <TableRow 
                   key={quote.id} 
                   className={cn('cursor-pointer hover:bg-muted/50', getRowHighlight(quote.status))}
+                  onClick={() => window.location.href = `/quotes/${quote.id}`}
+                  role="link"
+                  tabIndex={0}
+                  aria-label={`${quote.quoteNumber} - ${quote.name} - ${quote.clientName}`}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      window.location.href = `/quotes/${quote.id}`
+                    }
+                  }}
                 >
                   {(isAdmin || isPM) && (
                     <TableCell onClick={(e) => e.stopPropagation()}>
@@ -577,22 +590,28 @@ export default function QuotesPage() {
                     </TableCell>
                   )}
                   <TableCell>
-                    <Link href={`/quotes/${quote.id}`} className="flex items-center gap-2 hover:underline">
+                    <div className="flex items-center gap-2">
                       <FileText className="h-4 w-4 text-muted-foreground" />
                       <span className="font-medium">{quote.quoteNumber}</span>
-                    </Link>
+                    </div>
                   </TableCell>
+                  {/* Update 02: Show quote name instead of project name */}
                   <TableCell>
-                    <Link href={`/projects/${quote.projectId}`} className="text-muted-foreground hover:text-foreground hover:underline">
-                      {quote.projectName}
-                    </Link>
+                    <span className="text-foreground">{quote.name}</span>
                   </TableCell>
                   <TableCell>{quote.clientName}</TableCell>
+                  {/* Update 01: Show price with currency, handle optional price */}
                   <TableCell className="font-semibold">
-                    {formatCurrency(quote.totalAmount)}
-                    <span className="ml-1 text-xs text-muted-foreground">{quote.currency}</span>
+                    {quote.price ? (
+                      <>
+                        {formatCurrency(quote.price)}
+                        {quote.currency && <span className="ml-1 text-xs text-muted-foreground">{quote.currency}</span>}
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
                   </TableCell>
-                  <TableCell>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     <StatusBadge status={quote.status} />
                   </TableCell>
                   <TableCell className="text-muted-foreground">{formatDate(quote.createdAt)}</TableCell>

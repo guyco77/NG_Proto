@@ -351,23 +351,29 @@ export const TASK_STEP_TYPES = [
 // Alias for backwards compatibility
 export const TASK_SERVICE_TYPES = TASK_STEP_TYPES
 
+// Update 01: mockQuotes with name field (required), projectId optional, price replaces totalAmount
 export const mockQuotes: Quote[] = [
   {
     id: 'q1',
     quoteNumber: 'Q-2024-001',
+    name: 'Amazon Feature Film Localization',
+    description: 'Full localization services for upcoming feature film release.',
     projectId: 'p4',
     projectName: 'Amazon Prime Feature Film',
     clientId: 'c4',
     clientName: 'Amazon Studios',
     status: 'sent',
+    services: ['Translation from Audio', 'Subtitles Transcription AI', 'Extra QC'],
+    sourceLanguage: 'EN',
+    targetLanguages: ['ES', 'DE', 'FR'],
     currency: 'USD',
-    totalAmount: 158400,
+    price: 158400,
     createdAt: '2024-02-01',
     sentAt: '2024-02-02',
     notesToClient: 'Thank you for choosing NG Broadcast. This quote covers full localization services for your feature film.',
     internalNotes: 'High priority client. Consider 5% discount on next project.',
     items: [
-      { id: 'qi1', service: 'Dubbing with AI Transcript', description: 'Full dubbing ES + DE', quantity: 120, unitRate: 1000, lineTotal: 120000 },
+      { id: 'qi1', service: 'Translation from Audio', description: 'Full dubbing ES + DE', quantity: 120, unitRate: 1000, lineTotal: 120000 },
       { id: 'qi2', service: 'Subtitles Transcription AI', description: 'Subtitling FR', quantity: 120, unitRate: 300, lineTotal: 36000 },
       { id: 'qi3', service: 'Extra QC', description: 'Quality control all deliverables', quantity: 20, unitRate: 120, lineTotal: 2400 },
     ],
@@ -378,13 +384,18 @@ export const mockQuotes: Quote[] = [
   {
     id: 'q2',
     quoteNumber: 'Q-2024-002',
+    name: 'Netflix Q1 Localization Package',
+    description: 'Q1 localization for 10 episodes including subtitling and dubbing.',
     projectId: 'p1',
     projectName: 'Netflix Q1 Localization',
     clientId: 'c1',
     clientName: 'Netflix Inc.',
     status: 'approved',
+    services: ['Subtitles Transcription AI', 'Translation from Audio', 'Extra QC'],
+    sourceLanguage: 'EN',
+    targetLanguages: ['ES', 'FR', 'DE'],
     currency: 'USD',
-    totalAmount: 125000,
+    price: 125000,
     createdAt: '2024-01-10',
     sentAt: '2024-01-10',
     approvedAt: '2024-01-12',
@@ -393,7 +404,7 @@ export const mockQuotes: Quote[] = [
     notesToClient: 'We look forward to working on your Q1 localization project.',
     items: [
       { id: 'qi4', service: 'Subtitles Transcription AI', description: 'Subtitling - 10 episodes (ES, FR)', quantity: 200, unitRate: 250, lineTotal: 50000 },
-      { id: 'qi5', service: 'Dubbing with AI Transcript', description: 'Dubbing - 10 episodes (DE)', quantity: 100, unitRate: 700, lineTotal: 70000 },
+      { id: 'qi5', service: 'Translation from Audio', description: 'Dubbing - 10 episodes (DE)', quantity: 100, unitRate: 700, lineTotal: 70000 },
       { id: 'qi6', service: 'Extra QC', description: 'Final QC pass', quantity: 50, unitRate: 100, lineTotal: 5000 },
     ],
     pmId: '2',
@@ -403,13 +414,15 @@ export const mockQuotes: Quote[] = [
   {
     id: 'q3',
     quoteNumber: 'Q-2024-003',
+    name: 'Paramount Reality Show Subtitling',
     projectId: 'p6',
     projectName: 'Paramount+ Reality Show',
     clientId: 'c6',
     clientName: 'Paramount Global',
     status: 'unsent',
+    services: ['Subtitles Transcription AI'],
     currency: 'USD',
-    totalAmount: 45000,
+    price: 45000,
     createdAt: '2024-02-15',
     items: [
       { id: 'qi7', service: 'Subtitles Transcription AI', description: 'Subtitling - 12 episodes', quantity: 120, unitRate: 375, lineTotal: 45000 },
@@ -420,19 +433,24 @@ export const mockQuotes: Quote[] = [
   {
     id: 'q4',
     quoteNumber: 'Q-2024-004',
+    name: 'Disney Series Full Adaptation',
+    description: 'Complete adaptation package for the new animated series.',
     projectId: 'p2',
     projectName: 'Disney+ Series Adaptation',
     clientId: 'c2',
     clientName: 'Disney Streaming',
     status: 'changes_requested',
+    services: ['Translation from Audio', 'Subtitles Transcription AI', 'Extra QC'],
+    sourceLanguage: 'EN',
+    targetLanguages: ['ES', 'PT'],
     currency: 'USD',
-    totalAmount: 250000,
+    price: 250000,
     createdAt: '2024-01-25',
     sentAt: '2024-01-26',
     notesToClient: 'Complete adaptation package for your new series.',
     internalNotes: 'Client asked for breakdown by episode. Need to revise line items.',
     items: [
-      { id: 'qi8', service: 'Dubbing with AI Transcript', description: 'Dubbing ES', quantity: 200, unitRate: 800, lineTotal: 160000 },
+      { id: 'qi8', service: 'Translation from Audio', description: 'Dubbing ES', quantity: 200, unitRate: 800, lineTotal: 160000 },
       { id: 'qi9', service: 'Subtitles Transcription AI', description: 'Subtitling PT', quantity: 200, unitRate: 350, lineTotal: 70000 },
       { id: 'qi10', service: 'Extra QC', description: 'QC all deliverables', quantity: 200, unitRate: 100, lineTotal: 20000 },
     ],
@@ -442,13 +460,18 @@ export const mockQuotes: Quote[] = [
   {
     id: 'q5',
     quoteNumber: 'Q-2024-005',
+    name: 'HBO Documentary Subtitling',
+    description: 'Subtitling services for award-winning documentary series.',
     projectId: 'p3',
     projectName: 'HBO Max Documentary',
     clientId: 'c3',
     clientName: 'Warner Bros.',
-    status: 'moved_to_project',
+    status: 'moved_to_show', // Update 02: changed from moved_to_project
+    services: ['Subtitles Transcription AI', 'Extra QC'],
+    sourceLanguage: 'EN',
+    targetLanguages: ['ES', 'FR'],
     currency: 'USD',
-    totalAmount: 85000,
+    price: 85000,
     createdAt: '2023-11-20',
     sentAt: '2023-11-20',
     approvedAt: '2023-11-22',
@@ -461,8 +484,28 @@ export const mockQuotes: Quote[] = [
     pmId: '1',
     pmName: 'Sarah Admin',
   },
+  // Update 01: Example standalone quote (no project linked)
+  {
+    id: 'q6',
+    quoteNumber: 'Q-2024-006',
+    name: 'Verbal Request - Corporate Training Videos',
+    description: 'Client called to discuss subtitling for internal training materials. No files submitted yet.',
+    clientId: 'c1',
+    clientName: 'Netflix Inc.',
+    status: 'draft',
+    services: ['Subtitles Transcription', 'Text Translation'],
+    sourceLanguage: 'EN',
+    targetLanguages: ['ES', 'FR', 'DE', 'JA'],
+    currency: 'USD',
+    price: 12000,
+    createdAt: '2024-02-20',
+    internalNotes: 'Estimate based on 60 minutes of content. Waiting for client to send files.',
+    pmId: '2',
+    pmName: 'Mike Manager',
+  },
 ]
 
+// Update 02: Changed moved_to_project → moved_to_show
 export const QUOTE_STATUSES: { value: string; label: string }[] = [
   { value: 'unsent', label: 'Unsent' },
   { value: 'draft', label: 'Draft' },
@@ -471,8 +514,39 @@ export const QUOTE_STATUSES: { value: string; label: string }[] = [
   { value: 'approved', label: 'Approved' },
   { value: 'rejected', label: 'Rejected' },
   { value: 'superseded', label: 'Superseded' },
-  { value: 'moved_to_project', label: 'Moved to Project' },
+  { value: 'moved_to_show', label: 'Moved to Show' },
 ]
+
+// Update 01: Canonical 17 services grouped by category (Epic 14 - SERV-001)
+export const SERVICES_BY_CATEGORY = {
+  'Transcription Services': [
+    'Subtitles Transcription',
+    'Subtitles Transcription AI',
+  ],
+  'Translation Services': [
+    'Translation from Audio + Template',
+    'Translation from Audio',
+    'Translation from Audio + Template AI',
+    'Translation from Template AI',
+    'Text Translation',
+    'Translation Pivot Language',
+  ],
+  'Editing & Quality Control': [
+    'Proofread',
+    'Extra QC',
+  ],
+  'Technical & Special Services': [
+    'Timing',
+    'Client Corrections',
+    'New Version (Re-conforming)',
+    'Convert Files',
+    'Other',
+  ],
+  'Administrative / Billing Only': [
+    'Raw Materials',
+    'Translation On-Site',
+  ],
+} as const
 
 export const SERVICES_LIST = [
   'Subtitles Transcription',
@@ -1015,6 +1089,170 @@ export const PRICING_MODELS: { value: string; label: string }[] = [
   { value: 'custom', label: 'Custom (manual price per project)' },
 ]
 
+// Update PROJ-001: Shows (top-level entity that groups Scenes/Projects)
+export interface Show {
+  id: string
+  name: string
+  clientId: string
+  clientName: string
+  description?: string
+  createdAt: string
+  sceneCount: number
+}
+
+export const mockShows: Show[] = [
+  { id: 'show-1', name: 'Stranger Things', clientId: 'c1', clientName: 'Netflix Inc.', description: 'Sci-fi horror drama series', createdAt: '2025-01-15T10:00:00Z', sceneCount: 12 },
+  { id: 'show-2', name: 'The Crown', clientId: 'c1', clientName: 'Netflix Inc.', description: 'Historical drama series', createdAt: '2025-02-20T14:00:00Z', sceneCount: 8 },
+  { id: 'show-3', name: 'Moana 2', clientId: 'c2', clientName: 'Disney Studios', description: 'Animated feature film', createdAt: '2025-03-10T09:00:00Z', sceneCount: 3 },
+  { id: 'show-4', name: 'The Bear', clientId: 'c1', clientName: 'Netflix Inc.', description: 'Drama comedy series', createdAt: '2025-04-01T11:00:00Z', sceneCount: 6 },
+  { id: 'show-5', name: 'House of the Dragon', clientId: 'c3', clientName: 'HBO Max', description: 'Fantasy drama series', createdAt: '2025-04-15T08:00:00Z', sceneCount: 10 },
+  { id: 'show-6', name: 'Foundation', clientId: 'c-apple', clientName: 'Apple Inc.', description: 'Sci-fi drama series', createdAt: '2025-05-01T10:00:00Z', sceneCount: 4 },
+  { id: 'show-7', name: 'Severance', clientId: 'c-apple', clientName: 'Apple Inc.', description: 'Thriller drama series', createdAt: '2025-05-10T12:00:00Z', sceneCount: 7 },
+  { id: 'show-8', name: 'The Mandalorian', clientId: 'c2', clientName: 'Disney Studios', description: 'Star Wars series', createdAt: '2025-06-01T10:00:00Z', sceneCount: 16 },
+  { id: 'show-9', name: 'True Detective', clientId: 'c3', clientName: 'HBO Max', description: 'Crime drama anthology', createdAt: '2025-07-15T09:00:00Z', sceneCount: 8 },
+]
+
+// PROJ-013: Project Templates
+export interface ProjectTemplate {
+  id: string
+  name: string
+  clientId: string
+  clientName: string
+  showId?: string
+  showName?: string
+  languages: { source: string; target: string }[]
+  workflow: { serviceType: string; order: number }[]
+  preferredVendors: { serviceType: string; language: string; vendorId: string; vendorName: string }[]
+  priority?: 'low' | 'medium' | 'high' | 'urgent'
+  internalNotes?: string
+  createdAt: string
+  updatedAt: string
+  ownerId: string
+  ownerName: string
+  usageCount: number
+  lastUsedAt?: string
+}
+
+export const mockProjectTemplates: ProjectTemplate[] = [
+  {
+    id: 'tpl-1',
+    name: 'Netflix Series - Standard Subtitles',
+    clientId: 'c1',
+    clientName: 'Netflix Inc.',
+    showId: 'show-1',
+    showName: 'Stranger Things',
+    languages: [
+      { source: 'EN', target: 'ES' },
+      { source: 'EN', target: 'FR' },
+      { source: 'EN', target: 'DE' },
+    ],
+    workflow: [
+      { serviceType: 'Transcription', order: 1 },
+      { serviceType: 'Timing', order: 2 },
+      { serviceType: 'Translation', order: 3 },
+      { serviceType: 'QC', order: 4 },
+      { serviceType: 'PM Verification', order: 5 },
+    ],
+    preferredVendors: [
+      { serviceType: 'Transcription', language: 'ES', vendorId: 'v1', vendorName: 'Lisa Translator' },
+      { serviceType: 'Translation', language: 'ES', vendorId: 'v1', vendorName: 'Lisa Translator' },
+      { serviceType: 'Translation', language: 'FR', vendorId: 'v2', vendorName: 'Pierre Dubois' },
+    ],
+    priority: 'high',
+    internalNotes: 'Standard workflow for Netflix series. Always use qualified vendors.',
+    createdAt: '2026-01-15T10:00:00Z',
+    updatedAt: '2026-04-20T14:30:00Z',
+    ownerId: '1',
+    ownerName: 'Sarah L.',
+    usageCount: 24,
+    lastUsedAt: '2026-04-28T09:15:00Z',
+  },
+  {
+    id: 'tpl-2',
+    name: 'Disney+ Feature Film',
+    clientId: 'c2',
+    clientName: 'Disney Studios',
+    languages: [
+      { source: 'EN', target: 'ES' },
+      { source: 'EN', target: 'PT' },
+    ],
+    workflow: [
+      { serviceType: 'Transcription AI', order: 1 },
+      { serviceType: 'QC', order: 2 },
+      { serviceType: 'Translation', order: 3 },
+      { serviceType: 'Proofread', order: 4 },
+      { serviceType: 'PM Verification', order: 5 },
+      { serviceType: 'Client Review', order: 6 },
+    ],
+    preferredVendors: [
+      { serviceType: 'QC', language: 'ES', vendorId: 'v3', vendorName: 'Maria Garcia' },
+      { serviceType: 'Translation', language: 'PT', vendorId: 'v2', vendorName: 'Pierre Dubois' },
+    ],
+    priority: 'urgent',
+    createdAt: '2026-02-10T08:00:00Z',
+    updatedAt: '2026-04-15T11:00:00Z',
+    ownerId: '2',
+    ownerName: 'Mike Manager',
+    usageCount: 8,
+    lastUsedAt: '2026-04-25T16:45:00Z',
+  },
+  {
+    id: 'tpl-3',
+    name: 'HBO Documentary - Hebrew',
+    clientId: 'c3',
+    clientName: 'HBO Max',
+    showId: 'show-3',
+    showName: 'Documentary Collection',
+    languages: [
+      { source: 'EN', target: 'HE' },
+    ],
+    workflow: [
+      { serviceType: 'Transcription', order: 1 },
+      { serviceType: 'Timing', order: 2 },
+      { serviceType: 'Translation', order: 3 },
+      { serviceType: 'QC', order: 4 },
+    ],
+    preferredVendors: [],
+    priority: 'medium',
+    internalNotes: 'Hebrew localization requires specific timing guidelines.',
+    createdAt: '2026-03-01T12:00:00Z',
+    updatedAt: '2026-03-01T12:00:00Z',
+    ownerId: '1',
+    ownerName: 'Sarah L.',
+    usageCount: 3,
+  },
+  {
+    id: 'tpl-4',
+    name: 'Apple TV+ Drama - Multi-Language',
+    clientId: 'c-apple',
+    clientName: 'Apple Inc.',
+    languages: [
+      { source: 'EN', target: 'ES' },
+      { source: 'EN', target: 'FR' },
+      { source: 'EN', target: 'DE' },
+      { source: 'EN', target: 'IT' },
+      { source: 'EN', target: 'PT' },
+    ],
+    workflow: [
+      { serviceType: 'Transcription', order: 1 },
+      { serviceType: 'Timing', order: 2 },
+      { serviceType: 'Translation', order: 3 },
+      { serviceType: 'PM Verification', order: 4 },
+      { serviceType: 'Client Review', order: 5 },
+    ],
+    preferredVendors: [
+      { serviceType: 'Transcription', language: 'ES', vendorId: 'v1', vendorName: 'Lisa Translator' },
+    ],
+    priority: 'high',
+    createdAt: '2026-04-01T09:00:00Z',
+    updatedAt: '2026-04-28T10:00:00Z',
+    ownerId: '1',
+    ownerName: 'Sarah L.',
+    usageCount: 5,
+    lastUsedAt: '2026-04-29T08:30:00Z',
+  },
+]
+
 export const mockServices: Service[] = [
   // Transcription Services
   {
@@ -1404,7 +1642,8 @@ export function getStatusColor(status: string): string {
     changes_requested: 'bg-amber-100 text-amber-800 border border-amber-200',
     rejected: 'bg-red-100 text-red-800 border border-red-200',
     superseded: 'bg-gray-200 text-gray-700 border border-gray-300',
-    moved_to_project: 'bg-teal-100 text-teal-800 border border-teal-200',
+    // Update 02: Changed from moved_to_project to moved_to_show
+    moved_to_show: 'bg-teal-100 text-teal-800 border border-teal-200',
     // Invoice statuses (BILL-002)
     paid: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
     sent: 'bg-blue-100 text-blue-800 border border-blue-200',

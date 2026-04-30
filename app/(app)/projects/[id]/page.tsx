@@ -31,6 +31,11 @@ import {
   AlertTriangle,
   UserPlus,
   Check,
+  ChevronRight,
+  ChevronDown,
+  Film,
+  Search,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -43,6 +48,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Switch } from '@/components/ui/switch'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   DropdownMenu,
@@ -66,7 +72,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { mockProjects, mockTasks, mockQuotes, formatCurrency, formatDate, getPriorityColor, PROJECT_STATUSES, SERVICES_LIST } from '@/lib/mock-data'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import { mockProjects, mockTasks, mockQuotes, mockVendors, formatCurrency, formatDate, getPriorityColor, PROJECT_STATUSES, SERVICES_LIST, mockShows, mockClients } from '@/lib/mock-data'
 import { useRole } from '@/app/(app)/layout'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
@@ -115,6 +134,11 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const projectTasks = mockTasks.filter((t) => t.projectId === project.id)
   const projectQuote = mockQuotes.find((q) => q.projectId === project.id)
   
+  // Update PROJ-004: Get the Show for this project (Scene)
+  // For demo, assign Shows based on client - first matching Show for the client
+  const projectShow = mockShows.find(s => s.clientId === project.clientId) || mockShows[0]
+  const clientShows = mockShows.filter(s => s.clientId === project.clientId)
+  
   const [activeTab, setActiveTab] = useState(initialTab)
   const [newNote, setNewNote] = useState('')
   const [noteVisibility, setNoteVisibility] = useState<'internal' | 'client' | 'vendor' | 'billing'>('internal')
@@ -145,6 +169,26 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [newTaskService, setNewTaskService] = useState('')
   const [newTaskLanguage, setNewTaskLanguage] = useState('')
   
+  // PROJ-014: Follow-up task state
+  const [showFollowupTaskDialog, setShowFollowupTaskDialog] = useState(false)
+  const [followupPredecessorTask, setFollowupPredecessorTask] = useState<typeof projectTasks[0] | null>(null)
+  const [followupServiceType, setFollowupServiceType] = useState('')
+  const [followupSourceLang, setFollowupSourceLang] = useState('')
+  const [followupTargetLang, setFollowupTargetLang] = useState('')
+  const [followupDeadline, setFollowupDeadline] = useState(project.deadline)
+  const [followupInternalNote, setFollowupInternalNote] = useState('')
+  const [followupAssignNow, setFollowupAssignNow] = useState(false)
+  const [followupVendorId, setFollowupVendorId] = useState<string | null>(null)
+  const [followupVerifierAssignNow, setFollowupVerifierAssignNow] = useState(false)
+  const [followupVerifierId, setFollowupVerifierId] = useState<string | null>(null)
+  const [followupVendorSearchQuery, setFollowupVendorSearchQuery] = useState('')
+  const [followupVerifierSearchQuery, setFollowupVerifierSearchQuery] = useState('')
+  const [isAddingFollowup, setIsAddingFollowup] = useState(false)
+  const [followupFiles, setFollowupFiles] = useState<{ id: string; name: string; size: number }[]>([])
+  // Track follow-up tasks for badges
+  const [followupTaskIds, setFollowupTaskIds] = useState<Set<string>>(new Set())
+  const [autoAddedTaskIds, setAutoAddedTaskIds] = useState<Set<string>>(new Set())
+  
   // TASK-004: Multi-select state for tasks
   const [selectedTaskIds, setSelectedTaskIds] = useState<string[]>([])
   const [showBulkAssignDialog, setShowBulkAssignDialog] = useState(false)
@@ -171,7 +215,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   // Edit mode state
   const [isEditing, setIsEditing] = useState(false)
   const [editedProject, setEditedProject] = useState({
-    name: project.name,
+    name: project.name, // This is the Scene name
+    showId: projectShow?.id || '',
     clientContact: project.clientContact || '',
     pm: project.pm,
     priority: project.priority,
@@ -179,6 +224,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     startDate: project.startDate,
     videoVolume: project.videoVolume || 45.5, // Mock video volume in minutes
   })
+  
+  // Update PROJ-004: Show selector state
+  const [showSearchOpen, setShowSearchOpen] = useState(false)
+  const selectedShow = mockShows.find(s => s.id === editedProject.showId) || projectShow
   
   const isAdmin = currentRole === 'admin'
   const isPM = currentRole === 'pm'
@@ -188,12 +237,17 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const canSeeBilling = isAdmin || isFinance
   const isQuoteLocked = project.status !== 'draft' && project.status !== 'quoted'
   
+  // PROJ-014: Check if project is in active status for follow-up tasks
+  const isProjectActive = project.status === 'in_progress' || project.status === 'in_review'
+  const canAddFollowup = (isAdmin || isPM) && isProjectActive
+  
   // Determine which fields can be edited based on role and quote status
   const canEditField = (field: string) => {
     if (!canEditStatus) return false
     
-    // Quote-locked fields: services, languages, videoVolume, priority, deadline, startDate, client
-    const quoteLockableFields = ['priority', 'deadline', 'startDate', 'videoVolume', 'services', 'languages', 'client']
+    // Update PROJ-004: Show is quote-locked (changing Show affects billing context)
+    // "name" (Scene) is NOT quote-locked - can be edited at any time
+    const quoteLockableFields = ['priority', 'deadline', 'startDate', 'videoVolume', 'services', 'languages', 'client', 'show']
     
     if (isQuoteLocked && quoteLockableFields.includes(field)) {
       return false // Fields are locked after quote approval
@@ -201,7 +255,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     
     // Admin can edit all fields before quote approval
     if (isAdmin) {
-      // After approval, admin can only edit: name, clientContact, pm
+      // After approval, admin can only edit: name (Scene), clientContact, pm
       if (isQuoteLocked) {
         return ['name', 'clientContact', 'pm'].includes(field)
       }
@@ -212,7 +266,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     if (isPM) {
       if (['client', 'clientContact', 'pm'].includes(field)) return false
       if (isQuoteLocked) {
-        return field === 'name' // PM can only edit name after approval
+        return field === 'name' // PM can only edit Scene name after approval
       }
       return true
     }
@@ -247,9 +301,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   ]
 
   const handleStatusChange = (newStatus: string) => {
+    // Update PROJ-011: Use Show › Scene format
     toast({
       title: 'Status Updated',
-      description: `Project status changed to ${newStatus.replace('_', ' ')}`,
+      description: `${projectShow?.name} › ${project.name} status changed to ${newStatus.replace('_', ' ')}`,
     })
   }
 
@@ -257,7 +312,8 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
     setIsEditing(true)
     // Reset edited values to current project values
     setEditedProject({
-      name: project.name,
+      name: project.name, // Scene name
+      showId: projectShow?.id || '',
       clientContact: project.clientContact || '',
       pm: project.pm,
       priority: project.priority,
@@ -268,9 +324,10 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   }
 
   const handleSaveProject = () => {
+    // Update PROJ-011: Use Show › Scene format
     toast({
-      title: 'Project Updated',
-      description: 'Project details have been saved successfully.',
+      title: 'Scene Updated',
+      description: `${projectShow?.name} › ${project.name} details saved.`,
     })
     setIsEditing(false)
   }
@@ -279,7 +336,8 @@ const handleCancelEdit = () => {
     setIsEditing(false)
     // Reset to original values
     setEditedProject({
-      name: project.name,
+      name: project.name, // Scene name
+      showId: projectShow?.id || '',
       clientContact: project.clientContact || '',
       pm: project.pm,
       priority: project.priority,
@@ -366,9 +424,10 @@ const handleCancelEdit = () => {
       })
     } else {
       // Admin/PM actually cancelling
+      // Update PROJ-011: Use Show › Scene format
       toast({
-        title: 'Project Cancelled',
-        description: `Project has been cancelled. Reason: ${cancelReason}`,
+        title: 'Scene Cancelled',
+        description: `${projectShow?.name} › ${project.name} cancelled. Reason: ${cancelReason}`,
       })
     }
     setShowCancelDialog(false)
@@ -376,9 +435,10 @@ const handleCancelEdit = () => {
   }
 
   const handleArchiveProject = () => {
+    // Update PROJ-011: Use Show › Scene format
     toast({
-      title: 'Project Archived',
-      description: `"${project.name}" has been moved to the archive.`,
+      title: 'Scene Archived',
+      description: `${projectShow?.name} › ${project.name} moved to archive.`,
     })
     setShowArchiveDialog(false)
   }
@@ -397,9 +457,10 @@ const handleCancelEdit = () => {
       setShowDuplicateDialog(false)
       setDuplicateName(`${project.name} (Copy)`)
       
+      // Update PROJ-011: Use Show › Scene format
       toast({
-        title: 'Project duplicated. Upload your source files to continue.',
-        description: `"${duplicateName}" created in Draft status.`,
+        title: 'Scene duplicated. Upload your source files to continue.',
+        description: `${projectShow?.name} › ${duplicateName} created in Draft status.`,
       })
       
 // Redirect to new project detail with highlight flag
@@ -499,10 +560,11 @@ const handleCancelEdit = () => {
     })
     setLocalTaskUpdates(prev => ({ ...prev, ...updates }))
     
-    toast({
-      title: `${vendor?.name} assigned to ${eligibleForAssign.length} tasks.`,
-      description: 'Vendor has been notified via a single consolidated notification.',
-    })
+// Update PROJ-011: Use Show › Scene format
+      toast({
+        title: `${vendor?.name} assigned to ${eligibleForAssign.length} tasks`,
+        description: `Tasks in ${projectShow?.name} › ${project.name}. Vendor notified.`,
+      })
     
     setIsBulkAssigning(false)
     setShowBulkAssignDialog(false)
@@ -513,13 +575,126 @@ const handleCancelEdit = () => {
 
   const handleAddTask = () => {
     if (!newTaskService) return
+    // Update PROJ-011: Use Show › Scene format in notification
     toast({
       title: 'Task Created',
-      description: `New ${newTaskService} task has been added to the project.`,
+      description: `New ${newTaskService} task added to ${projectShow?.name} › ${project.name}.`,
     })
     setShowAddTaskDialog(false)
     setNewTaskService('')
     setNewTaskLanguage('')
+  }
+  
+  // PROJ-014: Open follow-up task dialog
+  const handleOpenFollowupDialog = (task: typeof projectTasks[0]) => {
+    setFollowupPredecessorTask(task)
+    setFollowupServiceType('')
+    setFollowupSourceLang(task.sourceLanguage || '')
+    setFollowupTargetLang(task.targetLanguage || '')
+    setFollowupDeadline(project.deadline)
+    setFollowupInternalNote('')
+    setFollowupAssignNow(false)
+    setFollowupVendorId(null)
+    setFollowupVerifierAssignNow(false)
+    setFollowupVerifierId(null)
+    setFollowupVendorSearchQuery('')
+    setFollowupVerifierSearchQuery('')
+    setFollowupFiles([])
+    setShowFollowupTaskDialog(true)
+  }
+  
+  // PROJ-014: Submit follow-up task
+  const handleAddFollowupTask = async () => {
+    if (!followupPredecessorTask || !followupServiceType) return
+    
+    // Validation: Check predecessor is still Done
+    const currentPredecessor = updatedProjectTasks.find(t => t.id === followupPredecessorTask.id)
+    if (!currentPredecessor || (currentPredecessor.status !== 'completed' && currentPredecessor.status !== 'complete')) {
+      toast({
+        title: 'Cannot add follow-up',
+        description: 'The predecessor task is no longer Done. Refresh and try again.',
+        variant: 'destructive',
+      })
+      return
+    }
+    
+    // Validation: Check project is still active
+    if (!isProjectActive) {
+      toast({
+        title: 'Cannot add follow-up',
+        description: 'This project is no longer active. Follow-up tasks cannot be added.',
+        variant: 'destructive',
+      })
+      return
+    }
+    
+    // Check for duplicate task warning
+    const existingDuplicate = updatedProjectTasks.find(
+      t => t.serviceType === followupServiceType && 
+           t.sourceLanguage === followupSourceLang && 
+           t.targetLanguage === followupTargetLang
+    )
+    
+    setIsAddingFollowup(true)
+    
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    // Create new follow-up task ID
+    const newTaskId = `t-followup-${Date.now()}`
+    setFollowupTaskIds(prev => new Set([...prev, newTaskId]))
+    
+    // Check if auto PM Verification should be added
+    const needsAutoPMVerification = followupServiceType !== 'PM Verification'
+    let autoPMTaskId: string | null = null
+    
+    if (needsAutoPMVerification) {
+      autoPMTaskId = `t-auto-pm-${Date.now()}`
+      setAutoAddedTaskIds(prev => new Set([...prev, autoPMTaskId!]))
+    }
+    
+    // Update local task state (in real app, would refetch from API)
+    const newFollowupTask = {
+      id: newTaskId,
+      projectId: project.id,
+      projectName: project.name,
+      name: followupServiceType,
+      service: followupServiceType,
+      serviceType: followupServiceType,
+      status: followupAssignNow && followupVendorId ? 'assigned' : 'unassigned',
+      assignedVendor: followupAssignNow && followupVendorId 
+        ? mockVendors.find(v => v.id === followupVendorId)?.name 
+        : undefined,
+      vendorId: followupAssignNow ? followupVendorId || undefined : undefined,
+      dueDate: followupDeadline,
+      price: 250, // Mock price
+      sourceLanguage: followupSourceLang,
+      targetLanguage: followupTargetLang,
+    }
+    
+    setLocalTaskUpdates(prev => ({
+      ...prev,
+      [newTaskId]: newFollowupTask
+    }))
+    
+    // Build toast message
+    let toastMsg = `Follow-up task added after "${followupPredecessorTask.name}"`
+    if (needsAutoPMVerification) {
+      toastMsg += ' + PM Verification'
+    }
+    
+    toast({
+      title: 'Follow-up Task Added',
+      description: toastMsg,
+    })
+    
+    setIsAddingFollowup(false)
+    setShowFollowupTaskDialog(false)
+  }
+  
+  // PROJ-014: Check if task can have follow-up added
+  const canAddFollowupToTask = (task: typeof projectTasks[0]) => {
+    return canAddFollowup && (task.status === 'completed' || task.status === 'complete')
   }
   
   // Archive is only available for Closed or Cancelled projects per PRD PROJ-009
@@ -549,12 +724,25 @@ const handleCancelEdit = () => {
       <div className="border-b border-border bg-card px-6 py-4">
         <div className="flex items-start justify-between">
           <div>
+            {/* Update PROJ-004: Show › Scene breadcrumb header */}
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+              <Film className="h-4 w-4" />
+              <Link 
+                href={`/shows/${projectShow?.id}`} 
+                className="hover:text-foreground hover:underline transition-colors"
+              >
+                {selectedShow?.name || projectShow?.name || 'Unknown Show'}
+              </Link>
+              <ChevronRight className="h-3.5 w-3.5" />
+            </div>
             <div className="flex items-center gap-3">
+              {/* Scene name (editable) */}
               {isEditing && canEditField('name') ? (
                 <Input
                   value={editedProject.name}
                   onChange={(e) => setEditedProject({ ...editedProject, name: e.target.value })}
                   className="text-2xl font-semibold h-auto py-0 px-2 w-64"
+                  placeholder="Scene name..."
                 />
               ) : (
                 <h1 className="text-2xl font-semibold text-foreground">{project.name}</h1>
@@ -751,10 +939,90 @@ const handleCancelEdit = () => {
             <div className="grid gap-6 md:grid-cols-2">
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-base">Project Details</CardTitle>
+                  <CardTitle className="text-base">Scene Details</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <TooltipProvider>
+                    {/* Update PROJ-004: Show field (editable before quote approval) */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground flex items-center gap-1.5">
+                        Show
+                        {!canEditField('show') && isEditing && (
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Lock className="h-3 w-3 text-muted-foreground" />
+                            </TooltipTrigger>
+                            <TooltipContent>Locked — this field is tied to the approved quote.</TooltipContent>
+                          </Tooltip>
+                        )}
+                      </span>
+                      {isEditing && canEditField('show') ? (
+                        <Popover open={showSearchOpen} onOpenChange={setShowSearchOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={showSearchOpen}
+                              className="w-48 h-7 text-sm justify-between font-normal"
+                            >
+                              {selectedShow?.name || 'Select Show...'}
+                              <ChevronDown className="ml-2 h-3 w-3 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[250px] p-0" align="end">
+                            <Command>
+                              <CommandInput placeholder="Search shows..." className="h-9" />
+                              <CommandList>
+                                <CommandEmpty>No shows found for this client.</CommandEmpty>
+                                <CommandGroup>
+                                  {clientShows.map((show) => (
+                                    <CommandItem
+                                      key={show.id}
+                                      value={show.name}
+                                      onSelect={() => {
+                                        setEditedProject({ ...editedProject, showId: show.id })
+                                        setShowSearchOpen(false)
+                                      }}
+                                    >
+                                      <Check
+                                        className={cn(
+                                          "mr-2 h-4 w-4",
+                                          editedProject.showId === show.id ? "opacity-100" : "opacity-0"
+                                        )}
+                                      />
+                                      {show.name}
+                                    </CommandItem>
+                                  ))}
+                                </CommandGroup>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
+                      ) : (
+                        <Link 
+                          href={`/shows/${projectShow?.id}`}
+                          className="text-sm font-medium hover:text-primary hover:underline transition-colors"
+                        >
+                          {projectShow?.name || '-'}
+                        </Link>
+                      )}
+                    </div>
+                    
+                    {/* Update PROJ-004: Scene field (editable at any time - general field) */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Scene</span>
+                      {isEditing && canEditField('name') ? (
+                        <Input
+                          value={editedProject.name}
+                          onChange={(e) => setEditedProject({ ...editedProject, name: e.target.value })}
+                          className="w-48 h-7 text-sm"
+                          placeholder="Scene name..."
+                        />
+                      ) : (
+                        <span className="text-sm font-medium">{project.name}</span>
+                      )}
+                    </div>
+                    
                     {/* Client - hidden from client view (implicit from logged-in user) */}
                     {!isClient && (
                       <div className="flex items-center justify-between">
@@ -1016,7 +1284,7 @@ const handleCancelEdit = () => {
                           {index > 0 && (
                             <div className="w-8 h-0.5 bg-gray-300" />
                           )}
-                          <div className="relative">
+                          <div className="relative group">
                             {/* TASK-004: Checkbox for multi-select (Admin/PM only) */}
                             {(isAdmin || isPM) && (
                               <div className="absolute -top-2 -left-2 z-10">
@@ -1025,6 +1293,47 @@ const handleCancelEdit = () => {
                                   onCheckedChange={() => toggleTaskSelection(task.id)}
                                   className="h-4 w-4 bg-background border-2"
                                 />
+                              </div>
+                            )}
+                            {/* PROJ-014: Follow-up and Auto-added badges */}
+                            {followupTaskIds.has(task.id) && (
+                              <div className="absolute -top-2 right-0 z-10">
+                                <span className="px-1.5 py-0.5 text-[9px] font-medium bg-blue-500 text-white rounded">
+                                  Follow-up
+                                </span>
+                              </div>
+                            )}
+                            {autoAddedTaskIds.has(task.id) && (
+                              <div className="absolute -top-2 right-0 z-10">
+                                <span className="px-1.5 py-0.5 text-[9px] font-medium bg-purple-500 text-white rounded">
+                                  Auto-added
+                                </span>
+                              </div>
+                            )}
+                            {/* PROJ-014: Add follow-up button on hover for Done tasks */}
+                            {canAddFollowupToTask(task) && (
+                              <div className="absolute -right-3 top-1/2 -translate-y-1/2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        size="icon"
+                                        variant="secondary"
+                                        className="h-6 w-6 rounded-full shadow-md border border-border"
+                                        onClick={(e) => {
+                                          e.preventDefault()
+                                          e.stopPropagation()
+                                          handleOpenFollowupDialog(task)
+                                        }}
+                                      >
+                                        <Plus className="h-3 w-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right">
+                                      <p>Add follow-up task</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
                               </div>
                             )}
                             <TooltipProvider>
@@ -1536,15 +1845,16 @@ const handleCancelEdit = () => {
                   </CardHeader>
                   <CardContent className="px-6 pb-6 pt-2">
                     <div className="flex items-center justify-between">
+                      {/* Update 01: Quote name is primary, expiresAt removed, totalAmount renamed to price */}
                       <div>
-                        <p className="font-medium">Quote #{projectQuote.id.toUpperCase()}</p>
+                        <p className="font-medium">{projectQuote.name}</p>
                         <p className="text-sm text-muted-foreground">
-                          Created {formatDate(projectQuote.createdAt)} - Expires {formatDate(projectQuote.expiresAt)}
+                          {projectQuote.quoteNumber} &middot; Created {formatDate(projectQuote.createdAt)}
                         </p>
                       </div>
                       <div className="flex items-center gap-3">
                         <StatusBadge status={projectQuote.status} />
-                        <p className="text-xl font-semibold">{formatCurrency(projectQuote.totalAmount, project.currency)}</p>
+                        <p className="text-xl font-semibold">{projectQuote.price ? formatCurrency(projectQuote.price, project.currency) : '—'}</p>
                         <Link href={`/quotes/${projectQuote.id}`}>
                           <Button variant="outline" size="sm">
                             <Eye className="h-4 w-4 mr-1" />
@@ -1651,12 +1961,13 @@ const handleCancelEdit = () => {
       </Dialog>
 
       {/* Add Task Dialog - Individual task types only, no Service-level addition */}
+      {/* Update PROJ-011: Show › Scene in dialog header */}
       <Dialog open={showAddTaskDialog} onOpenChange={setShowAddTaskDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Task</DialogTitle>
+            <DialogTitle>Add Task to {projectShow?.name} › {project.name}</DialogTitle>
             <DialogDescription>
-              Select a task type to add to this project. Individual tasks only.
+              Select a task type to add to this scene. Individual tasks only.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
@@ -1742,6 +2053,268 @@ const handleCancelEdit = () => {
         </DialogContent>
       </Dialog>
       
+      {/* PROJ-014: Add Follow-up Task Dialog */}
+      <Dialog open={showFollowupTaskDialog} onOpenChange={setShowFollowupTaskDialog}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Follow-up Task</DialogTitle>
+            <DialogDescription>
+              Add a task after the completed task. A PM Verification task will be auto-added unless you&apos;re adding PM Verification.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-2">
+            {/* Predecessor task (read-only) */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Predecessor Task</Label>
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/50 border">
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-500 text-white text-xs">
+                  ✓
+                </div>
+                <div>
+                  <p className="text-sm font-medium">{followupPredecessorTask?.name || followupPredecessorTask?.service}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {followupPredecessorTask?.sourceLanguage && followupPredecessorTask?.targetLanguage 
+                      ? `${followupPredecessorTask.sourceLanguage} → ${followupPredecessorTask.targetLanguage}` 
+                      : followupPredecessorTask?.sourceLanguage || ''} · Done
+                  </p>
+                </div>
+              </div>
+            </div>
+            
+            {/* Service type */}
+            <div className="space-y-2">
+              <Label htmlFor="followup-service">Service Type <span className="text-destructive">*</span></Label>
+              <Select value={followupServiceType} onValueChange={setFollowupServiceType}>
+                <SelectTrigger id="followup-service">
+                  <SelectValue placeholder="Select task type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Transcription">Transcription</SelectItem>
+                  <SelectItem value="Translation">Translation</SelectItem>
+                  <SelectItem value="Translation from Audio">Translation from Audio</SelectItem>
+                  <SelectItem value="QC">QC</SelectItem>
+                  <SelectItem value="Proofread">Proofread</SelectItem>
+                  <SelectItem value="PM Verification">PM Verification</SelectItem>
+                  <SelectItem value="Timing">Timing</SelectItem>
+                </SelectContent>
+              </Select>
+              {followupServiceType && followupServiceType !== 'PM Verification' && (
+                <p className="text-xs text-muted-foreground">
+                  A PM Verification task will be auto-added after this task.
+                </p>
+              )}
+            </div>
+            
+            {/* Language pair */}
+            <div className="space-y-2">
+              <Label>Language Pair <span className="text-destructive">*</span></Label>
+              <div className="flex items-center gap-2">
+                <Select value={followupSourceLang} onValueChange={setFollowupSourceLang}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Source" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EN">EN</SelectItem>
+                    <SelectItem value="ES">ES</SelectItem>
+                    <SelectItem value="FR">FR</SelectItem>
+                    <SelectItem value="DE">DE</SelectItem>
+                    <SelectItem value="JA">JA</SelectItem>
+                    <SelectItem value="KO">KO</SelectItem>
+                    <SelectItem value="AR">AR</SelectItem>
+                    <SelectItem value="HE">HE</SelectItem>
+                    <SelectItem value="PT">PT</SelectItem>
+                    <SelectItem value="ZH">ZH</SelectItem>
+                  </SelectContent>
+                </Select>
+                <span className="text-muted-foreground">→</span>
+                <Select value={followupTargetLang} onValueChange={setFollowupTargetLang}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Target" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EN">EN</SelectItem>
+                    <SelectItem value="ES">ES</SelectItem>
+                    <SelectItem value="FR">FR</SelectItem>
+                    <SelectItem value="DE">DE</SelectItem>
+                    <SelectItem value="JA">JA</SelectItem>
+                    <SelectItem value="KO">KO</SelectItem>
+                    <SelectItem value="AR">AR</SelectItem>
+                    <SelectItem value="HE">HE</SelectItem>
+                    <SelectItem value="PT">PT</SelectItem>
+                    <SelectItem value="ZH">ZH</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            {/* Deadline */}
+            <div className="space-y-2">
+              <Label htmlFor="followup-deadline">Deadline <span className="text-destructive">*</span></Label>
+              <Input 
+                id="followup-deadline" 
+                type="date" 
+                value={followupDeadline}
+                onChange={(e) => setFollowupDeadline(e.target.value)}
+              />
+            </div>
+            
+            {/* Internal note */}
+            <div className="space-y-2">
+              <Label htmlFor="followup-note">Internal Note (optional)</Label>
+              <Textarea 
+                id="followup-note"
+                placeholder="Add an internal note about this follow-up task..."
+                value={followupInternalNote}
+                onChange={(e) => setFollowupInternalNote(e.target.value)}
+                rows={2}
+              />
+            </div>
+            
+            {/* Assign vendor section */}
+            <div className="space-y-3 pt-2 border-t">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Assign Vendor</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="followup-assign-now" className="text-xs text-muted-foreground cursor-pointer">
+                    {followupAssignNow ? 'Assign now' : 'Skip — assign later'}
+                  </Label>
+                  <Switch
+                    id="followup-assign-now"
+                    checked={followupAssignNow}
+                    onCheckedChange={setFollowupAssignNow}
+                  />
+                </div>
+              </div>
+              
+              {followupAssignNow && (
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Search vendors..."
+                    value={followupVendorSearchQuery}
+                    onChange={(e) => setFollowupVendorSearchQuery(e.target.value)}
+                  />
+                  <div className="max-h-32 overflow-y-auto space-y-1 border rounded-lg p-2">
+                    {mockVendors
+                      .filter(v => v.name.toLowerCase().includes(followupVendorSearchQuery.toLowerCase()))
+                      .slice(0, 5)
+                      .map(vendor => (
+                        <div
+                          key={vendor.id}
+                          className={cn(
+                            'flex items-center justify-between p-2 rounded cursor-pointer hover:bg-muted',
+                            followupVendorId === vendor.id && 'bg-primary/10 border border-primary'
+                          )}
+                          onClick={() => setFollowupVendorId(vendor.id)}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-6 w-6">
+                              <AvatarFallback className="text-xs">
+                                {vendor.name.split(' ').map(n => n[0]).join('')}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="text-sm font-medium">{vendor.name}</p>
+                              <p className="text-xs text-muted-foreground">{vendor.rating}/5 · {vendor.availability}</p>
+                            </div>
+                          </div>
+                          {followupVendorId === vendor.id && (
+                            <CheckCircle2 className="h-4 w-4 text-primary" />
+                          )}
+                        </div>
+                      ))}
+                    {mockVendors.filter(v => v.name.toLowerCase().includes(followupVendorSearchQuery.toLowerCase())).length === 0 && (
+                      <p className="text-xs text-muted-foreground text-center py-2">No qualified vendors. Skip and assign later.</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Assign verifier for auto PM Verification */}
+            {followupServiceType && followupServiceType !== 'PM Verification' && (
+              <div className="space-y-3 pt-2 border-t">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label className="text-sm font-medium">Assign Verifier</Label>
+                    <p className="text-xs text-muted-foreground">For the auto-added PM Verification task</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="followup-verifier-now" className="text-xs text-muted-foreground cursor-pointer">
+                      {followupVerifierAssignNow ? 'Assign now' : 'Skip'}
+                    </Label>
+                    <Switch
+                      id="followup-verifier-now"
+                      checked={followupVerifierAssignNow}
+                      onCheckedChange={setFollowupVerifierAssignNow}
+                    />
+                  </div>
+                </div>
+                
+                {followupVerifierAssignNow && (
+                  <div className="space-y-2">
+                    <Input
+                      placeholder="Search verifiers..."
+                      value={followupVerifierSearchQuery}
+                      onChange={(e) => setFollowupVerifierSearchQuery(e.target.value)}
+                    />
+                    <div className="max-h-32 overflow-y-auto space-y-1 border rounded-lg p-2">
+                      {mockVendors
+                        .filter(v => v.name.toLowerCase().includes(followupVerifierSearchQuery.toLowerCase()))
+                        .slice(0, 5)
+                        .map(vendor => (
+                          <div
+                            key={vendor.id}
+                            className={cn(
+                              'flex items-center justify-between p-2 rounded cursor-pointer hover:bg-muted',
+                              followupVerifierId === vendor.id && 'bg-primary/10 border border-primary'
+                            )}
+                            onClick={() => setFollowupVerifierId(vendor.id)}
+                          >
+                            <div className="flex items-center gap-2">
+                              <Avatar className="h-6 w-6">
+                                <AvatarFallback className="text-xs">
+                                  {vendor.name.split(' ').map(n => n[0]).join('')}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="text-sm font-medium">{vendor.name}</p>
+                                <p className="text-xs text-muted-foreground">{vendor.rating}/5</p>
+                              </div>
+                            </div>
+                            {followupVerifierId === vendor.id && (
+                              <CheckCircle2 className="h-4 w-4 text-primary" />
+                            )}
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowFollowupTaskDialog(false)}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleAddFollowupTask} 
+              disabled={!followupServiceType || !followupSourceLang || !followupTargetLang || !followupDeadline || isAddingFollowup}
+            >
+              {isAddingFollowup ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Adding task...
+                </>
+              ) : (
+                'Add Task'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
       {/* PROJ-012: Duplicate Project Dialog */}
       <Dialog open={showDuplicateDialog} onOpenChange={(open) => { 
         setShowDuplicateDialog(open)
@@ -1754,24 +2327,25 @@ const handleCancelEdit = () => {
           <DialogHeader>
             <DialogTitle>Duplicate &quot;{project.name}&quot;?</DialogTitle>
             <DialogDescription>
-              Create a new project with the same settings. Source files are not duplicated — you&apos;ll upload a new video after creation.
+              Create a new scene with the same settings. Source files are not duplicated — you&apos;ll upload a new video after creation.
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
+            {/* Update PROJ-001: "Project name" renamed to "Scene name" */}
             <div className="space-y-2">
               <Label htmlFor="duplicate-name" className="text-sm font-medium">
-                New project name <span className="text-destructive">*</span>
+                New scene name <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="duplicate-name"
                 value={duplicateName}
                 onChange={(e) => setDuplicateName(e.target.value)}
-                placeholder="Enter project name..."
+                placeholder="Enter scene name..."
                 autoFocus
               />
               {!duplicateName.trim() && (
-                <p className="text-xs text-destructive">Project name is required.</p>
+                <p className="text-xs text-destructive">Scene name is required.</p>
               )}
             </div>
             

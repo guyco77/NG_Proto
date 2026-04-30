@@ -27,7 +27,8 @@ export type ProjectStatus = 'draft' | 'quoted' | 'approved' | 'in_progress' | 'i
 export type ProjectPriority = 'low' | 'medium' | 'high' | 'urgent'
 export type NoteVisibility = 'internal' | 'client' | 'vendor' | 'billing'
 export type TaskStatus = 'unassigned' | 'open_for_offers' | 'assigned' | 'in_progress' | 'submitted' | 'complete'
-export type QuoteStatus = 'unsent' | 'draft' | 'sent' | 'changes_requested' | 'approved' | 'rejected' | 'superseded' | 'moved_to_project'
+// Update 02: Approved quote → Show (not Project)
+export type QuoteStatus = 'unsent' | 'draft' | 'sent' | 'changes_requested' | 'approved' | 'rejected' | 'superseded' | 'moved_to_show'
 export type QuoteCurrency = 'ILS' | 'USD' | 'EUR'
 // BILL-002: Invoice Status Lifecycle
 export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'paid' | 'overdue'
@@ -125,16 +126,25 @@ export interface TaskNote {
   createdAt: string
 }
 
+// Update 01: Quote interface with name (required), optional project linkage
 export interface Quote {
   id: string
   quoteNumber: string // Q-YYYY-NNN format
-  projectId: string
-  projectName: string
+  // Update 01: name is the primary identifier (required), projectId is optional
+  name: string // Required - human-readable label for the quote/request
+  description?: string // Optional - longer context for the quote/request
+  projectId?: string // Optional - can be linked later or never
+  projectName?: string // Optional - only if projectId is set
   clientId: string
   clientName: string
   status: QuoteStatus
-  currency: QuoteCurrency
-  totalAmount: number
+  // Update 01: services and languages are optional arrays
+  services?: string[] // Optional - from SERVICES_LIST
+  sourceLanguage?: string // Optional
+  targetLanguages?: string[] // Optional
+  // Update 01: price replaces totalAmount, currency is per-quote
+  currency?: QuoteCurrency // Required only if price is entered
+  price?: number // Optional - replaces totalAmount
   createdAt: string
   sentAt?: string
   approvedAt?: string
@@ -145,7 +155,7 @@ export interface Quote {
   rejectionReason?: string
   notesToClient?: string
   internalNotes?: string
-  items: QuoteItem[]
+  items?: QuoteItem[] // Optional - line items
   pmId: string
   pmName: string
   version?: number

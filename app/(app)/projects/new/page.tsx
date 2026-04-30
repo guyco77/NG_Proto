@@ -17,6 +17,15 @@ import {
   Search,
   Pencil,
   ChevronDown,
+  Mic,
+  Languages,
+  CheckCircle2,
+  ClipboardCheck,
+  User,
+  CalendarClock,
+  RotateCcw,
+  UserX,
+  Info,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -36,6 +45,11 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -44,7 +58,7 @@ import {
   CommandList,
 } from '@/components/ui/command'
 import { cn } from '@/lib/utils'
-import { mockClients, mockUsers, formatCurrency, mockServices, SERVICE_CATEGORIES } from '@/lib/mock-data'
+import { mockClients, mockUsers, formatCurrency, mockServices, SERVICE_CATEGORIES, mockShows, mockVendors } from '@/lib/mock-data'
 import type { Service, WorkflowStep } from '@/lib/types'
 import { useToast } from '@/hooks/use-toast'
 import { useRole } from '../../layout'
@@ -128,7 +142,12 @@ export default function NewProjectPage() {
   const autoClientId = isClientRole ? 'c1' : '' // Demo: auto-assign first client for client role
   
   // Step 1: Overview
-  const [projectName, setProjectName] = useState('')
+  // Update PROJ-001: "Project name" renamed to "Scene", new "Show" field added
+  const [sceneName, setSceneName] = useState('')
+  const [showId, setShowId] = useState('')
+  const [showSearchOpen, setShowSearchOpen] = useState(false)
+  const [newShowName, setNewShowName] = useState('')
+  const [isCreatingShow, setIsCreatingShow] = useState(false)
   const [clientId, setClientId] = useState(autoClientId)
   const [clientSearchOpen, setClientSearchOpen] = useState(false)
   const [editingFileId, setEditingFileId] = useState<string | null>(null)
@@ -140,6 +159,15 @@ export default function NewProjectPage() {
   const [referenceFiles, setReferenceFiles] = useState<UploadedFile[]>([])
   const [importUrl, setImportUrl] = useState('')
   
+  // Update PROJ-001: Shows filtered by selected client
+  const clientShows = mockShows.filter(s => s.clientId === clientId)
+  const selectedShow = mockShows.find(s => s.id === showId)
+  
+  // Update PROJ-001: Multi-video detection (more than 1 video = one Scene per video)
+  const videoFiles = sourceFiles.filter(f => f.name.match(/\.(mp4|mov|mkv|avi|wmv|webm)$/i))
+  const isMultiVideo = videoFiles.length > 1
+  const autoSceneNames = videoFiles.map(f => f.name.replace(/\.[^/.]+$/, '')) // filename without extension
+  
   // Step 2: Services & Timeline (Admin/PM)
   const [selectedServices, setSelectedServices] = useState<SelectedService[]>([])
   const [serviceSearchOpen, setServiceSearchOpen] = useState(false)
@@ -150,6 +178,27 @@ export default function NewProjectPage() {
   // Step 2: Task Types (Client self-service - PROJ-010)
   const [selectedTaskTypes, setSelectedTaskTypes] = useState<SelectedTaskType[]>([])
   const [taskTypeSearchOpen, setTaskTypeSearchOpen] = useState(false)
+  
+  // Update PROJ-001: Tasks Pipeline preview state (Admin/PM only)
+  interface PipelineTask {
+    id: string
+    serviceType: string
+    languagePair: { source: string; target: string } | null
+    order: number
+    // Per-task schedule (date + time)
+    startDate: string
+    startTime: string
+    endDate: string
+    endTime: string
+    // Optional vendor pre-assignment
+    vendorId: string | null
+    vendorName: string | null
+    vendorNote: string
+    // UI state
+    isExpanded: boolean
+  }
+  const [pipelineTasks, setPipelineTasks] = useState<PipelineTask[]>([])
+  const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null)
   
   // Step 3: Billing & Notes
   const [notes, setNotes] = useState('')
@@ -319,14 +368,13 @@ export default function NewProjectPage() {
     }
     
     if (type === 'source') {
-      // PROJ-006: Client can only have one source video - replace instead of append
-      if (isClientRole && sourceFiles.length > 0) {
-        // Clear existing source files first
-        setSourceFiles([mockFile])
-        setDetectedDuration(null)
-      } else {
-        setSourceFiles([...sourceFiles, mockFile])
+      // Update PROJ-010: Client can now upload multiple videos (up to 50) like Admin/PM
+      // Each video creates a separate Scene
+      if (videoFiles.length >= 50) {
+        toast({ title: 'Maximum reached', description: 'You can upload up to 50 videos at once.' })
+        return
       }
+      setSourceFiles([...sourceFiles, mockFile])
       
       // Simulate video duration detection (1-2 second delay)
       if (isVideoFile) {
@@ -363,8 +411,10 @@ export default function NewProjectPage() {
     }
   }
   
-  // For client role, clientId is auto-set so just check name and files
-  const canProceedStep1 = projectName.trim() && (isClientRole || clientId) && sourceFiles.length > 0
+  // Update PROJ-001: Scene + Show required, sourceFiles required
+  // Update PROJ-006: Block if >50 videos uploaded
+  // Update PROJ-010: Client also needs Show (scoped to their company)
+  const canProceedStep1 = sceneName.trim() && showId && (isClientRole || clientId) && sourceFiles.length > 0 && videoFiles.length <= 50
   
   // Step 2 validation: different for client vs admin/PM
   // Client: at least one task type selected, all language pairs complete, deadline set
@@ -380,25 +430,55 @@ export default function NewProjectPage() {
        ) && deadline)
   
   const handleSubmit = () => {
+    // Update PROJ-001: Multi-video creates one Scene per video
+    const sceneCount = isMultiVideo ? videoFiles.length : 1
+    const sceneNames = isMultiVideo ? autoSceneNames : [sceneName]
+    
     if (isClientRole) {
-      // PROJ-010: Client creates project in Approved status directly, no quote
-      toast({
-        title: 'Project created. Assign your team to get started.',
-        description: `${projectName} is ready for team assignment.`,
-      })
+      // Update PROJ-010: Client creates project in Approved status directly
+      // Multi-video creates one Scene per video with auto-generated Approved quotes
+      const toastTitle = isMultiVideo 
+        ? `${sceneCount} Scenes Created` 
+        : 'Scene Created'
+      const toastDesc = isMultiVideo
+        ? `${sceneCount} scenes created under "${selectedShow?.name}". One approved quote per scene. Ready for team assignment.`
+        : `"${sceneName}" is ready for team assignment under "${selectedShow?.name}".`
+      
+      toast({ title: toastTitle, description: toastDesc })
+      
       // In real app, would POST to API then redirect
       setTimeout(() => {
-        router.push('/projects/new/success?name=' + encodeURIComponent(projectName) + '&client=true')
+        router.push('/projects/new/success?name=' + encodeURIComponent(sceneName) + '&client=true&scenes=' + sceneCount + '&show=' + encodeURIComponent(selectedShow?.name || ''))
       }, 500)
     } else {
       // Admin/PM creates project in Draft status
-      toast({
-        title: 'Project Created',
-        description: `${projectName} has been created successfully.`,
-      })
+      // Update PROJ-001: Show multi-scene creation info
+      const toastTitle = isMultiVideo 
+        ? `${sceneCount} Scenes Created` 
+        : 'Scene Created'
+      const toastDesc = isMultiVideo
+        ? `${sceneCount} scenes created under "${selectedShow?.name}". Tasks and quote generated per scene.`
+        : `"${sceneName}" has been created under "${selectedShow?.name}".`
+      
+      toast({ title: toastTitle, description: toastDesc })
+      
+      // Audit log for pipeline pre-assignments
+      if (pipelineTasks.some(t => t.vendorId)) {
+        console.log('[Audit] Vendors pre-assigned from creation:', {
+          sceneNames,
+          preAssignments: pipelineTasks.filter(t => t.vendorId).map(t => ({
+            serviceType: t.serviceType,
+            vendorId: t.vendorId,
+            vendorName: t.vendorName,
+          })),
+          actor: 'current_user',
+          timestamp: new Date().toISOString(),
+        })
+      }
+      
       // In real app, would POST to API then redirect
       setTimeout(() => {
-        router.push('/projects/new/success?name=' + encodeURIComponent(projectName))
+        router.push('/projects/new/success?name=' + encodeURIComponent(sceneName) + '&scenes=' + sceneCount)
       }, 500)
     }
   }
@@ -443,9 +523,9 @@ export default function NewProjectPage() {
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
-      {/* Header */}
+      {/* Header - Update PROJ-001: "Project" renamed to "Scene" */}
       <div>
-        <h1 className="text-2xl font-semibold text-foreground">Create New Project</h1>
+        <h1 className="text-2xl font-semibold text-foreground">Create New Scene</h1>
         <p className="text-sm text-muted-foreground mt-1">Step {currentStep} of 3</p>
       </div>
 
@@ -490,19 +570,135 @@ export default function NewProjectPage() {
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Project Information</CardTitle>
+              <CardTitle className="text-base">Scene Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="projectName">Project Name *</Label>
-                <Input
-                  id="projectName"
-                  placeholder="e.g., Netflix Series S2"
-                  value={projectName}
-                  onChange={(e) => setProjectName(e.target.value)}
-                  className="max-w-md"
-                />
-              </div>
+              {/* Update PROJ-010: Show selector for Client (scoped to their company) */}
+              {isClientRole && (
+                <div className="space-y-2">
+                  <Label htmlFor="show">Show *</Label>
+                  <Popover open={showSearchOpen} onOpenChange={setShowSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={showSearchOpen}
+                        className="w-full max-w-md justify-between font-normal"
+                      >
+                        {showId
+                          ? selectedShow?.name
+                          : "Search or create a Show..."}
+                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[350px] p-0" align="start">
+                      <Command>
+                        <CommandInput 
+                          placeholder="Search shows..." 
+                          value={newShowName}
+                          onValueChange={setNewShowName}
+                        />
+                        <CommandList>
+                          <CommandEmpty>
+                            <div className="py-2 px-3">
+                              <p className="text-sm text-muted-foreground mb-2">No shows found.</p>
+                              {newShowName.trim() && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="w-full gap-1.5"
+                                  onClick={() => {
+                                    setIsCreatingShow(true)
+                                    const newId = `show-new-${Date.now()}`
+                                    setTimeout(() => {
+                                      mockShows.push({
+                                        id: newId,
+                                        name: newShowName.trim(),
+                                        clientId: autoClientId,
+                                        clientName: mockClients.find(c => c.id === autoClientId)?.displayName || '',
+                                        createdAt: new Date().toISOString(),
+                                        sceneCount: 0,
+                                      })
+                                      setShowId(newId)
+                                      setShowSearchOpen(false)
+                                      setNewShowName('')
+                                      setIsCreatingShow(false)
+                                      toast({ title: 'Show created', description: `"${newShowName.trim()}" created.` })
+                                    }, 500)
+                                  }}
+                                  disabled={isCreatingShow}
+                                >
+                                  {isCreatingShow ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                                  Create &quot;{newShowName.trim()}&quot;
+                                </Button>
+                              )}
+                            </div>
+                          </CommandEmpty>
+                          <CommandGroup heading="Your Shows">
+                            {clientShows.map((show) => (
+                              <CommandItem
+                                key={show.id}
+                                value={show.name}
+                                onSelect={() => {
+                                  setShowId(show.id)
+                                  setShowSearchOpen(false)
+                                  setNewShowName('')
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    showId === show.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex-1">
+                                  <span>{show.name}</span>
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    {show.sceneCount} scene{show.sceneCount !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                          {newShowName.trim() && clientShows.length > 0 && (
+                            <CommandGroup>
+                              <CommandItem
+                                value={`create-${newShowName}`}
+                                onSelect={() => {
+                                  setIsCreatingShow(true)
+                                  const newId = `show-new-${Date.now()}`
+                                  setTimeout(() => {
+                                    mockShows.push({
+                                      id: newId,
+                                      name: newShowName.trim(),
+                                      clientId: autoClientId,
+                                      clientName: mockClients.find(c => c.id === autoClientId)?.displayName || '',
+                                      createdAt: new Date().toISOString(),
+                                      sceneCount: 0,
+                                    })
+                                    setShowId(newId)
+                                    setShowSearchOpen(false)
+                                    setNewShowName('')
+                                    setIsCreatingShow(false)
+                                    toast({ title: 'Show created', description: `"${newShowName.trim()}" created.` })
+                                  }, 500)
+                                }}
+                              >
+                                <Plus className="mr-2 h-4 w-4" />
+                                Create new Show &quot;{newShowName.trim()}&quot;
+                              </CommandItem>
+                            </CommandGroup>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {!showId && (
+                    <p className="text-xs text-destructive">Show is required</p>
+                  )}
+                </div>
+              )}
+              
               {/* PROJ-010: Client role doesn't see client/PM selectors */}
               {!isClientRole && (
                 <div className="grid gap-4 md:grid-cols-2">
@@ -534,6 +730,7 @@ export default function NewProjectPage() {
                                   value={client.displayName}
                                   onSelect={() => {
                                     setClientId(client.id)
+                                    setShowId('') // Reset show when client changes
                                     setClientSearchOpen(false)
                                   }}
                                 >
@@ -569,6 +766,160 @@ export default function NewProjectPage() {
                   </div>
                 </div>
               )}
+              
+              {/* Update PROJ-001: Show selector (Admin/PM only, scoped to selected client) */}
+              {!isClientRole && clientId && (
+                <div className="space-y-2">
+                  <Label htmlFor="show">Show *</Label>
+                  <Popover open={showSearchOpen} onOpenChange={setShowSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={showSearchOpen}
+                        className="w-full max-w-md justify-between font-normal"
+                      >
+                        {showId
+                          ? selectedShow?.name
+                          : "Search or create a Show..."}
+                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[350px] p-0" align="start">
+                      <Command>
+                        <CommandInput 
+                          placeholder="Search shows..." 
+                          value={newShowName}
+                          onValueChange={setNewShowName}
+                        />
+                        <CommandList>
+                          <CommandEmpty>
+                            <div className="py-2 px-3">
+                              <p className="text-sm text-muted-foreground mb-2">No shows found for this client.</p>
+                              {newShowName.trim() && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="w-full gap-1.5"
+                                  onClick={() => {
+                                    // Create new show inline
+                                    setIsCreatingShow(true)
+                                    const newId = `show-new-${Date.now()}`
+                                    // In real app, would POST to API
+                                    setTimeout(() => {
+                                      mockShows.push({
+                                        id: newId,
+                                        name: newShowName.trim(),
+                                        clientId: clientId,
+                                        clientName: mockClients.find(c => c.id === clientId)?.displayName || '',
+                                        createdAt: new Date().toISOString(),
+                                        sceneCount: 0,
+                                      })
+                                      setShowId(newId)
+                                      setShowSearchOpen(false)
+                                      setNewShowName('')
+                                      setIsCreatingShow(false)
+                                      toast({ title: 'Show created', description: `"${newShowName.trim()}" created.` })
+                                    }, 500)
+                                  }}
+                                  disabled={isCreatingShow}
+                                >
+                                  {isCreatingShow ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                                  Create &quot;{newShowName.trim()}&quot;
+                                </Button>
+                              )}
+                            </div>
+                          </CommandEmpty>
+                          <CommandGroup heading="Shows for this client">
+                            {clientShows.map((show) => (
+                              <CommandItem
+                                key={show.id}
+                                value={show.name}
+                                onSelect={() => {
+                                  setShowId(show.id)
+                                  setShowSearchOpen(false)
+                                  setNewShowName('')
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    showId === show.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex-1">
+                                  <span>{show.name}</span>
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    {show.sceneCount} scene{show.sceneCount !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                          {newShowName.trim() && clientShows.length > 0 && (
+                            <CommandGroup>
+                              <CommandItem
+                                value={`create-${newShowName}`}
+                                onSelect={() => {
+                                  setIsCreatingShow(true)
+                                  const newId = `show-new-${Date.now()}`
+                                  setTimeout(() => {
+                                    mockShows.push({
+                                      id: newId,
+                                      name: newShowName.trim(),
+                                      clientId: clientId,
+                                      clientName: mockClients.find(c => c.id === clientId)?.displayName || '',
+                                      createdAt: new Date().toISOString(),
+                                      sceneCount: 0,
+                                    })
+                                    setShowId(newId)
+                                    setShowSearchOpen(false)
+                                    setNewShowName('')
+                                    setIsCreatingShow(false)
+                                    toast({ title: 'Show created', description: `"${newShowName.trim()}" created.` })
+                                  }, 500)
+                                }}
+                              >
+                                <Plus className="mr-2 h-4 w-4" />
+                                Create new Show &quot;{newShowName.trim()}&quot;
+                              </CommandItem>
+                            </CommandGroup>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {!showId && clientId && (
+                    <p className="text-xs text-destructive">Show is required</p>
+                  )}
+                </div>
+              )}
+              
+              {/* Update PROJ-001: Scene field (was "Project name") */}
+              <div className="space-y-2">
+                <Label htmlFor="sceneName">Scene *</Label>
+                <Input
+                  id="sceneName"
+                  placeholder="e.g. Episode 4 — Opening"
+                  value={sceneName}
+                  onChange={(e) => setSceneName(e.target.value)}
+                  className={cn("max-w-md", isMultiVideo && "line-through opacity-60")}
+                  disabled={isMultiVideo}
+                />
+                {isMultiVideo && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <p className="text-xs text-amber-600 flex items-center gap-1 cursor-help">
+                        <Info className="h-3 w-3" />
+                        Scene name will be replaced by video file names (multiple videos uploaded)
+                      </p>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs">When multiple videos are uploaded, each video creates its own Scene using the video&apos;s filename.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
               <div className="space-y-2">
                 <Label>Priority</Label>
                 <div className="flex gap-2">
@@ -602,32 +953,55 @@ export default function NewProjectPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Source Files *</CardTitle>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-base">Source Files *</CardTitle>
+                {/* Update PROJ-010: Multi-video count indicator for both Client and Admin/PM */}
+                {videoFiles.length > 0 && (
+                  <span className={cn(
+                    "text-xs px-2 py-0.5 rounded-full",
+                    isMultiVideo ? "bg-blue-100 text-blue-700" : "bg-muted text-muted-foreground"
+                  )}>
+                    {videoFiles.length} video{videoFiles.length > 1 ? 's' : ''} — {isMultiVideo ? `${videoFiles.length} Scenes will be created` : '1 Scene'}
+                  </span>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="px-6 pb-6 pt-2">
-              {/* PROJ-006: Client role - one source video per project, hide upload once file exists */}
-              {(!isClientRole || sourceFiles.length === 0) && (
+              {/* Update PROJ-010: Both Client and Admin/PM can upload up to 50 videos (multi-Scene creation) */}
+              {videoFiles.length < 50 && (
                 <div
                   className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-border p-8 hover:border-primary/50 transition-colors cursor-pointer"
                   onClick={() => handleFileUpload('source')}
                 >
                   <Upload className="h-10 w-10 text-muted-foreground mb-3" />
                   <p className="text-sm font-medium">
-                    {isClientRole ? 'Upload your source video' : 'Drag and drop files here'}
+                    {isClientRole ? 'Upload your source video(s)' : 'Drag and drop files here'}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">or click to browse</p>
                   <p className="text-xs text-muted-foreground mt-2">
                     Supports: MP4, MOV, MKV{!isClientRole && ', SRT, VTT'}
                   </p>
-                  {isClientRole && (
-                    <p className="text-xs text-muted-foreground mt-1">One source video per project</p>
-                  )}
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Up to 50 videos — each creates a separate Scene
+                  </p>
+                </div>
+              )}
+              
+              {/* Update PROJ-006: 50-video limit validation error */}
+              {videoFiles.length > 50 && (
+                <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 p-3 mt-4">
+                  <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-800">
+                    You can upload up to 50 videos at once. Remove some files to continue.
+                  </p>
                 </div>
               )}
               
               {sourceFiles.length > 0 && (
                 <div className="mt-4 space-y-2">
-                  {sourceFiles.map((file) => (
+                  {sourceFiles.map((file) => {
+                    const isVideo = file.name.match(/\.(mp4|mov|mkv|avi|wmv|webm)$/i)
+                    return (
                     <div key={file.id} className="flex items-center justify-between rounded-lg border border-border p-3">
                       <div className="flex items-center gap-3 flex-1 min-w-0">
                         <Video className="h-5 w-5 text-muted-foreground shrink-0" />
@@ -652,6 +1026,12 @@ export default function NewProjectPage() {
                           )}
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <span>{formatFileSize(file.size)}</span>
+                            {/* Update PROJ-006: Show video badge and per-video duration */}
+                            {isVideo && (
+                              <span className="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-xs">
+                                Video
+                              </span>
+                            )}
                             {file.isProcessing && (
                               <span className="flex items-center gap-1 text-amber-600">
                                 <Loader2 className="h-3 w-3 animate-spin" />
@@ -671,7 +1051,8 @@ export default function NewProjectPage() {
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               )}
               
@@ -1080,6 +1461,363 @@ export default function NewProjectPage() {
             </Card>
           )}
 
+          {/* Update PROJ-001: Tasks Pipeline Preview (Admin/PM only) */}
+          {!isClientRole && selectedServices.length > 0 && selectedServices.every(ss => 
+            ss.languagePairs.length === 0 || ss.languagePairs.every(lp => lp.source && lp.target)
+          ) && (
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-base">Tasks Pipeline Preview</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      Preview and configure tasks that will be auto-generated. Set per-task schedules and pre-assign vendors.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-7 gap-1"
+                      onClick={() => {
+                        // Reset all schedules to project defaults
+                        setPipelineTasks(prev => prev.map(t => ({
+                          ...t,
+                          startDate: startDate || '',
+                          startTime: '09:00',
+                          endDate: deadline || '',
+                          endTime: '18:00',
+                        })))
+                        toast({ title: 'Schedules reset', description: 'All tasks reset to project schedule.' })
+                      }}
+                    >
+                      <RotateCcw className="h-3 w-3" />
+                      Reset all to project schedule
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-xs h-7 gap-1"
+                      onClick={() => {
+                        // Clear all vendor pre-assignments
+                        setPipelineTasks(prev => prev.map(t => ({
+                          ...t,
+                          vendorId: null,
+                          vendorName: null,
+                          vendorNote: '',
+                        })))
+                        toast({ title: 'Vendors cleared', description: 'All vendor pre-assignments removed.' })
+                      }}
+                    >
+                      <UserX className="h-3 w-3" />
+                      Clear all vendor pre-assignments
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="px-6 pb-6 pt-2">
+                {/* Generate pipeline tasks from selected services */}
+                {(() => {
+                  // Build task list from services and language pairs
+                  const tasks: Array<{
+                    id: string
+                    serviceType: string
+                    icon: React.ReactNode
+                    langPair: { source: string; target: string } | null
+                    serviceName: string
+                    order: number
+                  }> = []
+                  
+                  let orderCounter = 1
+                  selectedServices.forEach(ss => {
+                    ss.service.workflow.forEach(step => {
+                      if (ss.languagePairs.length > 0 && (step.type === 'translation' || step.type === 'transcription')) {
+                        // One task per language pair for translation/transcription steps
+                        ss.languagePairs.forEach(lp => {
+                          if (lp.source && lp.target) {
+                            tasks.push({
+                              id: `${ss.id}-${step.id}-${lp.id}`,
+                              serviceType: step.name,
+                              icon: step.type === 'transcription' ? <Mic className="h-3.5 w-3.5" /> :
+                                    step.type === 'translation' ? <Languages className="h-3.5 w-3.5" /> :
+                                    step.type === 'qa' || step.type === 'qc' ? <CheckCircle2 className="h-3.5 w-3.5" /> :
+                                    <ClipboardCheck className="h-3.5 w-3.5" />,
+                              langPair: { source: lp.source, target: lp.target },
+                              serviceName: ss.service.name,
+                              order: orderCounter++,
+                            })
+                          }
+                        })
+                      } else {
+                        // Single task for non-language-specific steps
+                        tasks.push({
+                          id: `${ss.id}-${step.id}`,
+                          serviceType: step.name,
+                          icon: step.type === 'qa' || step.type === 'qc' ? <CheckCircle2 className="h-3.5 w-3.5" /> :
+                                step.type === 'pm_review' ? <ClipboardCheck className="h-3.5 w-3.5" /> :
+                                step.type === 'transcription' ? <Mic className="h-3.5 w-3.5" /> :
+                                step.type === 'translation' ? <Languages className="h-3.5 w-3.5" /> :
+                                <ClipboardCheck className="h-3.5 w-3.5" />,
+                          langPair: null,
+                          serviceName: ss.service.name,
+                          order: orderCounter++,
+                        })
+                      }
+                    })
+                  })
+
+                  if (tasks.length === 0) {
+                    return (
+                      <div className="text-center text-muted-foreground py-4">
+                        Complete language pair selection above to preview tasks.
+                      </div>
+                    )
+                  }
+
+                  return (
+                    <div className="space-y-4">
+                      {/* Pipeline chips row */}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {tasks.map((task, idx) => {
+                          const pipelineTask = pipelineTasks.find(t => t.id === task.id)
+                          const hasSchedule = pipelineTask && (pipelineTask.startDate || pipelineTask.endDate)
+                          const hasVendor = pipelineTask?.vendorId
+                          
+                          return (
+                            <div key={task.id} className="flex items-center gap-1">
+                              <button
+                                onClick={() => setExpandedTaskId(expandedTaskId === task.id ? null : task.id)}
+                                className={cn(
+                                  "flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-sm transition-colors",
+                                  expandedTaskId === task.id
+                                    ? "border-primary bg-primary/5"
+                                    : "border-border bg-background hover:border-primary/50"
+                                )}
+                              >
+                                <span className="text-muted-foreground">{task.icon}</span>
+                                <span className="font-medium">{task.serviceType}</span>
+                                {task.langPair && (
+                                  <span className="text-xs text-muted-foreground">
+                                    {task.langPair.source}→{task.langPair.target}
+                                  </span>
+                                )}
+                                <span className="w-2 h-2 rounded-full bg-gray-300" title="Pending creation" />
+                                {hasSchedule && (
+                                  <CalendarClock className="h-3 w-3 text-blue-500" />
+                                )}
+                                {hasVendor && (
+                                  <User className="h-3 w-3 text-green-500" />
+                                )}
+                              </button>
+                              {idx < tasks.length - 1 && (
+                                <ArrowRight className="h-3 w-3 text-muted-foreground/50" />
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* Expanded task editor */}
+                      {expandedTaskId && (() => {
+                        const task = tasks.find(t => t.id === expandedTaskId)
+                        if (!task) return null
+                        
+                        const pipelineTask = pipelineTasks.find(t => t.id === task.id) || {
+                          id: task.id,
+                          serviceType: task.serviceType,
+                          languagePair: task.langPair,
+                          order: task.order,
+                          startDate: startDate || '',
+                          startTime: '09:00',
+                          endDate: deadline || '',
+                          endTime: '18:00',
+                          vendorId: null,
+                          vendorName: null,
+                          vendorNote: '',
+                          isExpanded: false,
+                        }
+
+                        // Find qualified vendors for this task
+                        const qualifiedVendors = mockVendors.filter(v => 
+                          v.status === 'active' && 
+                          v.services.some(s => 
+                            s.name.toLowerCase().includes(task.serviceType.toLowerCase()) ||
+                            task.serviceType.toLowerCase().includes(s.name.toLowerCase())
+                          )
+                        )
+
+                        const updatePipelineTask = (updates: Partial<typeof pipelineTask>) => {
+                          setPipelineTasks(prev => {
+                            const existing = prev.find(t => t.id === task.id)
+                            if (existing) {
+                              return prev.map(t => t.id === task.id ? { ...t, ...updates } : t)
+                            }
+                            return [...prev, { ...pipelineTask, ...updates }]
+                          })
+                        }
+
+                        // Validation
+                        const startDateTime = pipelineTask.startDate && pipelineTask.startTime 
+                          ? new Date(`${pipelineTask.startDate}T${pipelineTask.startTime}`) 
+                          : null
+                        const endDateTime = pipelineTask.endDate && pipelineTask.endTime 
+                          ? new Date(`${pipelineTask.endDate}T${pipelineTask.endTime}`) 
+                          : null
+                        const projectDeadline = deadline ? new Date(`${deadline}T18:00`) : null
+                        
+                        const isEndBeforeStart = startDateTime && endDateTime && endDateTime <= startDateTime
+                        const isStartInPast = startDateTime && startDateTime < new Date()
+                        const isEndInPast = endDateTime && endDateTime < new Date()
+                        const isEndAfterProjectDeadline = endDateTime && projectDeadline && endDateTime > projectDeadline
+
+                        return (
+                          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-4">
+                            <div className="flex items-center justify-between">
+                              <h4 className="font-medium flex items-center gap-2">
+                                {task.icon}
+                                {task.serviceType}
+                                {task.langPair && (
+                                  <span className="text-sm text-muted-foreground">
+                                    ({task.langPair.source} → {task.langPair.target})
+                                  </span>
+                                )}
+                              </h4>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setExpandedTaskId(null)}
+                              >
+                                <X className="h-4 w-4" />
+                              </Button>
+                            </div>
+
+                            {/* Per-task Schedule */}
+                            <div className="space-y-3">
+                              <Label className="text-sm font-medium">Schedule (per task)</Label>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label className="text-xs text-muted-foreground">Start (date + time)</Label>
+                                  <div className="flex gap-2">
+                                    <Input
+                                      type="date"
+                                      value={pipelineTask.startDate}
+                                      onChange={(e) => updatePipelineTask({ startDate: e.target.value })}
+                                      className="flex-1"
+                                    />
+                                    <Input
+                                      type="time"
+                                      value={pipelineTask.startTime}
+                                      onChange={(e) => updatePipelineTask({ startTime: e.target.value })}
+                                      className="w-28"
+                                    />
+                                  </div>
+                                  {isStartInPast && (
+                                    <p className="text-xs text-destructive">Task schedule cannot be in the past.</p>
+                                  )}
+                                </div>
+                                <div className="space-y-2">
+                                  <Label className="text-xs text-muted-foreground">End / deadline (date + time)</Label>
+                                  <div className="flex gap-2">
+                                    <Input
+                                      type="date"
+                                      value={pipelineTask.endDate}
+                                      onChange={(e) => updatePipelineTask({ endDate: e.target.value })}
+                                      className="flex-1"
+                                    />
+                                    <Input
+                                      type="time"
+                                      value={pipelineTask.endTime}
+                                      onChange={(e) => updatePipelineTask({ endTime: e.target.value })}
+                                      className="w-28"
+                                    />
+                                  </div>
+                                  {isEndInPast && (
+                                    <p className="text-xs text-destructive">Task schedule cannot be in the past.</p>
+                                  )}
+                                  {isEndBeforeStart && (
+                                    <p className="text-xs text-destructive">Task end must be after task start.</p>
+                                  )}
+                                  {isEndAfterProjectDeadline && !isEndBeforeStart && !isEndInPast && (
+                                    <p className="text-xs text-amber-600 flex items-center gap-1">
+                                      <AlertCircle className="h-3 w-3" />
+                                      Task deadline is later than the project deadline.
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Vendor Assignment */}
+                            <div className="space-y-2">
+                              <Label className="text-sm font-medium">Assign vendor (optional)</Label>
+                              <Select 
+                                value={pipelineTask.vendorId || 'skip'}
+                                onValueChange={(v) => {
+                                  if (v === 'skip') {
+                                    updatePipelineTask({ vendorId: null, vendorName: null })
+                                  } else {
+                                    const vendor = mockVendors.find(vnd => vnd.id === v)
+                                    updatePipelineTask({ vendorId: v, vendorName: vendor?.name || null })
+                                  }
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Skip — assign later" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="skip">Skip — assign later</SelectItem>
+                                  {qualifiedVendors.map(vendor => (
+                                    <SelectItem key={vendor.id} value={vendor.id}>
+                                      <div className="flex items-center justify-between w-full gap-4">
+                                        <span>{vendor.name}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                          ★{vendor.rating} • {vendor.status}
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  ))}
+                                  {qualifiedVendors.length === 0 && (
+                                    <SelectItem value="none" disabled>
+                                      No qualified vendors found
+                                    </SelectItem>
+                                  )}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            {/* Internal Note for Vendor */}
+                            {pipelineTask.vendorId && (
+                              <div className="space-y-2">
+                                <Label className="text-sm font-medium">Internal note for vendor (optional)</Label>
+                                <Textarea
+                                  placeholder="Add instructions or context for this vendor..."
+                                  value={pipelineTask.vendorNote}
+                                  onChange={(e) => updatePipelineTask({ vendorNote: e.target.value })}
+                                  rows={2}
+                                  className="text-sm"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
+
+                      {/* Multi-video notice */}
+                      {isMultiVideo && (
+                        <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-800">
+                          <Info className="h-4 w-4 mt-0.5 shrink-0" />
+                          <p className="text-sm">
+                            These per-task schedules and vendor assignments will apply to each of the <strong>{videoFiles.length} Scenes</strong> that will be created.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })()}
+              </CardContent>
+            </Card>
+          )}
+
           {/* Timeline - Deadline on left (required), Start date on right (optional) */}
           <Card>
             <CardHeader>
@@ -1127,17 +1865,67 @@ export default function NewProjectPage() {
       {/* Step 3: Notes & Review (Client) or Billing, Notes & Review (Admin/PM) */}
       {currentStep === 3 && (
         <div className="space-y-6">
-          {/* PROJ-010: Client sees Project Summary (no cost), Admin/PM sees full billing */}
+          {/* Update PROJ-010: Client sees Project Summary with Show + Scene, no cost */}
           {isClientRole ? (
             // CLIENT PROJECT SUMMARY (no pricing)
             <Card>
               <CardHeader>
-                <CardTitle className="text-base">Project Summary</CardTitle>
+                <CardTitle className="text-base">Scene Summary</CardTitle>
               </CardHeader>
               <CardContent className="px-6 pb-6 pt-2">
                 <div className="space-y-4">
+                  {/* Update PROJ-010: Show + Scene display */}
+                  <div className="rounded-lg bg-muted/30 p-3 space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">Show</span>
+                      <span className="font-medium">{selectedShow?.name || '-'}</span>
+                    </div>
+                    {!isMultiVideo && (
+                      <div className="flex justify-between text-sm">
+                        <span className="text-muted-foreground">Scene</span>
+                        <span className="font-medium">{sceneName}</span>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Update PROJ-010: Multi-video Scene preview for client */}
+                  {isMultiVideo && (
+                    <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 space-y-3">
+                      <div className="flex items-center gap-2 text-blue-800">
+                        <Info className="h-4 w-4" />
+                        <span className="font-medium text-sm">{videoFiles.length} Scenes will be created</span>
+                      </div>
+                      <p className="text-xs text-blue-700">One per uploaded video. Scene names will use the video file names:</p>
+                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                        {videoFiles.slice(0, 10).map((video, idx) => {
+                          const autoName = video.name.replace(/\.[^/.]+$/, '')
+                          return (
+                            <div key={idx} className="flex items-center justify-between text-xs bg-white/50 rounded px-2 py-1">
+                              <span className="text-blue-800 truncate flex-1">{autoName}</span>
+                              {video.duration && (
+                                <span className="text-blue-600 ml-2 flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {video.duration} min
+                                </span>
+                              )}
+                            </div>
+                          )
+                        })}
+                        {videoFiles.length > 10 && (
+                          <p className="text-xs text-blue-600 pl-2">...and {videoFiles.length - 10} more scenes</p>
+                        )}
+                      </div>
+                      <div className="pt-2 border-t border-blue-200">
+                        <p className="text-xs text-blue-700">
+                          One <strong>approved quote per Scene</strong> will be generated. You&apos;ll assign team members per Scene after submission.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
                   {/* Task Summary */}
                   <div className="space-y-3">
+                    <h4 className="text-sm font-medium text-muted-foreground">Tasks{isMultiVideo ? ' (per Scene)' : ''}</h4>
                     {selectedTaskTypes.map((st) => {
                       const taskCount = Math.max(1, st.languagePairs.length)
                       return (
@@ -1178,7 +1966,10 @@ export default function NewProjectPage() {
                   
                   {/* Footer notice */}
                   <p className="text-xs text-muted-foreground">
-                    NG will confirm pricing and timing for your project. You&apos;ll see updates in My Projects.
+                    {isMultiVideo 
+                      ? `${videoFiles.length} approved quotes will be generated — one per Scene. You'll see updates in My Projects.`
+                      : "NG will confirm pricing and timing for your project. You'll see updates in My Projects."
+                    }
                   </p>
                 </div>
               </CardContent>
@@ -1352,10 +2143,62 @@ export default function NewProjectPage() {
             </CardHeader>
             <CardContent className="px-6 pb-6 pt-2">
               <div className="space-y-3">
+                {/* Update PROJ-001: Show + Scene instead of Project Name */}
+                {!isClientRole && selectedShow && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Show</span>
+                    <span className="font-medium">{selectedShow.name}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Project Name</span>
-                  <span className="font-medium">{projectName}</span>
+                  <span className="text-muted-foreground">Scene</span>
+                  <span className={cn("font-medium", isMultiVideo && "line-through text-muted-foreground")}>
+                    {sceneName || '(not set)'}
+                  </span>
                 </div>
+                {/* Update PROJ-006: Multi-video Scene preview with per-video volume */}
+                {isMultiVideo && (
+                  <div className="rounded-lg bg-blue-50 border border-blue-200 p-3 space-y-3">
+                    <div className="flex items-center gap-2 text-blue-800">
+                      <Info className="h-4 w-4" />
+                      <span className="font-medium text-sm">{videoFiles.length} Scenes will be created</span>
+                    </div>
+                    <p className="text-xs text-blue-700">One per uploaded video. Scene names will use the video file names:</p>
+                    <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                      {videoFiles.slice(0, 10).map((video, idx) => {
+                        const sceneName = video.name.replace(/\.[^/.]+$/, '')
+                        return (
+                          <div key={idx} className="flex items-center justify-between text-xs bg-white/50 rounded px-2 py-1">
+                            <span className="text-blue-800 truncate flex-1">{sceneName}</span>
+                            {video.duration && (
+                              <span className="text-blue-600 ml-2 flex items-center gap-1">
+                                <Clock className="h-3 w-3" />
+                                {video.duration} min
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
+                      {videoFiles.length > 10 && (
+                        <p className="text-xs text-blue-600 pl-2">...and {videoFiles.length - 10} more scenes</p>
+                      )}
+                    </div>
+                    {/* Reference files sharing notice */}
+                    {referenceFiles.length > 0 && (
+                      <div className="pt-2 border-t border-blue-200">
+                        <p className="text-xs text-blue-700">
+                          <strong>{referenceFiles.length} reference file(s)</strong> will be shared across all {videoFiles.length} scenes.
+                        </p>
+                      </div>
+                    )}
+                    {/* Per-scene cost notice */}
+                    <div className="pt-2 border-t border-blue-200">
+                      <p className="text-xs text-blue-700">
+                        Tasks and quotes will be generated <strong>per scene</strong> based on each video&apos;s duration.
+                      </p>
+                    </div>
+                  </div>
+                )}
                 {/* Client and PM only shown for Admin/PM */}
                 {!isClientRole && (
                   <>
@@ -1387,14 +2230,34 @@ export default function NewProjectPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Source Files</span>
-                  <span className="font-medium">{sourceFiles.length} file(s)</span>
+                  <span className="font-medium">
+                    {videoFiles.length} video{videoFiles.length !== 1 ? 's' : ''}
+                    {sourceFiles.length - videoFiles.length > 0 && (
+                      <>, {sourceFiles.length - videoFiles.length} other</>
+                    )}
+                  </span>
                 </div>
+                {/* Update PROJ-006: Non-video assets attach to first Scene notice */}
+                {isMultiVideo && sourceFiles.length - videoFiles.length > 0 && (
+                  <p className="text-xs text-muted-foreground -mt-2 ml-auto max-w-[200px] text-right">
+                    Non-video files will be attached to the first Scene by default
+                  </p>
+                )}
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">{isClientRole ? 'Tasks' : 'Services'}</span>
                   <span className="font-medium">
                     {isClientRole ? selectedTaskTypes.length : selectedServices.length} {isClientRole ? 'task type(s)' : 'service(s)'}
                   </span>
                 </div>
+                {/* Update PROJ-001: Pre-assigned vendors summary */}
+                {!isClientRole && pipelineTasks.some(t => t.vendorId) && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Pre-assigned Vendors</span>
+                    <span className="font-medium text-green-600">
+                      {pipelineTasks.filter(t => t.vendorId).length} task(s)
+                    </span>
+                  </div>
+                )}
                 {/* Estimated Cost only for Admin/PM */}
                 {!isClientRole && (
                   <div className="flex justify-between border-t border-border pt-3">
@@ -1412,7 +2275,7 @@ export default function NewProjectPage() {
               Back
             </Button>
             <Button onClick={handleSubmit}>
-              Create Project
+              {isMultiVideo ? `Create ${videoFiles.length} Scenes` : 'Create Scene'}
               <Check className="ml-2 h-4 w-4" />
             </Button>
           </div>

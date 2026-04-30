@@ -51,10 +51,14 @@ export default function QuoteEditPage({ params }: { params: Promise<{ id: string
   // Redirect if not authorized or quote not editable
   const isEditable = ['unsent', 'draft', 'changes_requested'].includes(quote.status)
   
-  const [currency, setCurrency] = useState<QuoteCurrency>(quote.currency)
+  // Update 01: Handle optional fields
+  const [name, setName] = useState(quote.name)
+  const [description, setDescription] = useState(quote.description || '')
+  const [currency, setCurrency] = useState<QuoteCurrency>(quote.currency || 'USD')
+  const [price, setPrice] = useState<string>(quote.price?.toString() || '')
   const [notesToClient, setNotesToClient] = useState(quote.notesToClient || '')
   const [internalNotes, setInternalNotes] = useState(quote.internalNotes || '')
-  const [items, setItems] = useState<QuoteItem[]>(quote.items.map(item => ({...item})))
+  const [items, setItems] = useState<QuoteItem[]>((quote.items || []).map(item => ({...item})))
   const [isSaving, setIsSaving] = useState(false)
   
   const addLineItem = () => {
@@ -84,11 +88,8 @@ export default function QuoteEditPage({ params }: { params: Promise<{ id: string
     }))
   }
   
+  // Update 01: Line items are optional, can remove all
   const removeLineItem = (itemId: string) => {
-    if (items.length <= 1) {
-      toast({ title: 'Cannot remove', description: 'Quote must have at least one line item.', variant: 'destructive' })
-      return
-    }
     setItems(items.filter(item => item.id !== itemId))
   }
   
@@ -97,11 +98,19 @@ export default function QuoteEditPage({ params }: { params: Promise<{ id: string
   }
   
   const handleSave = async () => {
-    // Validate
-    const hasEmptyService = items.some(item => !item.service)
-    if (hasEmptyService) {
-      toast({ title: 'Validation error', description: 'All line items must have a service selected.', variant: 'destructive' })
+    // Update 01: Only name is required
+    if (!name.trim()) {
+      toast({ title: 'Validation error', description: 'Quote name is required.', variant: 'destructive' })
       return
+    }
+    
+    // If line items exist, validate them
+    if (items.length > 0) {
+      const hasEmptyService = items.some(item => !item.service)
+      if (hasEmptyService) {
+        toast({ title: 'Validation error', description: 'All line items must have a service selected.', variant: 'destructive' })
+        return
+      }
     }
     
     setIsSaving(true)
@@ -136,13 +145,15 @@ export default function QuoteEditPage({ params }: { params: Promise<{ id: string
 
   return (
     <div className="p-6 lg:p-8 space-y-8">
-      {/* Header */}
+      {/* Update 01: Header with quote name */}
       <div>
         <div className="flex items-start justify-between">
           <div>
-            <h1 className="text-2xl font-semibold text-foreground">Edit {quote.quoteNumber}</h1>
+            <h1 className="text-2xl font-semibold text-foreground">Edit Quote</h1>
             <p className="mt-1 text-muted-foreground">
-              {quote.projectName} - {quote.clientName}
+              {quote.quoteNumber}
+              {quote.projectName && <> &middot; {quote.projectName}</>}
+              {quote.clientName && <> &middot; {quote.clientName}</>}
             </p>
           </div>
           
@@ -151,7 +162,7 @@ export default function QuoteEditPage({ params }: { params: Promise<{ id: string
               <X className="h-4 w-4 mr-2" />
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={isSaving}>
+            <Button onClick={handleSave} disabled={isSaving || !name.trim()}>
               <Save className="h-4 w-4 mr-2" />
               {isSaving ? 'Saving...' : 'Save Changes'}
             </Button>
@@ -160,20 +171,62 @@ export default function QuoteEditPage({ params }: { params: Promise<{ id: string
       </div>
       
       <div className="space-y-6">
-        {/* Currency */}
+        {/* Update 01: Quote Details - Name, Description, Price, Currency */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold">Quote Settings</CardTitle>
+            <CardTitle className="text-base font-semibold">Quote Details</CardTitle>
           </CardHeader>
-          <CardContent className="px-6 pb-6 pt-2">
-            <div className="max-w-xs">
-              <label className="text-sm font-medium">Currency</label>
-              <div className="mt-1 flex items-center gap-2">
-                <div className="h-9 flex items-center rounded-md border border-input bg-muted px-3 text-sm">
-                  {currency === 'ILS' ? 'ILS - Israeli Shekel' : currency === 'USD' ? 'USD - US Dollar' : 'EUR - Euro'}
-                </div>
+          <CardContent className="px-6 pb-6 pt-2 space-y-4">
+            {/* Name (required) */}
+            <div>
+              <label className="text-sm font-medium">Name <span className="text-destructive">*</span></label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Quote name"
+                className="mt-1.5"
+              />
+            </div>
+            
+            {/* Description (optional) */}
+            <div>
+              <label className="text-sm font-medium">Description</label>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Longer context for the quote..."
+                rows={2}
+                className="mt-1.5"
+              />
+            </div>
+            
+            {/* Price and Currency */}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="text-sm font-medium">Price</label>
+                <Input
+                  type="number"
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                  placeholder="0.00"
+                  className="mt-1.5"
+                  min={0}
+                  step={0.01}
+                />
               </div>
-              <p className="mt-1.5 text-xs text-muted-foreground">Currency is locked after the quote is saved.</p>
+              <div>
+                <label className="text-sm font-medium">Currency</label>
+                <Select value={currency} onValueChange={(v) => setCurrency(v as QuoteCurrency)}>
+                  <SelectTrigger className="mt-1.5">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD - US Dollar</SelectItem>
+                    <SelectItem value="EUR">EUR - Euro</SelectItem>
+                    <SelectItem value="ILS">ILS - Israeli Shekel</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardContent>
         </Card>

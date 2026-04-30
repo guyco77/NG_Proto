@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -18,6 +18,12 @@ import {
   Split,
   Trash2,
   AlertTriangle,
+  FileStack,
+  ArrowLeft,
+  Loader2,
+  Film,
+  Layers,
+  Check,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/status-badge'
@@ -45,6 +51,14 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -60,7 +74,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { mockUsers, formatDate, getPriorityColor, PROJECT_STATUSES, SERVICES_LIST } from '@/lib/mock-data'
+import { mockUsers, formatDate, getPriorityColor, PROJECT_STATUSES, SERVICES_LIST, mockProjectTemplates, type ProjectTemplate, mockShows } from '@/lib/mock-data'
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { useRole } from '../layout'
@@ -445,6 +459,7 @@ export default function ProjectsPage() {
   
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
+  const [showFilters, setShowFilters] = useState<string[]>([]) // Update PROJ-005: Show filter
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [serviceFilters, setServiceFilters] = useState<string[]>([])
   const [taskTypeFilters, setTaskTypeFilters] = useState<string[]>([])
@@ -453,6 +468,9 @@ export default function ProjectsPage() {
   const [deadlineRange, setDeadlineRange] = useState<{ from: string; to: string }>({ from: '', to: '' })
   const [includeArchived, setIncludeArchived] = useState(false)
   const [sortBy, setSortBy] = useState<SortOption>('date_created')
+  const [groupByShow, setGroupByShow] = useState(false) // Update PROJ-005: Group by Show toggle
+  const [showFilterOpen, setShowFilterOpen] = useState(false) // Update PROJ-005: Show filter dropdown state
+  const [collapsedShows, setCollapsedShows] = useState<Set<string>>(new Set()) // Update PROJ-005: Collapsed Show sections
   
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
@@ -526,18 +544,157 @@ export default function ProjectsPage() {
     failedEpisodes: number[] // episode numbers that failed
   }>({ show: false, created: 0, failed: 0, failedEpisodes: [] })
   
+  // PROJ-013: New Project Modal with template support (Admin/PM only)
+  const [showNewProjectModal, setShowNewProjectModal] = useState(false)
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
+  const [templateSearchQuery, setTemplateSearchQuery] = useState('')
+  const [isCreatingFromTemplate, setIsCreatingFromTemplate] = useState(false)
+  const [templateError, setTemplateError] = useState('')
+  const [highlightedProjectId, setHighlightedProjectId] = useState<string | null>(null)
+  
   const pms = mockUsers.filter(u => u.role === 'admin' || u.role === 'pm')
   
+  // Update PROJ-005: Helper to get Show for a project (by clientId match)
+  const getProjectShow = (project: typeof seedProjects[0] | typeof clientSeedProjects[0]) => {
+    // In real app, project would have showId field. For demo, match by clientId.
+    return mockShows.find(s => s.clientId === project.clientId) || mockShows[0]
+  }
+  
+  // Update PROJ-005: Available Shows scoped by role
+  // Admin/Finance see all Shows, PM sees their Shows, Client sees their Shows
+  const availableShows = useMemo(() => {
+    if (currentRole === 'admin' || currentRole === 'finance') {
+      return mockShows
+    }
+    if (currentRole === 'pm') {
+      // PM sees Shows for projects they manage - for demo, show all
+      return mockShows
+    }
+    // Client roles see only their Shows
+    if (isClient) {
+      // For demo, filter by a mock clientId
+      return mockShows.filter(s => s.clientId === 'c1') // Acme Corp client shows
+    }
+    return mockShows
+  }, [currentRole, isClient])
+  
+  // PROJ-013: Filter templates by search query
+  const filteredTemplates = useMemo(() => {
+    if (!templateSearchQuery.trim()) {
+      // Sort by most recently used first
+      return [...mockProjectTemplates].sort((a, b) => {
+        const aTime = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0
+        const bTime = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0
+        return bTime - aTime
+      })
+    }
+    const query = templateSearchQuery.toLowerCase()
+    return mockProjectTemplates.filter(t => 
+      t.name.toLowerCase().includes(query) ||
+      t.clientName.toLowerCase().includes(query) ||
+      (t.showName && t.showName.toLowerCase().includes(query))
+    ).sort((a, b) => {
+      const aTime = a.lastUsedAt ? new Date(a.lastUsedAt).getTime() : 0
+      const bTime = b.lastUsedAt ? new Date(b.lastUsedAt).getTime() : 0
+      return bTime - aTime
+    })
+  }, [templateSearchQuery])
+  
+  // PROJ-013: Handle creating project from template
+  const handleCreateFromTemplate = async (template: ProjectTemplate) => {
+    setIsCreatingFromTemplate(true)
+    setTemplateError('')
+    
+    try {
+      // Simulate API call
+      await new Promise(r => setTimeout(r, 800))
+      
+      // Generate new project data from template
+      const today = new Date()
+      const newProjectId = `proj-tpl-${Date.now()}`
+      const sceneName = `${template.name} - ${today.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+      
+      // Create new project (in real app, this would be an API call)
+      const newProject = {
+        id: newProjectId,
+        name: sceneName,
+        client: template.clientName,
+        clientId: template.clientId,
+        status: 'draft' as const,
+        services: template.workflow.map(w => w.serviceType),
+        pm: userName,
+        pmId: currentRole === 'admin' ? '1' : '2',
+        priority: template.priority || 'medium',
+        deadline: '', // User fills this after opening
+        progress: 0,
+        createdAt: today.toISOString(),
+        isUnassigned: true,
+        // Template metadata
+        fromTemplate: template.name,
+        templateId: template.id,
+        languages: template.languages.map(l => `${l.source} → ${l.target}`),
+        showName: template.showName,
+      }
+      
+      // Add to projects (in real app, would update via mutation)
+      // For now, we'll use local state
+      setProjects(prev => [newProject, ...prev])
+      
+      // Close modals
+      setShowTemplatePicker(false)
+      setShowNewProjectModal(false)
+      setTemplateSearchQuery('')
+      
+      // Highlight the new project
+      setHighlightedProjectId(newProjectId)
+      setTimeout(() => setHighlightedProjectId(null), 3000)
+      
+      // Audit log
+      console.log('[Audit] Project created from template:', {
+        projectId: newProjectId,
+        templateId: template.id,
+        templateName: template.name,
+        actor: userName,
+        timestamp: new Date().toISOString(),
+      })
+      
+      // Show success toast
+      toast({
+        title: 'Project created from template',
+        description: `"${sceneName}" has been created from template "${template.name}".`,
+      })
+    } catch {
+      setTemplateError('Failed to create project from template. Please try again.')
+    } finally {
+      setIsCreatingFromTemplate(false)
+    }
+  }
+  
+  // PROJ-013: Add local projects state for demo
+  const [localProjects, setLocalProjects] = useState<typeof seedProjects>([])
+  const setProjects = (updater: (prev: typeof seedProjects) => typeof seedProjects) => {
+    setLocalProjects(updater)
+  }
+  
   // Use seed projects - client sees client-specific projects, admin/PM sees all projects
-  const projects = isClient ? clientSeedProjects : seedProjects
+  // PROJ-013: Include locally created projects from templates
+  const projects = isClient ? clientSeedProjects : [...localProjects, ...seedProjects]
   
   // Filter projects
   const filteredProjects = useMemo(() => {
     let result = projects.filter((project: typeof seedProjects[0] | typeof clientSeedProjects[0]) => {
-      // Search - PROJ-005-Client: clients search project name only, admin/PM searches name + client
+      // Update PROJ-005: Get the Show for this project
+      const projectShow = getProjectShow(project)
+      
+      // Update PROJ-005: Search now matches Show name in addition to Scene name and client
       const matchesSearch = !searchQuery || 
         project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (!isClient && project.client.toLowerCase().includes(searchQuery.toLowerCase()))
+        (!isClient && project.client.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (projectShow && projectShow.name.toLowerCase().includes(searchQuery.toLowerCase()))
+      
+      // Update PROJ-005: Show filter
+      const matchesShow = showFilters.length === 0 || 
+        (projectShow && showFilters.includes(projectShow.id))
       
       // Status filter
       const matchesStatus = statusFilters.length === 0 || statusFilters.includes(project.status)
@@ -576,7 +733,7 @@ export default function ProjectsPage() {
       const isArchivedProject = project.status === 'closed'
       const matchesArchived = includeArchived || !isArchivedProject
       
-      return matchesSearch && matchesStatus && matchesService && matchesTaskType && matchesPM && matchesAssignee && matchesDeadline && matchesArchived
+      return matchesSearch && matchesShow && matchesStatus && matchesService && matchesTaskType && matchesPM && matchesAssignee && matchesDeadline && matchesArchived
     })
     
     // Sort - default is date_created (newest first) per PRD
@@ -600,7 +757,7 @@ export default function ProjectsPage() {
     })
     
     return result
-  }, [searchQuery, statusFilters, serviceFilters, taskTypeFilters, pmFilters, assigneeFilters, deadlineRange, includeArchived, sortBy, projects, isClient])
+  }, [searchQuery, showFilters, statusFilters, serviceFilters, taskTypeFilters, pmFilters, assigneeFilters, deadlineRange, includeArchived, sortBy, projects, isClient, getProjectShow])
   
   // Pagination
   const totalPages = Math.ceil(filteredProjects.length / ITEMS_PER_PAGE)
@@ -609,10 +766,51 @@ export default function ProjectsPage() {
     currentPage * ITEMS_PER_PAGE
   )
   
-  // Active filter count
-  const activeFilterCount = statusFilters.length + serviceFilters.length + taskTypeFilters.length + 
+  // Update PROJ-005: Group projects by Show
+  const groupedProjects = useMemo(() => {
+    if (!groupByShow) return null
+    
+    const groups = new Map<string, { show: typeof mockShows[0]; projects: typeof paginatedProjects }>()
+    
+    paginatedProjects.forEach(project => {
+      const show = getProjectShow(project)
+      if (!show) return
+      
+      if (!groups.has(show.id)) {
+        groups.set(show.id, { show, projects: [] })
+      }
+      groups.get(show.id)!.projects.push(project)
+    })
+    
+    // Sort groups by Show name
+    return Array.from(groups.values()).sort((a, b) => a.show.name.localeCompare(b.show.name))
+  }, [groupByShow, paginatedProjects, getProjectShow])
+  
+  // Update PROJ-005: Toggle Show section collapse
+  const toggleShowCollapse = (showId: string) => {
+    setCollapsedShows(prev => {
+      const next = new Set(prev)
+      if (next.has(showId)) {
+        next.delete(showId)
+      } else {
+        next.add(showId)
+      }
+      return next
+    })
+  }
+  
+  // Active filter count - Update PROJ-005: Include Show filters
+  const activeFilterCount = showFilters.length + statusFilters.length + serviceFilters.length + taskTypeFilters.length + 
     (isClient ? assigneeFilters.length : pmFilters.length) + 
     (deadlineRange.from ? 1 : 0) + (deadlineRange.to ? 1 : 0)
+  
+  // Update PROJ-005: Show filter toggle
+  const toggleShowFilter = (showId: string) => {
+    setShowFilters(prev => 
+      prev.includes(showId) ? prev.filter(s => s !== showId) : [...prev, showId]
+    )
+    setCurrentPage(1)
+  }
   
   const toggleStatusFilter = (status: string) => {
     setStatusFilters(prev => 
@@ -651,6 +849,7 @@ export default function ProjectsPage() {
   }
   
   const clearAllFilters = () => {
+    setShowFilters([]) // Update PROJ-005
     setStatusFilters([])
     setServiceFilters([])
     setTaskTypeFilters([])
@@ -864,17 +1063,27 @@ export default function ProjectsPage() {
             {filteredProjects.length} of {projects.length} projects
           </p>
         </div>
-        {/* PROJ-005-Client: + New Project only visible to Client Admin (or admin/PM) */}
-        {(!isClient || isClientAdmin) && (
-          <div className="flex items-center gap-2 mt-4 sm:mt-0">
-            <Link href="/projects/new" prefetch={true}>
-              <Button className="gap-1.5">
-                <Plus className="h-4 w-4" />
-                New Project
-              </Button>
-            </Link>
-          </div>
-        )}
+{/* PROJ-005-Client: + New Project only visible to Client Admin (or admin/PM) */}
+  {/* PROJ-013: Admin/PM see modal with template option; Client Admin goes directly to wizard */}
+  {(!isClient || isClientAdmin) && (
+  <div className="flex items-center gap-2 mt-4 sm:mt-0">
+  {isClient ? (
+    // Client Admin: Direct link to wizard (no template option)
+    <Link href="/projects/new" prefetch={true}>
+      <Button className="gap-1.5">
+        <Plus className="h-4 w-4" />
+        New Project
+      </Button>
+    </Link>
+  ) : (
+    // Admin/PM: Open New Project Modal with template option
+    <Button className="gap-1.5" onClick={() => setShowNewProjectModal(true)}>
+      <Plus className="h-4 w-4" />
+      New Project
+    </Button>
+  )}
+  </div>
+  )}
       </div>
       
       {/* Filters Row - Order: Status · Service · Task Type · PM · Deadline per PRD */}
@@ -888,11 +1097,57 @@ export default function ProjectsPage() {
             value={searchQuery}
             onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1) }}
             className="h-9 w-64 rounded-lg border border-input bg-background pl-9 pr-4 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-        </div>
-        
-        {/* Status Filter */}
-        <Popover>
+/>
+  </div>
+  
+  {/* Update PROJ-005: Show Filter - first filter in the bar */}
+  <Popover open={showFilterOpen} onOpenChange={setShowFilterOpen}>
+    <PopoverTrigger asChild>
+      <Button variant="outline" size="sm" className="gap-1.5">
+        <Film className="h-3.5 w-3.5" />
+        Show
+        {showFilters.length > 0 && (
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-[10px] text-primary-foreground">
+            {showFilters.length}
+          </span>
+        )}
+        <ChevronDown className="h-3 w-3" />
+      </Button>
+    </PopoverTrigger>
+    <PopoverContent className="w-72 p-0" align="start">
+      <Command>
+        <CommandInput placeholder="Search shows..." className="h-9" />
+        <CommandList>
+          <CommandEmpty>No shows found.</CommandEmpty>
+          <CommandGroup>
+            {availableShows.map((show) => (
+              <CommandItem
+                key={show.id}
+                value={show.name}
+                onSelect={() => toggleShowFilter(show.id)}
+              >
+                <Check
+                  className={cn(
+                    "mr-2 h-4 w-4",
+                    showFilters.includes(show.id) ? "opacity-100" : "opacity-0"
+                  )}
+                />
+                <div className="flex-1 min-w-0">
+                  <span className="truncate">{show.name}</span>
+                  <span className="text-xs text-muted-foreground ml-2">
+                    {show.sceneCount} scene{show.sceneCount !== 1 ? 's' : ''}
+                  </span>
+                </div>
+              </CommandItem>
+            ))}
+          </CommandGroup>
+        </CommandList>
+      </Command>
+    </PopoverContent>
+  </Popover>
+  
+  {/* Status Filter */}
+  <Popover>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className="gap-1.5">
               Status
@@ -1111,7 +1366,19 @@ export default function ProjectsPage() {
           </PopoverContent>
         </Popover>
         
-        {/* Sort - PROJ-005-Client: no Client Name sort for clients, add Project Name A-Z */}
+        {/* Update PROJ-005: Group by Show toggle */}
+        <Button
+          variant={groupByShow ? "secondary" : "outline"}
+          size="sm"
+          className="gap-1.5"
+          onClick={() => setGroupByShow(!groupByShow)}
+        >
+          <Layers className="h-3.5 w-3.5" />
+          Group by Show
+        </Button>
+        
+        {/* Sort - PROJ-005-Client: no Client Name sort for clients, add Scene Name A-Z */}
+        {/* Update PROJ-001: "Project Name" renamed to "Scene Name" in user-facing labels */}
         <Select value={sortBy} onValueChange={(v: SortOption) => setSortBy(v)}>
           <SelectTrigger className="w-40 h-9">
             <ArrowUpDown className="h-3 w-3 mr-2" />
@@ -1121,7 +1388,7 @@ export default function ProjectsPage() {
             <SelectItem value="date_created">Date Created</SelectItem>
             <SelectItem value="deadline">Deadline</SelectItem>
             <SelectItem value="priority">Priority</SelectItem>
-            <SelectItem value="project_name">Project Name (A-Z)</SelectItem>
+            <SelectItem value="project_name">Scene Name (A-Z)</SelectItem>
             {!isClient && <SelectItem value="client_name">Client Name</SelectItem>}
           </SelectContent>
         </Select>
@@ -1149,6 +1416,19 @@ export default function ProjectsPage() {
       {/* Active Filter Pills */}
       {activeFilterCount > 0 && (
         <div className="flex flex-wrap gap-2">
+          {/* Update PROJ-005: Show filter pills */}
+          {showFilters.map((showId) => {
+            const show = mockShows.find(s => s.id === showId)
+            return (
+              <span key={showId} className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
+                <Film className="h-3 w-3" />
+                Show: {show?.name || showId}
+                <button onClick={() => toggleShowFilter(showId)} className="hover:bg-amber-200 rounded-full p-0.5">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )
+          })}
           {statusFilters.map((status) => (
             <span key={status} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
               {PROJECT_STATUSES.find(s => s.value === status)?.label}
@@ -1224,9 +1504,10 @@ export default function ProjectsPage() {
   <div className="rounded-lg border border-border bg-background overflow-hidden p-4">
   <Table>
           <TableHeader>
-            <TableRow className="hover:bg-transparent bg-muted/50">
-              {/* PROJ-005-Client: Different columns for clients vs admin/PM */}
-              <TableHead className={isClient ? "w-[300px]" : "w-[280px]"}>Project</TableHead>
+<TableRow className="hover:bg-transparent bg-muted/50">
+                {/* PROJ-005-Client: Different columns for clients vs admin/PM */}
+                {/* Update PROJ-005: "Project" renamed to "Show / Scene" */}
+                <TableHead className={isClient ? "w-[300px]" : "w-[280px]"}>Show / Scene</TableHead>
               {!isClient && <TableHead className="w-[140px]">Client</TableHead>}
               <TableHead className="w-[160px]">Status</TableHead>
               {isClient ? (
@@ -1242,22 +1523,226 @@ export default function ProjectsPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {paginatedProjects.map((project) => {
+            {/* Update PROJ-005: Render grouped or ungrouped view */}
+            {groupByShow && groupedProjects ? (
+              // Grouped view - Show sections with collapsible rows
+              groupedProjects.map((group) => {
+                const isCollapsed = collapsedShows.has(group.show.id)
+                return (
+                  <React.Fragment key={group.show.id}>
+                    {/* Show section header */}
+                    <TableRow 
+                      className="bg-muted/70 hover:bg-muted cursor-pointer border-t-2 border-border"
+                      onClick={() => toggleShowCollapse(group.show.id)}
+                    >
+                      <TableCell colSpan={isClient ? 6 : 8} className="py-2">
+                        <div className="flex items-center gap-2">
+                          <ChevronDown className={cn(
+                            "h-4 w-4 transition-transform",
+                            isCollapsed && "-rotate-90"
+                          )} />
+                          <Film className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-semibold">{group.show.name}</span>
+                          <span className="text-xs text-muted-foreground px-2 py-0.5 bg-background rounded-full">
+                            {group.projects.length} scene{group.projects.length !== 1 ? 's' : ''}
+                          </span>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                    {/* Scene rows within the Show (hidden when collapsed) */}
+                    {!isCollapsed && group.projects.map((project) => {
+                      const isArchived = project.status === 'closed'
+                      const canCancel = CANCELLABLE_STATUSES.includes(project.status)
+                      const isHighlighted = highlightedProjectId === project.id
+                      
+                      return (
+                        <TableRow
+                          key={project.id}
+                          className={cn(
+                            "cursor-pointer bg-background hover:bg-muted/50 transition-colors duration-500",
+                            isArchived && "opacity-60",
+                            isHighlighted && "animate-pulse bg-emerald-50 ring-2 ring-emerald-500 ring-inset"
+                          )}
+                          onClick={() => router.push(`/projects/${project.id}`)}
+                        >
+                          {/* Scene name only (Show is in section header) */}
+                          <TableCell>
+                            <div className="pl-6">
+                              <p className="font-medium text-foreground">{project.name}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {project.services.join(', ')}
+                              </p>
+                            </div>
+                          </TableCell>
+                          {!isClient && (
+                            <TableCell>
+                              <span className="text-sm">{project.client}</span>
+                            </TableCell>
+                          )}
+                          <TableCell>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <StatusBadge status={project.status} />
+                              {isClient && 'needsTeamAssignment' in project && project.needsTeamAssignment && (
+                                <span className="rounded-full bg-teal-100 px-2 py-0.5 text-xs font-medium text-teal-700">
+                                  Assign your team
+                                </span>
+                              )}
+                              {project.isUnassigned && !('needsTeamAssignment' in project && project.needsTeamAssignment) && (
+                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">
+                                  Unassigned
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          {isClient ? (
+                            <TableCell>
+                              {'assignees' in project && project.assignees && project.assignees.length > 0 ? (
+                                <div className="flex items-center gap-1">
+                                  <TooltipProvider>
+                                    {project.assignees.slice(0, 3).map((assignee) => (
+                                      <Tooltip key={assignee.id}>
+                                        <TooltipTrigger asChild>
+                                          {assignee.type === 'ng' ? (
+                                            <div className="h-6 w-6 flex items-center justify-center rounded-full bg-blue-100 text-[10px] font-medium text-blue-700">
+                                              NG
+                                            </div>
+                                          ) : (
+                                            <Avatar className="h-6 w-6">
+                                              <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                                                {assignee.initials}
+                                              </AvatarFallback>
+                                            </Avatar>
+                                          )}
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          {assignee.type === 'ng' ? 'Handled by NG' : assignee.name}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    ))}
+                                    {project.assignees.length > 3 && (
+                                      <span className="text-xs text-muted-foreground ml-1">
+                                        +{project.assignees.length - 3}
+                                      </span>
+                                    )}
+                                  </TooltipProvider>
+                                </div>
+                              ) : (
+                                <div className="h-6 w-6 flex items-center justify-center rounded-full bg-gray-100 text-[10px] font-medium text-gray-500">
+                                  ?
+                                </div>
+                              )}
+                            </TableCell>
+                          ) : (
+                            <TableCell>
+                              <span className="text-sm">{project.pm}</span>
+                            </TableCell>
+                          )}
+                          <TableCell>
+                            <span className="text-sm">{formatDate(project.deadline)}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', getPriorityColor(project.priority))}>
+                              {project.priority.charAt(0).toUpperCase() + project.priority.slice(1)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <span className="text-sm font-medium">{project.progress}%</span>
+                          </TableCell>
+                          {!isClient && (
+                            <TableCell>
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                                      <MoreHorizontal className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                    {!isArchived && (
+                                      <DropdownMenuItem onClick={() => handleDuplicateProject(project.id)}>
+                                        <Copy className="mr-2 h-4 w-4" />
+                                        Duplicate Scene
+                                      </DropdownMenuItem>
+                                    )}
+                                    {!isArchived && (
+                                      <DropdownMenuItem onClick={() => handleSplitProject(project.id)}>
+                                        <Split className="mr-2 h-4 w-4" />
+                                        Split Scene
+                                      </DropdownMenuItem>
+                                    )}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem 
+                                      onClick={() => setArchiveDialog({ 
+                                        open: true, 
+                                        projectId: project.id, 
+                                        projectName: project.name,
+                                        isArchived 
+                                      })}
+                                    >
+                                      {isArchived ? (
+                                        <>
+                                          <ArchiveRestore className="mr-2 h-4 w-4" />
+                                          Unarchive Scene
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Archive className="mr-2 h-4 w-4" />
+                                          Archive Scene
+                                        </>
+                                      )}
+                                    </DropdownMenuItem>
+                                    {canCancel && (
+                                      <DropdownMenuItem 
+                                        className="text-destructive"
+                                        onClick={() => setCancelDialog({ 
+                                          open: true, 
+                                          projectId: project.id, 
+                                          projectName: project.name 
+                                        })}
+                                      >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Cancel Scene
+                                      </DropdownMenuItem>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </TableCell>
+                          )}
+                        </TableRow>
+                      )
+                    })}
+                  </React.Fragment>
+                )
+              })
+            ) : (
+              // Ungrouped view - flat list
+              paginatedProjects.map((project) => {
               const isArchived = project.status === 'closed'
               const canCancel = CANCELLABLE_STATUSES.includes(project.status)
+              // PROJ-013: Highlight newly created project from template
+              const isHighlighted = highlightedProjectId === project.id
               
               return (
                 <TableRow
                   key={project.id}
                   className={cn(
-                    "cursor-pointer bg-background hover:bg-muted/50",
-                    isArchived && "opacity-60"
+                    "cursor-pointer bg-background hover:bg-muted/50 transition-colors duration-500",
+                    isArchived && "opacity-60",
+                    isHighlighted && "animate-pulse bg-emerald-50 ring-2 ring-emerald-500 ring-inset"
                   )}
                   onClick={() => router.push(`/projects/${project.id}`)}
                 >
-                  {/* Project Name + Service */}
+                  {/* Update PROJ-005: Show > Scene display */}
                   <TableCell>
                     <div>
+                      {/* Show breadcrumb */}
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground mb-0.5">
+                        <Film className="h-3 w-3" />
+                        <span>{getProjectShow(project)?.name || 'Unknown Show'}</span>
+                        <ChevronRight className="h-3 w-3" />
+                      </div>
+                      {/* Scene name */}
                       <p className="font-medium text-foreground">{project.name}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">
                         {project.services.join(', ')}
@@ -1426,7 +1911,8 @@ export default function ProjectsPage() {
                   )}
                 </TableRow>
               )
-            })}
+            })
+            )}
           </TableBody>
         </Table>
       </div>
@@ -1608,25 +2094,25 @@ export default function ProjectsPage() {
           <DialogHeader>
             <DialogTitle>Duplicate &quot;{duplicateDialog.originalName}&quot;?</DialogTitle>
             <DialogDescription>
-              Create a new project with the same settings. Source files are not duplicated — you&apos;ll upload a new video after creation.
+              Create a new scene with the same settings. Source files are not duplicated — you&apos;ll upload a new video after creation.
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-4">
-            {/* New Project Name */}
+            {/* Update PROJ-001: "Project Name" renamed to "Scene name" */}
             <div className="space-y-2">
               <Label htmlFor="duplicate-name" className="text-sm font-medium">
-                New project name <span className="text-destructive">*</span>
+                New scene name <span className="text-destructive">*</span>
               </Label>
               <Input
                 id="duplicate-name"
                 value={duplicateName}
                 onChange={(e) => setDuplicateName(e.target.value)}
-                placeholder="Enter project name..."
+                placeholder="Enter scene name..."
                 autoFocus
               />
               {!duplicateName.trim() && (
-                <p className="text-xs text-destructive">Project name is required.</p>
+                <p className="text-xs text-destructive">Scene name is required.</p>
               )}
             </div>
             
@@ -1942,6 +2428,170 @@ export default function ProjectsPage() {
               </>
             )}
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* PROJ-013: New Project Modal (Admin/PM only) */}
+      <Dialog open={showNewProjectModal} onOpenChange={(open) => {
+        setShowNewProjectModal(open)
+        if (!open) {
+          setShowTemplatePicker(false)
+          setTemplateSearchQuery('')
+          setTemplateError('')
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          {!showTemplatePicker ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>New Project</DialogTitle>
+                <DialogDescription>
+                  Create a new project from scratch or use a pre-configured template.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="grid gap-3 py-4">
+                <Link href="/projects/new" onClick={() => setShowNewProjectModal(false)}>
+                  <Button variant="outline" className="w-full justify-start gap-3 h-auto py-4 px-4">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                      <Plus className="h-5 w-5" />
+                    </div>
+                    <div className="text-left">
+                      <p className="font-medium">Create New</p>
+                      <p className="text-xs text-muted-foreground">Start from scratch with the project wizard</p>
+                    </div>
+                  </Button>
+                </Link>
+                
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start gap-3 h-auto py-4 px-4"
+                  onClick={() => setShowTemplatePicker(true)}
+                >
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
+                    <FileStack className="h-5 w-5" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium">Create from a Template</p>
+                    <p className="text-xs text-muted-foreground">Use a pre-configured project setup</p>
+                  </div>
+                </Button>
+              </div>
+            </>
+          ) : (
+            <>
+              <DialogHeader>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8"
+                    onClick={() => {
+                      setShowTemplatePicker(false)
+                      setTemplateSearchQuery('')
+                    }}
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  <DialogTitle>Choose a template</DialogTitle>
+                </div>
+                <DialogDescription>
+                  Select a template to instantly create a project with pre-configured settings.
+                </DialogDescription>
+              </DialogHeader>
+              
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search templates by name, client, or Show..."
+                  value={templateSearchQuery}
+                  onChange={(e) => setTemplateSearchQuery(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+              
+              {/* Error message */}
+              {templateError && (
+                <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 p-3">
+                  <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
+                  <p className="text-sm text-red-800">{templateError}</p>
+                </div>
+              )}
+              
+              {/* Template list */}
+              <div className="max-h-[300px] overflow-y-auto space-y-2">
+                {filteredTemplates.length === 0 ? (
+                  <div className="text-center py-8">
+                    {mockProjectTemplates.length === 0 ? (
+                      <>
+                        <FileStack className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">No templates yet.</p>
+                        <Link href="/settings/project-templates" onClick={() => setShowNewProjectModal(false)}>
+                          <Button variant="link" className="text-sm mt-1">
+                            Create one in Settings → Project Templates
+                          </Button>
+                        </Link>
+                      </>
+                    ) : (
+                      <>
+                        <Search className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                        <p className="text-sm text-muted-foreground">No templates match your search.</p>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  filteredTemplates.map((template) => (
+                    <button
+                      key={template.id}
+                      className="w-full text-left p-3 rounded-lg border border-border hover:bg-muted/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => handleCreateFromTemplate(template)}
+                      disabled={isCreatingFromTemplate}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm truncate">{template.name}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {template.clientName}
+                            {template.showName && ` · ${template.showName}`}
+                          </p>
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            <span className="text-xs px-1.5 py-0.5 bg-muted rounded">
+                              {template.languages.map(l => `${l.source}→${l.target}`).join(', ')}
+                            </span>
+                            <span className="text-xs px-1.5 py-0.5 bg-muted rounded">
+                              {template.workflow.length} tasks
+                            </span>
+                          </div>
+                        </div>
+                        {isCreatingFromTemplate && (
+                          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                        )}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
+              
+              <div className="flex justify-between items-center pt-2 border-t">
+                <Link href="/settings/project-templates" onClick={() => setShowNewProjectModal(false)}>
+                  <Button variant="link" size="sm" className="text-xs px-0">
+                    Manage templates
+                  </Button>
+                </Link>
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={() => {
+                    setShowTemplatePicker(false)
+                    setTemplateSearchQuery('')
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

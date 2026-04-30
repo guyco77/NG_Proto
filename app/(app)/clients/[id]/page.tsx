@@ -856,7 +856,8 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                       <TableCell className="font-medium">{quote.quoteNumber}</TableCell>
                       <TableCell>{quote.projectName}</TableCell>
                       <TableCell><StatusBadge status={quote.status} /></TableCell>
-                      <TableCell className="text-right">{formatCurrency(quote.totalAmount)} {quote.currency}</TableCell>
+                      {/* Update 01: totalAmount renamed to price */}
+                      <TableCell className="text-right">{quote.price ? `${formatCurrency(quote.price)} ${quote.currency || ''}` : '—'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
