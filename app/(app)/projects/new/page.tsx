@@ -368,14 +368,13 @@ export default function NewProjectPage() {
     }
     
     if (type === 'source') {
-      // PROJ-006: Client can only have one source video - replace instead of append
-      if (isClientRole && sourceFiles.length > 0) {
-        // Clear existing source files first
-        setSourceFiles([mockFile])
-        setDetectedDuration(null)
-      } else {
-        setSourceFiles([...sourceFiles, mockFile])
+      // Update PROJ-010: Client can now upload multiple videos (up to 50) like Admin/PM
+      // Each video creates a separate Scene
+      if (videoFiles.length >= 50) {
+        toast({ title: 'Maximum reached', description: 'You can upload up to 50 videos at once.' })
+        return
       }
+      setSourceFiles([...sourceFiles, mockFile])
       
       // Simulate video duration detection (1-2 second delay)
       if (isVideoFile) {
@@ -414,8 +413,8 @@ export default function NewProjectPage() {
   
   // Update PROJ-001: Scene + Show required, sourceFiles required
   // Update PROJ-006: Block if >50 videos uploaded
-  // For client role, clientId is auto-set so just check name and files
-  const canProceedStep1 = sceneName.trim() && (isClientRole || (clientId && showId)) && sourceFiles.length > 0 && videoFiles.length <= 50
+  // Update PROJ-010: Client also needs Show (scoped to their company)
+  const canProceedStep1 = sceneName.trim() && showId && (isClientRole || clientId) && sourceFiles.length > 0 && videoFiles.length <= 50
   
   // Step 2 validation: different for client vs admin/PM
   // Client: at least one task type selected, all language pairs complete, deadline set
@@ -436,14 +435,20 @@ export default function NewProjectPage() {
     const sceneNames = isMultiVideo ? autoSceneNames : [sceneName]
     
     if (isClientRole) {
-      // PROJ-010: Client creates project in Approved status directly, no quote
-      toast({
-        title: 'Project created. Assign your team to get started.',
-        description: `${sceneName} is ready for team assignment.`,
-      })
+      // Update PROJ-010: Client creates project in Approved status directly
+      // Multi-video creates one Scene per video with auto-generated Approved quotes
+      const toastTitle = isMultiVideo 
+        ? `${sceneCount} Scenes Created` 
+        : 'Scene Created'
+      const toastDesc = isMultiVideo
+        ? `${sceneCount} scenes created under "${selectedShow?.name}". One approved quote per scene. Ready for team assignment.`
+        : `"${sceneName}" is ready for team assignment under "${selectedShow?.name}".`
+      
+      toast({ title: toastTitle, description: toastDesc })
+      
       // In real app, would POST to API then redirect
       setTimeout(() => {
-        router.push('/projects/new/success?name=' + encodeURIComponent(sceneName) + '&client=true')
+        router.push('/projects/new/success?name=' + encodeURIComponent(sceneName) + '&client=true&scenes=' + sceneCount + '&show=' + encodeURIComponent(selectedShow?.name || ''))
       }, 500)
     } else {
       // Admin/PM creates project in Draft status
@@ -568,6 +573,132 @@ export default function NewProjectPage() {
               <CardTitle className="text-base">Scene Information</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Update PROJ-010: Show selector for Client (scoped to their company) */}
+              {isClientRole && (
+                <div className="space-y-2">
+                  <Label htmlFor="show">Show *</Label>
+                  <Popover open={showSearchOpen} onOpenChange={setShowSearchOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={showSearchOpen}
+                        className="w-full max-w-md justify-between font-normal"
+                      >
+                        {showId
+                          ? selectedShow?.name
+                          : "Search or create a Show..."}
+                        <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[350px] p-0" align="start">
+                      <Command>
+                        <CommandInput 
+                          placeholder="Search shows..." 
+                          value={newShowName}
+                          onValueChange={setNewShowName}
+                        />
+                        <CommandList>
+                          <CommandEmpty>
+                            <div className="py-2 px-3">
+                              <p className="text-sm text-muted-foreground mb-2">No shows found.</p>
+                              {newShowName.trim() && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="w-full gap-1.5"
+                                  onClick={() => {
+                                    setIsCreatingShow(true)
+                                    const newId = `show-new-${Date.now()}`
+                                    setTimeout(() => {
+                                      mockShows.push({
+                                        id: newId,
+                                        name: newShowName.trim(),
+                                        clientId: autoClientId,
+                                        clientName: mockClients.find(c => c.id === autoClientId)?.displayName || '',
+                                        createdAt: new Date().toISOString(),
+                                        sceneCount: 0,
+                                      })
+                                      setShowId(newId)
+                                      setShowSearchOpen(false)
+                                      setNewShowName('')
+                                      setIsCreatingShow(false)
+                                      toast({ title: 'Show created', description: `"${newShowName.trim()}" created.` })
+                                    }, 500)
+                                  }}
+                                  disabled={isCreatingShow}
+                                >
+                                  {isCreatingShow ? <Loader2 className="h-3 w-3 animate-spin" /> : <Plus className="h-3 w-3" />}
+                                  Create &quot;{newShowName.trim()}&quot;
+                                </Button>
+                              )}
+                            </div>
+                          </CommandEmpty>
+                          <CommandGroup heading="Your Shows">
+                            {clientShows.map((show) => (
+                              <CommandItem
+                                key={show.id}
+                                value={show.name}
+                                onSelect={() => {
+                                  setShowId(show.id)
+                                  setShowSearchOpen(false)
+                                  setNewShowName('')
+                                }}
+                              >
+                                <Check
+                                  className={cn(
+                                    "mr-2 h-4 w-4",
+                                    showId === show.id ? "opacity-100" : "opacity-0"
+                                  )}
+                                />
+                                <div className="flex-1">
+                                  <span>{show.name}</span>
+                                  <span className="text-xs text-muted-foreground ml-2">
+                                    {show.sceneCount} scene{show.sceneCount !== 1 ? 's' : ''}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                          {newShowName.trim() && clientShows.length > 0 && (
+                            <CommandGroup>
+                              <CommandItem
+                                value={`create-${newShowName}`}
+                                onSelect={() => {
+                                  setIsCreatingShow(true)
+                                  const newId = `show-new-${Date.now()}`
+                                  setTimeout(() => {
+                                    mockShows.push({
+                                      id: newId,
+                                      name: newShowName.trim(),
+                                      clientId: autoClientId,
+                                      clientName: mockClients.find(c => c.id === autoClientId)?.displayName || '',
+                                      createdAt: new Date().toISOString(),
+                                      sceneCount: 0,
+                                    })
+                                    setShowId(newId)
+                                    setShowSearchOpen(false)
+                                    setNewShowName('')
+                                    setIsCreatingShow(false)
+                                    toast({ title: 'Show created', description: `"${newShowName.trim()}" created.` })
+                                  }, 500)
+                                }}
+                              >
+                                <Plus className="mr-2 h-4 w-4" />
+                                Create new Show &quot;{newShowName.trim()}&quot;
+                              </CommandItem>
+                            </CommandGroup>
+                          )}
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                  {!showId && (
+                    <p className="text-xs text-destructive">Show is required</p>
+                  )}
+                </div>
+              )}
+              
               {/* PROJ-010: Client role doesn't see client/PM selectors */}
               {!isClientRole && (
                 <div className="grid gap-4 md:grid-cols-2">

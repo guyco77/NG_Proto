@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
@@ -1416,6 +1416,19 @@ export default function ProjectsPage() {
       {/* Active Filter Pills */}
       {activeFilterCount > 0 && (
         <div className="flex flex-wrap gap-2">
+          {/* Update PROJ-005: Show filter pills */}
+          {showFilters.map((showId) => {
+            const show = mockShows.find(s => s.id === showId)
+            return (
+              <span key={showId} className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-700">
+                <Film className="h-3 w-3" />
+                Show: {show?.name || showId}
+                <button onClick={() => toggleShowFilter(showId)} className="hover:bg-amber-200 rounded-full p-0.5">
+                  <X className="h-3 w-3" />
+                </button>
+              </span>
+            )
+          })}
           {statusFilters.map((status) => (
             <span key={status} className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary">
               {PROJECT_STATUSES.find(s => s.value === status)?.label}
@@ -1898,7 +1911,8 @@ export default function ProjectsPage() {
                   )}
                 </TableRow>
               )
-            })}
+            })
+            )}
           </TableBody>
         </Table>
       </div>
