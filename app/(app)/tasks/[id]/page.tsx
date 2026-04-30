@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   Calendar,
@@ -18,6 +19,7 @@ import {
   AlertTriangle,
   Trash2,
   RefreshCw,
+  ArrowLeft,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { OpenInEditorButton } from '@/components/open-in-editor-button'
@@ -132,9 +134,14 @@ function getServiceIcon(serviceType: string): string {
 
 export default function TaskDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const searchParams = useSearchParams()
   const { currentRole, userName } = useRole()
   const task = mockTasks.find((t) => t.id === id) || mockTasks[0]
   const project = mockProjects.find((p) => p.id === task.projectId)
+  
+  // TASK-011: Back to Project navigation
+  const fromProject = searchParams.get('from') === 'project'
+  const originProjectId = searchParams.get('projectId')
   
   const [notes, setNotes] = useState(mockTaskNotes)
   const [newNote, setNewNote] = useState('')
@@ -201,6 +208,16 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
       <div className="border-b border-border bg-card px-6 py-4">
         <div className="flex items-start justify-between">
           <div>
+            {/* TASK-011: Back to Project navigation */}
+            {fromProject && originProjectId && project && (
+              <Link 
+                href={`/projects/${originProjectId}`}
+                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-2 transition-colors"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to {project.name}
+              </Link>
+            )}
             <div className="flex items-center gap-3">
               <h1 className="text-2xl font-semibold text-foreground">{task.name}</h1>
               <StatusBadge status={currentStatus} />

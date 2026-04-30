@@ -1029,7 +1029,7 @@ const handleCancelEdit = () => {
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <Link href={`/tasks/${task.id}`}>
+                                  <Link href={`/tasks/${task.id}?from=project&projectId=${project.id}`}>
                                     <div className={cn(
                                       'relative flex flex-col items-center justify-center p-4 rounded-lg border-2 w-[120px] h-[120px] cursor-pointer transition-all hover:shadow-md',
                                       task.status === 'completed' ? 'border-emerald-500 bg-emerald-50' :
