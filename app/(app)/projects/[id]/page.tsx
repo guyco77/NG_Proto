@@ -27,7 +27,7 @@ import {
   Captions,
   Eye,
   Copy,
-  Split,
+
   AlertTriangle,
   UserPlus,
   Check,
@@ -151,20 +151,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [duplicateName, setDuplicateName] = useState(`${project.name} (Copy)`)
   const [isDuplicating, setIsDuplicating] = useState(false)
   
-  // PROJ-013: Split Project (Series → Episodes) dialog
-  const [showSplitDialog, setShowSplitDialog] = useState(false)
-  const [splitTotalEpisodes, setSplitTotalEpisodes] = useState<number | ''>('')
-  const [splitPrefix, setSplitPrefix] = useState(project.name)
-  const [isSplitting, setIsSplitting] = useState(false)
-  const [splitProgress, setSplitProgress] = useState({ created: 0, total: 0 })
-  const [splitError, setSplitError] = useState('')
-  const [splitResult, setSplitResult] = useState<{
-    show: boolean
-    created: number
-    failed: number
-    failedEpisodes: number[]
-  }>({ show: false, created: 0, failed: 0, failedEpisodes: [] })
-  
   const [showAddTaskDialog, setShowAddTaskDialog] = useState(false)
   const [newTaskService, setNewTaskService] = useState('')
   const [newTaskLanguage, setNewTaskLanguage] = useState('')
@@ -200,8 +186,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [isBulkAssigning, setIsBulkAssigning] = useState(false)
   const [localTaskUpdates, setLocalTaskUpdates] = useState<Record<string, { status?: string; assignedVendor?: string }>>({})
   
-  // Apply local updates to project tasks
-  const updatedProjectTasks = projectTasks.map(t => ({ ...t, ...localTaskUpdates[t.id] }))
+  // Quick assign dialog state for single task assignment from pipeline
+  const [showQuickAssignDialog, setShowQuickAssignDialog] = useState(false)
+  const [quickAssignTask, setQuickAssignTask] = useState<typeof projectTasks[0] | null>(null)
+  const [quickAssignVendorId, setQuickAssignVendorId] = useState<string | null>(null)
+  const [quickAssignSearchQuery, setQuickAssignSearchQuery] = useState('')
+  const [isQuickAssigning, setIsQuickAssigning] = useState(false)
+  
+  // Apply local updates to project tasks AND include new tasks from localTaskUpdates
+  const existingTaskIds = new Set(projectTasks.map(t => t.id))
+  const newTasks = Object.entries(localTaskUpdates)
+    .filter(([id]) => !existingTaskIds.has(id))
+    .map(([, task]) => task as typeof projectTasks[0])
+  const updatedProjectTasks = [
+    ...projectTasks.map(t => ({ ...t, ...localTaskUpdates[t.id] })),
+    ...newTasks
+  ]
   const selectedTasks = updatedProjectTasks.filter(t => selectedTaskIds.includes(t.id))
   const eligibleForAssign = selectedTasks.filter(t => t.status === 'unassigned')
   const ineligibleCount = selectedTasks.length - eligibleForAssign.length
@@ -479,76 +479,6 @@ const handleCancelEdit = () => {
       router.push(`/projects/${newProjectId}?duplicated=true`)
     }, 1000)
   }
-
-  // PROJ-013: Split Project helpers and handler
-  const getEpisodeNames = (prefix: string, total: number) => {
-    if (total < 2) return []
-    const padLength = total > 99 ? 3 : 2
-    const names: string[] = []
-    for (let i = 2; i <= total; i++) {
-      names.push(`${prefix} E${String(i).padStart(padLength, '0')}`)
-    }
-    return names
-  }
-
-  const handleSplitProject = (retryOnly = false, failedEpisodesToRetry: number[] = []) => {
-    if (!splitTotalEpisodes || splitTotalEpisodes < 2 || !splitPrefix.trim()) return
-    
-    setIsSplitting(true)
-    setSplitError('')
-    setSplitResult({ show: false, created: 0, failed: 0, failedEpisodes: [] })
-    
-    const totalToCreate = retryOnly ? failedEpisodesToRetry.length : splitTotalEpisodes - 1
-    setSplitProgress({ created: 0, total: totalToCreate })
-    
-    // Simulate creating episodes with progress (with ~5% random failure chance for demo)
-    let created = 0
-    let failed = 0
-    const failedEpisodes: number[] = []
-    let currentIndex = 0
-    
-    const createInterval = setInterval(() => {
-      const episodeNumber = retryOnly ? failedEpisodesToRetry[currentIndex] : currentIndex + 2
-      currentIndex++
-      
-      // Simulate ~5% failure rate for demo purposes (only if > 10 episodes)
-      const simulateFailure = totalToCreate > 10 && Math.random() < 0.05
-      
-      if (simulateFailure) {
-        failed++
-        failedEpisodes.push(episodeNumber)
-      } else {
-        created++
-      }
-      
-      setSplitProgress({ created: created + failed, total: totalToCreate })
-      
-      if (currentIndex >= totalToCreate) {
-        clearInterval(createInterval)
-        setIsSplitting(false)
-        
-        if (failed > 0) {
-          // Partial failure - show results screen
-          setSplitResult({ show: true, created, failed, failedEpisodes })
-        } else {
-          // Full success
-          setShowSplitDialog(false)
-          setSplitResult({ show: false, created: 0, failed: 0, failedEpisodes: [] })
-          
-          toast({
-            title: `Series split into ${splitTotalEpisodes} episodes.`,
-            description: 'Upload source files for each episode to continue.',
-          })
-          
-          router.push('/projects')
-        }
-      }
-    }, 150)
-  }
-  
-  const handleRetryFailed = () => {
-    handleSplitProject(true, splitResult.failedEpisodes)
-  }
   
   // TASK-004: Toggle task selection
   const toggleTaskSelection = (taskId: string) => {
@@ -585,12 +515,43 @@ const handleCancelEdit = () => {
     setBulkVendorSearchQuery('')
   }
 
-  const handleAddTask = () => {
-    if (!newTaskService) return
-    // Update PROJ-011: Use Show › Scene format in notification
+// Quick assign single task from pipeline
+  const handleOpenQuickAssignDialog = (task: typeof projectTasks[0]) => {
+    setQuickAssignTask(task)
+    setQuickAssignVendorId(null)
+    setQuickAssignSearchQuery('')
+    setShowQuickAssignDialog(true)
+  }
+  
+  const handleQuickAssignVendor = async () => {
+    if (!quickAssignTask || !quickAssignVendorId) return
+    setIsQuickAssigning(true)
+    await new Promise(r => setTimeout(r, 400))
+    
+    const vendor = mockVendors.find(v => v.id === quickAssignVendorId)
+    setLocalTaskUpdates(prev => ({
+      ...prev,
+      [quickAssignTask.id]: { status: 'assigned', assignedVendor: vendor?.name }
+    }))
+    
     toast({
-      title: 'Task Created',
-      description: `New ${newTaskService} task added to ${projectShow?.name} › ${project.name}.`,
+      title: `${vendor?.name} assigned`,
+      description: `Task "${quickAssignTask.name}" in ${projectShow?.name} › ${project.name}. Vendor notified.`,
+    })
+    
+    setIsQuickAssigning(false)
+    setShowQuickAssignDialog(false)
+    setQuickAssignTask(null)
+    setQuickAssignVendorId(null)
+    setQuickAssignSearchQuery('')
+  }
+  
+  const handleAddTask = () => {
+  if (!newTaskService) return
+  // Update PROJ-011: Use Show › Scene format in notification
+  toast({
+    title: 'Task Created',
+    description: `New ${newTaskService} task added to ${projectShow?.name} › ${project.name}.`,
     })
     setShowAddTaskDialog(false)
     setNewTaskService('')
@@ -768,10 +729,11 @@ const handleCancelEdit = () => {
         <div className="flex items-start justify-between">
           <div>
             {/* Update PROJ-004: Show › Scene breadcrumb header */}
+            {/* Link navigates to projects list filtered by this Show */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Film className="h-4 w-4" />
               <Link 
-                href={`/shows/${projectShow?.id}`} 
+                href={`/projects?show=${projectShow?.id}`} 
                 className="hover:text-foreground hover:underline transition-colors"
               >
                 {selectedShow?.name || projectShow?.name || 'Unknown Show'}
@@ -914,17 +876,6 @@ const handleCancelEdit = () => {
                     <Copy className="mr-2 h-4 w-4" />
                     Duplicate Project
                   </DropdownMenuItem>
-                  {/* PROJ-013: Split Project - available on any status */}
-                  <DropdownMenuItem onSelect={(e) => { 
-                    e.preventDefault(); 
-                    setSplitPrefix(project.name);
-                    setSplitTotalEpisodes('');
-                    setSplitError('');
-                    setShowSplitDialog(true); 
-                  }}>
-                    <Split className="mr-2 h-4 w-4" />
-                    Split Project
-                  </DropdownMenuItem>
                   {canEditStatus && canArchive && (
                     <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setShowArchiveDialog(true); }}>
                       <Archive className="mr-2 h-4 w-4" />
@@ -1042,12 +993,12 @@ const handleCancelEdit = () => {
                           </PopoverContent>
                         </Popover>
                       ) : (
-                        <Link 
-                          href={`/shows/${projectShow?.id}`}
-                          className="text-sm font-medium hover:text-primary hover:underline transition-colors"
-                        >
-                          {projectShow?.name || '-'}
-                        </Link>
+<Link
+                    href={`/projects?show=${projectShow?.id}`}
+                    className="text-sm font-medium hover:text-primary hover:underline transition-colors"
+                  >
+                    {projectShow?.name || '-'}
+                  </Link>
                       )}
                     </div>
                     
@@ -1379,26 +1330,53 @@ const handleCancelEdit = () => {
                                 </TooltipProvider>
                               </div>
                             )}
+                            {/* Inline assign vendor button for unassigned tasks (Admin/PM only) */}
+                            {(isAdmin || isPM) && task.status === 'unassigned' && (
+                              <div className="absolute -left-3 top-1/2 -translate-y-1/2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        size="icon"
+                                        variant="secondary"
+                                        className="h-6 w-6 rounded-full shadow-md border border-border"
+                                        onClick={(e) => {
+                                          e.preventDefault()
+                                          e.stopPropagation()
+                                          handleOpenQuickAssignDialog(task)
+                                        }}
+                                      >
+                                        <UserPlus className="h-3 w-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left">
+                                      <p>Assign vendor</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            )}
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Link href={`/tasks/${task.id}?from=project&projectId=${project.id}`}>
+                                    {/* Status colors: Unassigned/Draft = Grey, Assigned = Blue, In Progress = Orange, Done = Green */}
                                     <div className={cn(
                                       'relative flex flex-col items-center justify-center p-4 rounded-lg border-2 w-[120px] h-[120px] cursor-pointer transition-all hover:shadow-md',
-                                      task.status === 'completed' ? 'border-emerald-500 bg-emerald-50' :
-                                      task.status === 'in_progress' ? 'border-blue-500 bg-blue-50' :
+                                      task.status === 'completed' || task.status === 'complete' ? 'border-emerald-500 bg-emerald-50' :
+                                      task.status === 'in_progress' || task.status === 'submitted' ? 'border-orange-500 bg-orange-50' :
                                       task.status === 'review' ? 'border-purple-500 bg-purple-50' :
-                                      task.status === 'assigned' ? 'border-amber-500 bg-amber-50' :
+                                      task.status === 'assigned' ? 'border-blue-500 bg-blue-50' :
                                       'border-gray-200 bg-gray-50',
                                       selectedTaskIds.includes(task.id) && 'ring-2 ring-primary ring-offset-2'
                                     )}>
                                     {/* Type Icon */}
                                     <div className={cn(
                                       'flex h-8 w-8 items-center justify-center rounded-full text-sm',
-                                      task.status === 'completed' ? 'bg-emerald-500 text-white' :
-                                      task.status === 'in_progress' ? 'bg-blue-500 text-white' :
+                                      task.status === 'completed' || task.status === 'complete' ? 'bg-emerald-500 text-white' :
+                                      task.status === 'in_progress' || task.status === 'submitted' ? 'bg-orange-500 text-white' :
                                       task.status === 'review' ? 'bg-purple-500 text-white' :
-                                      task.status === 'assigned' ? 'bg-amber-500 text-white' :
+                                      task.status === 'assigned' ? 'bg-blue-500 text-white' :
                                       'bg-gray-300 text-gray-600'
                                     )}>
                                       {getTaskIcon(task.service)}
@@ -2536,236 +2514,6 @@ const handleCancelEdit = () => {
         </DialogContent>
       </Dialog>
       
-      {/* PROJ-013: Split Project (Series → Episodes) Dialog */}
-      <Dialog open={showSplitDialog} onOpenChange={(open) => { 
-        setShowSplitDialog(open)
-        if (!open) {
-          setSplitTotalEpisodes('')
-          setSplitPrefix(project.name)
-          setSplitError('')
-          setIsSplitting(false)
-          setSplitProgress({ created: 0, total: 0 })
-        }
-      }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Split &quot;{project.name}&quot; into a series?</DialogTitle>
-            <DialogDescription>
-              &quot;{project.name}&quot; will be treated as Episode 01. We&apos;ll create additional episode projects for the rest of the series — same client, services, vendors, and settings. You&apos;ll upload each episode&apos;s source video after the split.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            {/* Total Episodes Input */}
-            <div className="space-y-2">
-              <Label htmlFor="split-total" className="text-sm font-medium">
-                Total episodes <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="split-total"
-                type="number"
-                min={2}
-                max={200}
-                value={splitTotalEpisodes}
-                onChange={(e) => {
-                  const val = e.target.value === '' ? '' : parseInt(e.target.value, 10)
-                  setSplitTotalEpisodes(val)
-                  setSplitError('')
-                }}
-                placeholder="e.g., 20"
-                disabled={isSplitting}
-              />
-              <p className="text-xs text-muted-foreground">
-                Total number of episodes in the series, including this one.
-              </p>
-              {splitTotalEpisodes !== '' && splitTotalEpisodes < 2 && (
-                <p className="text-xs text-destructive">Enter a total of 2 or more episodes.</p>
-              )}
-              {splitTotalEpisodes !== '' && splitTotalEpisodes > 200 && (
-                <p className="text-xs text-destructive">Total episodes too high — maximum is 200. For larger series, contact support.</p>
-              )}
-              {splitTotalEpisodes !== '' && splitTotalEpisodes > 50 && splitTotalEpisodes <= 200 && (
-                <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-amber-800">
-                    You&apos;re about to create {splitTotalEpisodes - 1} new projects. This may take a moment to process and will appear at the top of your project list.
-                  </p>
-                </div>
-              )}
-            </div>
-            
-            {/* Episode Name Prefix */}
-            <div className="space-y-2">
-              <Label htmlFor="split-prefix" className="text-sm font-medium">
-                Episode name prefix <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="split-prefix"
-                value={splitPrefix}
-                onChange={(e) => {
-                  setSplitPrefix(e.target.value)
-                  setSplitError('')
-                }}
-                placeholder="e.g., Tehran"
-                disabled={isSplitting}
-              />
-              <p className="text-xs text-muted-foreground">
-                New episodes will be named {splitPrefix || '{prefix}'} E02, {splitPrefix || '{prefix}'} E03, …
-              </p>
-              {splitPrefix === '' && (
-                <p className="text-xs text-destructive">Episode name prefix is required.</p>
-              )}
-            </div>
-            
-            {/* Live Preview */}
-            {splitTotalEpisodes !== '' && splitTotalEpisodes >= 2 && splitTotalEpisodes <= 200 && splitPrefix.trim() && (
-              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                <p className="text-sm font-medium">Preview</p>
-                <p className="text-sm text-muted-foreground">
-                  This will create <span className="font-medium text-foreground">{splitTotalEpisodes - 1}</span> new projects:{' '}
-                  {(() => {
-                    const names = getEpisodeNames(splitPrefix, splitTotalEpisodes)
-                    if (names.length <= 5) {
-                      return <span className="font-medium text-foreground">{names.join(', ')}</span>
-                    }
-                    return (
-                      <span className="font-medium text-foreground">
-                        {names.slice(0, 3).join(', ')}, …, {names[names.length - 1]}
-                      </span>
-                    )
-                  })()}
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  The original project ({project.name}) remains as Episode 01 — it is not modified or renamed.
-                </p>
-              </div>
-            )}
-            
-            {/* What will be copied summary */}
-            <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
-              <p className="text-sm font-medium">What each episode will inherit:</p>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Client</span>
-                  <span className="font-medium">{project.client}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Priority</span>
-                  <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', getPriorityColor(project.priority))}>
-                    {project.priority.charAt(0).toUpperCase() + project.priority.slice(1)}
-                  </span>
-                </div>
-                <div className="flex justify-between col-span-2">
-                  <span className="text-muted-foreground">PM</span>
-                  <span className="font-medium">{project.pm}</span>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Also copied: reference files, internal notes
-              </p>
-            </div>
-            
-            {/* Source files note */}
-            <p className="text-xs text-muted-foreground">
-              <strong>Note:</strong> Source files are not duplicated — you&apos;ll upload a video for each episode after the split.
-            </p>
-            
-            {/* Error message */}
-            {splitError && (
-              <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 p-3">
-                <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-800">{splitError}</p>
-              </div>
-            )}
-            
-            {/* Progress indicator */}
-            {isSplitting && splitProgress.total > 0 && !splitResult.show && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Creating episodes...</span>
-                  <span className="text-muted-foreground">{splitProgress.created} of {splitProgress.total}</span>
-                </div>
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <div 
-                    className="h-full bg-primary transition-all duration-150"
-                    style={{ width: `${(splitProgress.created / splitProgress.total) * 100}%` }}
-                  />
-                </div>
-              </div>
-            )}
-            
-            {/* Partial failure results screen */}
-            {splitResult.show && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-amber-900">
-                      {splitResult.created} of {splitResult.created + splitResult.failed} episodes created. {splitResult.failed} failed.
-                    </p>
-                    <p className="text-xs text-amber-800 mt-1">
-                      Failed episodes: {splitResult.failedEpisodes.map(n => `E${String(n).padStart(splitTotalEpisodes && splitTotalEpisodes > 99 ? 3 : 2, '0')}`).join(', ')}
-                    </p>
-                  </div>
-                </div>
-                <p className="text-xs text-amber-800">
-                  Successfully created episodes have been saved. You can retry the failed ones or close this dialog and retry later.
-                </p>
-              </div>
-            )}
-          </div>
-          
-          <DialogFooter>
-            {splitResult.show ? (
-              <>
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setShowSplitDialog(false)
-                    setSplitResult({ show: false, created: 0, failed: 0, failedEpisodes: [] })
-                    toast({
-                      title: `${splitResult.created} episodes created.`,
-                      description: `${splitResult.failed} failed. You can retry from the project list.`,
-                    })
-                    router.push('/projects')
-                  }}
-                >
-                  Close
-                </Button>
-                <Button onClick={handleRetryFailed}>
-                  Retry failed ({splitResult.failed})
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button variant="outline" onClick={() => setShowSplitDialog(false)} disabled={isSplitting}>
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={() => handleSplitProject()}
-                  disabled={
-                    !splitPrefix.trim() || 
-                    splitTotalEpisodes === '' || 
-                    splitTotalEpisodes < 2 || 
-                    splitTotalEpisodes > 200 || 
-                    isSplitting
-                  }
-                >
-                  {isSplitting ? (
-                    <>
-                      <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      Creating {splitProgress.total > 0 ? `${splitProgress.created} of ${splitProgress.total}` : '...'}
-                    </>
-                  ) : (
-                    'Split Project'
-                  )}
-                </Button>
-              </>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
       {/* TASK-004: Bulk Assign Vendor Dialog */}
       <Dialog open={showBulkAssignDialog} onOpenChange={(open) => {
         setShowBulkAssignDialog(open)
@@ -2867,6 +2615,103 @@ const handleCancelEdit = () => {
               disabled={!bulkSelectedVendorId || isBulkAssigning || eligibleForAssign.length === 0}
             >
               {isBulkAssigning ? 'Assigning...' : `Assign to ${eligibleForAssign.length} Tasks`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Quick Assign Dialog - single task assignment from pipeline */}
+      <Dialog open={showQuickAssignDialog} onOpenChange={(open) => {
+        setShowQuickAssignDialog(open)
+        if (!open) {
+          setQuickAssignTask(null)
+          setQuickAssignVendorId(null)
+          setQuickAssignSearchQuery('')
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign Vendor</DialogTitle>
+            <DialogDescription>
+              {quickAssignTask && (
+                <>Assign a vendor to <strong>{quickAssignTask.name}</strong> ({quickAssignTask.sourceLanguage} → {quickAssignTask.targetLanguage})</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {/* Search */}
+            <Input
+              placeholder="Search vendors..."
+              value={quickAssignSearchQuery}
+              onChange={(e) => setQuickAssignSearchQuery(e.target.value)}
+            />
+            
+            {/* Vendor List */}
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {mockVendors
+                .filter(v => v.name.toLowerCase().includes(quickAssignSearchQuery.toLowerCase()))
+                .sort((a, b) => {
+                  const availOrder = { available: 0, limited: 1, unavailable: 2 }
+                  const aOrder = availOrder[a.availability as keyof typeof availOrder] ?? 2
+                  const bOrder = availOrder[b.availability as keyof typeof availOrder] ?? 2
+                  if (aOrder !== bOrder) return aOrder - bOrder
+                  return (b.onTimeRate || 0) - (a.onTimeRate || 0)
+                })
+                .map((vendor) => {
+                  const isUnavailable = vendor.availability === 'unavailable'
+                  const availabilityIcon = vendor.availability === 'available' ? '🟢' : vendor.availability === 'limited' ? '🟡' : '🔴'
+                  
+                  return (
+                    <div
+                      key={vendor.id}
+                      onClick={() => !isUnavailable && setQuickAssignVendorId(vendor.id)}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                        quickAssignVendorId === vendor.id 
+                          ? "border-primary bg-primary/5" 
+                          : "border-border hover:border-primary/50",
+                        isUnavailable && "opacity-50 cursor-not-allowed hover:border-border"
+                      )}
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                        <User className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{vendor.name}</span>
+                          <span title={`${vendor.availability}`}>{availabilityIcon}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          <p>{vendor.tasksDelivered || 0} tasks delivered, {vendor.onTimeRate || 95}% on-time</p>
+                        </div>
+                      </div>
+                      {quickAssignVendorId === vendor.id && (
+                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          <Check className="h-3 w-3" />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              {mockVendors.filter(v => v.name.toLowerCase().includes(quickAssignSearchQuery.toLowerCase())).length === 0 && (
+                <p className="text-center text-sm text-muted-foreground py-4">No vendors found</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowQuickAssignDialog(false)
+              setQuickAssignTask(null)
+              setQuickAssignVendorId(null)
+              setQuickAssignSearchQuery('')
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleQuickAssignVendor}
+              disabled={!quickAssignVendorId || isQuickAssigning}
+            >
+              {isQuickAssigning ? 'Assigning...' : 'Assign Vendor'}
             </Button>
           </DialogFooter>
         </DialogContent>

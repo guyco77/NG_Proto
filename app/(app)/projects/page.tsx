@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Plus,
   Search,
@@ -15,7 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Copy,
-  Split,
+
   Trash2,
   AlertTriangle,
   FileStack,
@@ -451,15 +451,19 @@ const CANCELLABLE_STATUSES = ['draft', 'quoted', 'approved', 'in_progress', 'in_
 export default function ProjectsPage() {
   const { toast } = useToast()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { currentRole } = useRole()
   
   // Role-based flags
   const isClient = currentRole === 'client_admin' || currentRole === 'task_owner' || currentRole === 'reviewer' || currentRole === 'viewer'
   const isClientAdmin = currentRole === 'client_admin'
   
+  // Read initial show filter from URL param (from Show breadcrumb click)
+  const initialShowFilter = searchParams.get('show')
+  
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
-  const [showFilters, setShowFilters] = useState<string[]>([]) // Update PROJ-005: Show filter
+  const [showFilters, setShowFilters] = useState<string[]>(initialShowFilter ? [initialShowFilter] : []) // Update PROJ-005: Show filter
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [serviceFilters, setServiceFilters] = useState<string[]>([])
   const [taskTypeFilters, setTaskTypeFilters] = useState<string[]>([])
@@ -512,37 +516,6 @@ export default function ProjectsPage() {
   })
   const [duplicateName, setDuplicateName] = useState('')
   const [isDuplicating, setIsDuplicating] = useState(false)
-  
-  // PROJ-013: Split Project (Series → Episodes) dialog
-  const [splitDialog, setSplitDialog] = useState<{
-    open: boolean
-    projectId: string
-    projectName: string
-    client: string
-    services: string[]
-    priority: string
-    pm: string
-  }>({
-    open: false,
-    projectId: '',
-    projectName: '',
-    client: '',
-    services: [],
-    priority: '',
-    pm: '',
-  })
-  const [splitTotalEpisodes, setSplitTotalEpisodes] = useState<number | ''>('')
-  const [splitPrefix, setSplitPrefix] = useState('')
-  const [isSplitting, setIsSplitting] = useState(false)
-  const [splitProgress, setSplitProgress] = useState({ created: 0, total: 0 })
-  const [splitError, setSplitError] = useState('')
-  // PROJ-013: Partial failure state
-  const [splitResult, setSplitResult] = useState<{
-    show: boolean
-    created: number
-    failed: number
-    failedEpisodes: number[] // episode numbers that failed
-  }>({ show: false, created: 0, failed: 0, failedEpisodes: [] })
   
   // PROJ-013: New Project Modal with template support (Admin/PM only)
   const [showNewProjectModal, setShowNewProjectModal] = useState(false)
@@ -930,126 +903,6 @@ export default function ProjectsPage() {
       // Redirect to new project detail with highlight flag
       router.push(`/projects/${newProjectId}?duplicated=true`)
     }, 1000)
-  }
-  
-  // PROJ-013: Split Project (Series → Episodes)
-  const handleSplitProject = (projectId: string) => {
-    const project = projects.find(p => p.id === projectId)
-    if (!project) return
-    
-    setSplitDialog({
-      open: true,
-      projectId: project.id,
-      projectName: project.name,
-      client: project.client,
-      services: project.services,
-      priority: project.priority,
-      pm: project.pm,
-    })
-    setSplitPrefix(project.name)
-    setSplitTotalEpisodes('')
-    setSplitError('')
-    setSplitProgress({ created: 0, total: 0 })
-  }
-  
-  // Generate episode names for preview
-  const getEpisodeNames = (prefix: string, total: number) => {
-    if (total < 2) return []
-    const padLength = total > 99 ? 3 : 2
-    const names: string[] = []
-    for (let i = 2; i <= total; i++) {
-      names.push(`${prefix} E${String(i).padStart(padLength, '0')}`)
-    }
-    return names
-  }
-  
-  // Check for name conflicts
-  const checkNameConflicts = (prefix: string, total: number) => {
-    const episodeNames = getEpisodeNames(prefix, total)
-    const existingNames = projects.map(p => p.name.toLowerCase())
-    return episodeNames.filter(name => existingNames.includes(name.toLowerCase()))
-  }
-  
-  const handleConfirmSplit = (retryOnly = false, failedEpisodesToRetry: number[] = []) => {
-    if (!splitTotalEpisodes || splitTotalEpisodes < 2 || !splitPrefix.trim()) return
-    
-    // Skip conflict check on retry (already passed initially)
-    if (!retryOnly) {
-      const conflicts = checkNameConflicts(splitPrefix, splitTotalEpisodes)
-      if (conflicts.length > 0) {
-        setSplitError(`${conflicts.length} episode names already exist (e.g., ${conflicts[0]}). Choose a different prefix or delete the existing episodes first.`)
-        return
-      }
-    }
-    
-    setIsSplitting(true)
-    setSplitError('')
-    setSplitResult({ show: false, created: 0, failed: 0, failedEpisodes: [] })
-    
-    const totalToCreate = retryOnly ? failedEpisodesToRetry.length : splitTotalEpisodes - 1
-    setSplitProgress({ created: 0, total: totalToCreate })
-    
-    // Simulate creating episodes with progress (with ~5% random failure chance for demo)
-    let created = 0
-    let failed = 0
-    const failedEpisodes: number[] = []
-    let currentIndex = 0
-    
-    const createInterval = setInterval(() => {
-      const episodeNumber = retryOnly ? failedEpisodesToRetry[currentIndex] : currentIndex + 2
-      currentIndex++
-      
-      // Simulate ~5% failure rate for demo purposes (only if > 10 episodes to see the effect)
-      const simulateFailure = totalToCreate > 10 && Math.random() < 0.05
-      
-      if (simulateFailure) {
-        failed++
-        failedEpisodes.push(episodeNumber)
-      } else {
-        created++
-      }
-      
-      setSplitProgress({ created: created + failed, total: totalToCreate })
-      
-      if (currentIndex >= totalToCreate) {
-        clearInterval(createInterval)
-        setIsSplitting(false)
-        
-        if (failed > 0) {
-          // Partial failure - show results screen
-          setSplitResult({
-            show: true,
-            created,
-            failed,
-            failedEpisodes,
-          })
-        } else {
-          // Full success
-          setSplitDialog({
-            open: false,
-            projectId: '',
-            projectName: '',
-            client: '',
-            services: [],
-            priority: '',
-            pm: '',
-          })
-          setSplitResult({ show: false, created: 0, failed: 0, failedEpisodes: [] })
-          
-          toast({
-            title: `Series split into ${splitTotalEpisodes} episodes.`,
-            description: 'Upload source files for each episode to continue.',
-          })
-          
-          router.push('/projects')
-        }
-      }
-    }, 150)
-  }
-  
-  // Retry failed episodes
-  const handleRetryFailed = () => {
-    handleConfirmSplit(true, splitResult.failedEpisodes)
   }
 
   return (
@@ -1505,22 +1358,23 @@ export default function ProjectsPage() {
   <Table>
           <TableHeader>
 <TableRow className="hover:bg-transparent bg-muted/50">
-                {/* PROJ-005-Client: Different columns for clients vs admin/PM */}
-                {/* Update PROJ-005: "Project" renamed to "Show / Scene" */}
-                <TableHead className={isClient ? "w-[300px]" : "w-[280px]"}>Show / Scene</TableHead>
-              {!isClient && <TableHead className="w-[140px]">Client</TableHead>}
-              <TableHead className="w-[160px]">Status</TableHead>
-              {isClient ? (
-                <TableHead className="w-[140px]">Assignee</TableHead>
-              ) : (
-                <TableHead className="w-[100px]">PM</TableHead>
-              )}
-              <TableHead className="w-[110px]">Deadline</TableHead>
-              <TableHead className="w-[90px]">Priority</TableHead>
-              <TableHead className="w-[80px] text-right">Progress</TableHead>
-              {/* PROJ-005-Client: No actions menu for clients */}
-              {!isClient && <TableHead className="w-[50px]"></TableHead>}
-            </TableRow>
+  {/* Update 02: Show, Scene, and Services as three separate columns */}
+  <TableHead className="w-[140px]">Show</TableHead>
+  <TableHead className="w-[160px]">Scene</TableHead>
+  <TableHead className="w-[140px]">Services</TableHead>
+  {!isClient && <TableHead className="w-[120px]">Client</TableHead>}
+  <TableHead className="w-[140px]">Status</TableHead>
+  {isClient ? (
+  <TableHead className="w-[120px]">Assignee</TableHead>
+  ) : (
+  <TableHead className="w-[100px]">PM</TableHead>
+  )}
+  <TableHead className="w-[100px]">Deadline</TableHead>
+  <TableHead className="w-[80px]">Priority</TableHead>
+  <TableHead className="w-[70px] text-right">Progress</TableHead>
+  {/* PROJ-005-Client: No actions menu for clients */}
+  {!isClient && <TableHead className="w-[50px]"></TableHead>}
+  </TableRow>
           </TableHeader>
           <TableBody>
             {/* Update PROJ-005: Render grouped or ungrouped view */}
@@ -1535,7 +1389,8 @@ export default function ProjectsPage() {
                       className="bg-muted/70 hover:bg-muted cursor-pointer border-t-2 border-border"
                       onClick={() => toggleShowCollapse(group.show.id)}
                     >
-                      <TableCell colSpan={isClient ? 6 : 8} className="py-2">
+                      {/* Update 02: colspan updated for 3 separate columns (Show, Scene, Services) + other columns */}
+                      <TableCell colSpan={isClient ? 8 : 10} className="py-2">
                         <div className="flex items-center gap-2">
                           <ChevronDown className={cn(
                             "h-4 w-4 transition-transform",
@@ -1565,14 +1420,18 @@ export default function ProjectsPage() {
                           )}
                           onClick={() => router.push(`/projects/${project.id}`)}
                         >
-                          {/* Scene name only (Show is in section header) */}
+                          {/* Update 02: In grouped view, Show column is empty (header shows it), Scene and Services separate */}
                           <TableCell>
-                            <div className="pl-6">
-                              <p className="font-medium text-foreground">{project.name}</p>
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                {project.services.join(', ')}
-                              </p>
-                            </div>
+                            {/* Empty - Show is in section header */}
+                            <div className="pl-4 text-muted-foreground text-sm">—</div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-medium text-foreground">{project.name}</span>
+                          </TableCell>
+                          <TableCell>
+                            <p className="text-sm text-muted-foreground truncate max-w-[140px]" title={project.services.join(', ')}>
+                              {project.services.join(', ')}
+                            </p>
                           </TableCell>
                           {!isClient && (
                             <TableCell>
@@ -1664,12 +1523,6 @@ export default function ProjectsPage() {
                                         Duplicate Scene
                                       </DropdownMenuItem>
                                     )}
-                                    {!isArchived && (
-                                      <DropdownMenuItem onClick={() => handleSplitProject(project.id)}>
-                                        <Split className="mr-2 h-4 w-4" />
-                                        Split Scene
-                                      </DropdownMenuItem>
-                                    )}
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem 
                                       onClick={() => setArchiveDialog({ 
@@ -1733,21 +1586,22 @@ export default function ProjectsPage() {
                   )}
                   onClick={() => router.push(`/projects/${project.id}`)}
                 >
-                  {/* Update PROJ-005: Show > Scene display */}
+                  {/* Update 02: Show, Scene, and Services as three separate columns */}
                   <TableCell>
-                    <div>
-                      {/* Show breadcrumb */}
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground mb-0.5">
-                        <Film className="h-3 w-3" />
-                        <span>{getProjectShow(project)?.name || 'Unknown Show'}</span>
-                        <ChevronRight className="h-3 w-3" />
-                      </div>
-                      {/* Scene name */}
-                      <p className="font-medium text-foreground">{project.name}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {project.services.join(', ')}
-                      </p>
+                    <div className="flex items-center gap-1.5">
+                      <Film className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span className="text-sm font-medium truncate">{getProjectShow(project)?.name || 'Unknown Show'}</span>
                     </div>
+                  </TableCell>
+                  
+                  <TableCell>
+                    <span className="font-medium text-foreground">{project.name}</span>
+                  </TableCell>
+                  
+                  <TableCell>
+                    <p className="text-sm text-muted-foreground truncate max-w-[140px]" title={project.services.join(', ')}>
+                      {project.services.join(', ')}
+                    </p>
                   </TableCell>
                   
                   {/* Client - only for admin/PM */}
@@ -1855,14 +1709,6 @@ export default function ProjectsPage() {
                               <DropdownMenuItem onClick={() => handleDuplicateProject(project.id)}>
                                 <Copy className="mr-2 h-4 w-4" />
                                 Duplicate Project
-                              </DropdownMenuItem>
-                            )}
-                            
-                            {/* Split Project - available on any non-archived status (PROJ-013) */}
-                            {!isArchived && (
-                              <DropdownMenuItem onClick={() => handleSplitProject(project.id)}>
-                                <Split className="mr-2 h-4 w-4" />
-                                Split Project
                               </DropdownMenuItem>
                             )}
                             
@@ -2180,253 +2026,6 @@ export default function ProjectsPage() {
                 'Duplicate Project'
               )}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-      
-      {/* PROJ-013: Split Project (Series → Episodes) Dialog */}
-      <Dialog open={splitDialog.open} onOpenChange={(open) => { 
-        setSplitDialog(prev => ({ ...prev, open }))
-        if (!open) {
-          setSplitTotalEpisodes('')
-          setSplitPrefix('')
-          setSplitError('')
-          setIsSplitting(false)
-          setSplitProgress({ created: 0, total: 0 })
-        }
-      }}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Split &quot;{splitDialog.projectName}&quot; into a series?</DialogTitle>
-            <DialogDescription>
-              &quot;{splitDialog.projectName}&quot; will be treated as Episode 01. We&apos;ll create additional episode projects for the rest of the series — same client, services, vendors, and settings. You&apos;ll upload each episode&apos;s source video after the split.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-4">
-            {/* Total Episodes Input */}
-            <div className="space-y-2">
-              <Label htmlFor="split-total" className="text-sm font-medium">
-                Total episodes <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="split-total"
-                type="number"
-                min={2}
-                max={200}
-                value={splitTotalEpisodes}
-                onChange={(e) => {
-                  const val = e.target.value === '' ? '' : parseInt(e.target.value, 10)
-                  setSplitTotalEpisodes(val)
-                  setSplitError('')
-                }}
-                placeholder="e.g., 20"
-                disabled={isSplitting}
-              />
-              <p className="text-xs text-muted-foreground">
-                Total number of episodes in the series, including this one.
-              </p>
-              {splitTotalEpisodes !== '' && splitTotalEpisodes < 2 && (
-                <p className="text-xs text-destructive">Enter a total of 2 or more episodes.</p>
-              )}
-              {splitTotalEpisodes !== '' && splitTotalEpisodes > 200 && (
-                <p className="text-xs text-destructive">Total episodes too high — maximum is 200. For larger series, contact support.</p>
-              )}
-              {splitTotalEpisodes !== '' && splitTotalEpisodes > 50 && splitTotalEpisodes <= 200 && (
-                <div className="flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 p-2">
-                  <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <p className="text-xs text-amber-800">
-                    You&apos;re about to create {splitTotalEpisodes - 1} new projects. This may take a moment to process and will appear at the top of your project list.
-                  </p>
-                </div>
-              )}
-            </div>
-            
-            {/* Episode Name Prefix */}
-            <div className="space-y-2">
-              <Label htmlFor="split-prefix" className="text-sm font-medium">
-                Episode name prefix <span className="text-destructive">*</span>
-              </Label>
-              <Input
-                id="split-prefix"
-                value={splitPrefix}
-                onChange={(e) => {
-                  setSplitPrefix(e.target.value)
-                  setSplitError('')
-                }}
-                placeholder="e.g., Tehran"
-                disabled={isSplitting}
-              />
-              <p className="text-xs text-muted-foreground">
-                New episodes will be named {splitPrefix || '{prefix}'} E02, {splitPrefix || '{prefix}'} E03, …
-              </p>
-              {splitPrefix === '' && (
-                <p className="text-xs text-destructive">Episode name prefix is required.</p>
-              )}
-            </div>
-            
-            {/* Live Preview */}
-            {splitTotalEpisodes !== '' && splitTotalEpisodes >= 2 && splitTotalEpisodes <= 200 && splitPrefix.trim() && (
-              <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-2">
-                <p className="text-sm font-medium">Preview</p>
-                <p className="text-sm text-muted-foreground">
-                  This will create <span className="font-medium text-foreground">{splitTotalEpisodes - 1}</span> new projects:{' '}
-                  {(() => {
-                    const names = getEpisodeNames(splitPrefix, splitTotalEpisodes)
-                    if (names.length <= 5) {
-                      return <span className="font-medium text-foreground">{names.join(', ')}</span>
-                    }
-                    return (
-                      <span className="font-medium text-foreground">
-                        {names.slice(0, 3).join(', ')}, …, {names[names.length - 1]}
-                      </span>
-                    )
-                  })()}
-                </p>
-                <p className="text-xs text-muted-foreground mt-2">
-                  The original project ({splitDialog.projectName}) remains as Episode 01 — it is not modified or renamed.
-                </p>
-              </div>
-            )}
-            
-            {/* What will be copied summary */}
-            <div className="rounded-lg border border-border bg-muted/30 p-4 space-y-3">
-              <p className="text-sm font-medium">What each episode will inherit:</p>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Client</span>
-                  <span className="font-medium">{splitDialog.client}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Priority</span>
-                  <span className={cn(
-                    'rounded-full px-2 py-0.5 text-xs font-medium',
-                    getPriorityColor(splitDialog.priority)
-                  )}>
-                    {splitDialog.priority ? splitDialog.priority.charAt(0).toUpperCase() + splitDialog.priority.slice(1) : '-'}
-                  </span>
-                </div>
-                <div className="flex justify-between col-span-2">
-                  <span className="text-muted-foreground">PM</span>
-                  <span className="font-medium">{splitDialog.pm || '-'}</span>
-                </div>
-                <div className="col-span-2">
-                  <span className="text-muted-foreground block mb-1">Services + Language Pairs</span>
-                  <div className="flex flex-wrap gap-1">
-                    {splitDialog.services.map((service, idx) => (
-                      <span key={idx} className="text-xs px-2 py-0.5 bg-background rounded border border-border">
-                        {service}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <p className="text-xs text-muted-foreground mt-2">
-                Also copied: reference files, internal notes
-              </p>
-            </div>
-            
-            {/* Source files note */}
-            <p className="text-xs text-muted-foreground">
-              <strong>Note:</strong> Source files are not duplicated — you&apos;ll upload a video for each episode after the split.
-            </p>
-            
-            {/* Error message */}
-            {splitError && (
-              <div className="flex items-start gap-2 rounded-lg bg-red-50 border border-red-200 p-3">
-                <AlertTriangle className="h-4 w-4 text-red-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-red-800">{splitError}</p>
-              </div>
-            )}
-            
-            {/* Progress indicator */}
-            {isSplitting && splitProgress.total > 0 && !splitResult.show && (
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Creating episodes...</span>
-                  <span className="text-muted-foreground">{splitProgress.created} of {splitProgress.total}</span>
-                </div>
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <div 
-                    className="h-full bg-primary transition-all duration-150"
-                    style={{ width: `${(splitProgress.created / splitProgress.total) * 100}%` }}
-                  />
-                </div>
-              </div>
-            )}
-            
-            {/* Partial failure results screen */}
-            {splitResult.show && (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-3">
-                <div className="flex items-start gap-2">
-                  <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <p className="text-sm font-medium text-amber-900">
-                      {splitResult.created} of {splitResult.created + splitResult.failed} episodes created. {splitResult.failed} failed.
-                    </p>
-                    <p className="text-xs text-amber-800 mt-1">
-                      Failed episodes: {splitResult.failedEpisodes.map(n => `E${String(n).padStart(splitTotalEpisodes && splitTotalEpisodes > 99 ? 3 : 2, '0')}`).join(', ')}
-                    </p>
-                  </div>
-                </div>
-                <p className="text-xs text-amber-800">
-                  Successfully created episodes have been saved. You can retry the failed ones or close this dialog and retry later.
-                </p>
-              </div>
-            )}
-          </div>
-          
-          <DialogFooter>
-            {splitResult.show ? (
-              <>
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setSplitDialog(prev => ({ ...prev, open: false }))
-                    setSplitResult({ show: false, created: 0, failed: 0, failedEpisodes: [] })
-                    toast({
-                      title: `${splitResult.created} episodes created.`,
-                      description: `${splitResult.failed} failed. You can retry from the project list.`,
-                    })
-                    router.push('/projects')
-                  }}
-                >
-                  Close
-                </Button>
-                <Button onClick={handleRetryFailed}>
-                  Retry failed ({splitResult.failed})
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button 
-                  variant="outline" 
-                  onClick={() => setSplitDialog(prev => ({ ...prev, open: false }))}
-                  disabled={isSplitting}
-                >
-                  Cancel
-                </Button>
-                <Button 
-                  onClick={() => handleConfirmSplit()}
-                  disabled={
-                    !splitPrefix.trim() || 
-                    splitTotalEpisodes === '' || 
-                    splitTotalEpisodes < 2 || 
-                    splitTotalEpisodes > 200 || 
-                    isSplitting
-                  }
-                >
-              {isSplitting ? (
-                    <>
-                      <span className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
-                      Creating {splitProgress.total > 0 ? `${splitProgress.created} of ${splitProgress.total}` : '...'}
-                    </>
-                  ) : (
-                    'Split Project'
-                  )}
-                </Button>
-              </>
-            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
