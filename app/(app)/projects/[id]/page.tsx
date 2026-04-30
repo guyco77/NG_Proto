@@ -200,8 +200,22 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [isBulkAssigning, setIsBulkAssigning] = useState(false)
   const [localTaskUpdates, setLocalTaskUpdates] = useState<Record<string, { status?: string; assignedVendor?: string }>>({})
   
-  // Apply local updates to project tasks
-  const updatedProjectTasks = projectTasks.map(t => ({ ...t, ...localTaskUpdates[t.id] }))
+  // Quick assign dialog state for single task assignment from pipeline
+  const [showQuickAssignDialog, setShowQuickAssignDialog] = useState(false)
+  const [quickAssignTask, setQuickAssignTask] = useState<typeof projectTasks[0] | null>(null)
+  const [quickAssignVendorId, setQuickAssignVendorId] = useState<string | null>(null)
+  const [quickAssignSearchQuery, setQuickAssignSearchQuery] = useState('')
+  const [isQuickAssigning, setIsQuickAssigning] = useState(false)
+  
+  // Apply local updates to project tasks AND include new tasks from localTaskUpdates
+  const existingTaskIds = new Set(projectTasks.map(t => t.id))
+  const newTasks = Object.entries(localTaskUpdates)
+    .filter(([id]) => !existingTaskIds.has(id))
+    .map(([, task]) => task as typeof projectTasks[0])
+  const updatedProjectTasks = [
+    ...projectTasks.map(t => ({ ...t, ...localTaskUpdates[t.id] })),
+    ...newTasks
+  ]
   const selectedTasks = updatedProjectTasks.filter(t => selectedTaskIds.includes(t.id))
   const eligibleForAssign = selectedTasks.filter(t => t.status === 'unassigned')
   const ineligibleCount = selectedTasks.length - eligibleForAssign.length
@@ -585,12 +599,43 @@ const handleCancelEdit = () => {
     setBulkVendorSearchQuery('')
   }
 
-  const handleAddTask = () => {
-    if (!newTaskService) return
-    // Update PROJ-011: Use Show › Scene format in notification
+// Quick assign single task from pipeline
+  const handleOpenQuickAssignDialog = (task: typeof projectTasks[0]) => {
+    setQuickAssignTask(task)
+    setQuickAssignVendorId(null)
+    setQuickAssignSearchQuery('')
+    setShowQuickAssignDialog(true)
+  }
+  
+  const handleQuickAssignVendor = async () => {
+    if (!quickAssignTask || !quickAssignVendorId) return
+    setIsQuickAssigning(true)
+    await new Promise(r => setTimeout(r, 400))
+    
+    const vendor = mockVendors.find(v => v.id === quickAssignVendorId)
+    setLocalTaskUpdates(prev => ({
+      ...prev,
+      [quickAssignTask.id]: { status: 'assigned', assignedVendor: vendor?.name }
+    }))
+    
     toast({
-      title: 'Task Created',
-      description: `New ${newTaskService} task added to ${projectShow?.name} › ${project.name}.`,
+      title: `${vendor?.name} assigned`,
+      description: `Task "${quickAssignTask.name}" in ${projectShow?.name} › ${project.name}. Vendor notified.`,
+    })
+    
+    setIsQuickAssigning(false)
+    setShowQuickAssignDialog(false)
+    setQuickAssignTask(null)
+    setQuickAssignVendorId(null)
+    setQuickAssignSearchQuery('')
+  }
+  
+  const handleAddTask = () => {
+  if (!newTaskService) return
+  // Update PROJ-011: Use Show › Scene format in notification
+  toast({
+    title: 'Task Created',
+    description: `New ${newTaskService} task added to ${projectShow?.name} › ${project.name}.`,
     })
     setShowAddTaskDialog(false)
     setNewTaskService('')
@@ -1380,26 +1425,53 @@ const handleCancelEdit = () => {
                                 </TooltipProvider>
                               </div>
                             )}
+                            {/* Inline assign vendor button for unassigned tasks (Admin/PM only) */}
+                            {(isAdmin || isPM) && task.status === 'unassigned' && (
+                              <div className="absolute -left-3 top-1/2 -translate-y-1/2 z-20 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        size="icon"
+                                        variant="secondary"
+                                        className="h-6 w-6 rounded-full shadow-md border border-border"
+                                        onClick={(e) => {
+                                          e.preventDefault()
+                                          e.stopPropagation()
+                                          handleOpenQuickAssignDialog(task)
+                                        }}
+                                      >
+                                        <UserPlus className="h-3 w-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="left">
+                                      <p>Assign vendor</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            )}
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <Link href={`/tasks/${task.id}?from=project&projectId=${project.id}`}>
+                                    {/* Status colors: Unassigned/Draft = Grey, Assigned = Blue, In Progress = Orange, Done = Green */}
                                     <div className={cn(
                                       'relative flex flex-col items-center justify-center p-4 rounded-lg border-2 w-[120px] h-[120px] cursor-pointer transition-all hover:shadow-md',
-                                      task.status === 'completed' ? 'border-emerald-500 bg-emerald-50' :
-                                      task.status === 'in_progress' ? 'border-blue-500 bg-blue-50' :
+                                      task.status === 'completed' || task.status === 'complete' ? 'border-emerald-500 bg-emerald-50' :
+                                      task.status === 'in_progress' || task.status === 'submitted' ? 'border-orange-500 bg-orange-50' :
                                       task.status === 'review' ? 'border-purple-500 bg-purple-50' :
-                                      task.status === 'assigned' ? 'border-amber-500 bg-amber-50' :
+                                      task.status === 'assigned' ? 'border-blue-500 bg-blue-50' :
                                       'border-gray-200 bg-gray-50',
                                       selectedTaskIds.includes(task.id) && 'ring-2 ring-primary ring-offset-2'
                                     )}>
                                     {/* Type Icon */}
                                     <div className={cn(
                                       'flex h-8 w-8 items-center justify-center rounded-full text-sm',
-                                      task.status === 'completed' ? 'bg-emerald-500 text-white' :
-                                      task.status === 'in_progress' ? 'bg-blue-500 text-white' :
+                                      task.status === 'completed' || task.status === 'complete' ? 'bg-emerald-500 text-white' :
+                                      task.status === 'in_progress' || task.status === 'submitted' ? 'bg-orange-500 text-white' :
                                       task.status === 'review' ? 'bg-purple-500 text-white' :
-                                      task.status === 'assigned' ? 'bg-amber-500 text-white' :
+                                      task.status === 'assigned' ? 'bg-blue-500 text-white' :
                                       'bg-gray-300 text-gray-600'
                                     )}>
                                       {getTaskIcon(task.service)}
@@ -2868,6 +2940,103 @@ const handleCancelEdit = () => {
               disabled={!bulkSelectedVendorId || isBulkAssigning || eligibleForAssign.length === 0}
             >
               {isBulkAssigning ? 'Assigning...' : `Assign to ${eligibleForAssign.length} Tasks`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Quick Assign Dialog - single task assignment from pipeline */}
+      <Dialog open={showQuickAssignDialog} onOpenChange={(open) => {
+        setShowQuickAssignDialog(open)
+        if (!open) {
+          setQuickAssignTask(null)
+          setQuickAssignVendorId(null)
+          setQuickAssignSearchQuery('')
+        }
+      }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Assign Vendor</DialogTitle>
+            <DialogDescription>
+              {quickAssignTask && (
+                <>Assign a vendor to <strong>{quickAssignTask.name}</strong> ({quickAssignTask.sourceLanguage} → {quickAssignTask.targetLanguage})</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            {/* Search */}
+            <Input
+              placeholder="Search vendors..."
+              value={quickAssignSearchQuery}
+              onChange={(e) => setQuickAssignSearchQuery(e.target.value)}
+            />
+            
+            {/* Vendor List */}
+            <div className="max-h-64 overflow-y-auto space-y-2">
+              {mockVendors
+                .filter(v => v.name.toLowerCase().includes(quickAssignSearchQuery.toLowerCase()))
+                .sort((a, b) => {
+                  const availOrder = { available: 0, limited: 1, unavailable: 2 }
+                  const aOrder = availOrder[a.availability as keyof typeof availOrder] ?? 2
+                  const bOrder = availOrder[b.availability as keyof typeof availOrder] ?? 2
+                  if (aOrder !== bOrder) return aOrder - bOrder
+                  return (b.onTimeRate || 0) - (a.onTimeRate || 0)
+                })
+                .map((vendor) => {
+                  const isUnavailable = vendor.availability === 'unavailable'
+                  const availabilityIcon = vendor.availability === 'available' ? '🟢' : vendor.availability === 'limited' ? '🟡' : '🔴'
+                  
+                  return (
+                    <div
+                      key={vendor.id}
+                      onClick={() => !isUnavailable && setQuickAssignVendorId(vendor.id)}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
+                        quickAssignVendorId === vendor.id 
+                          ? "border-primary bg-primary/5" 
+                          : "border-border hover:border-primary/50",
+                        isUnavailable && "opacity-50 cursor-not-allowed hover:border-border"
+                      )}
+                    >
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                        <User className="h-5 w-5 text-primary" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{vendor.name}</span>
+                          <span title={`${vendor.availability}`}>{availabilityIcon}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          <p>{vendor.tasksDelivered || 0} tasks delivered, {vendor.onTimeRate || 95}% on-time</p>
+                        </div>
+                      </div>
+                      {quickAssignVendorId === vendor.id && (
+                        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                          <Check className="h-3 w-3" />
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              {mockVendors.filter(v => v.name.toLowerCase().includes(quickAssignSearchQuery.toLowerCase())).length === 0 && (
+                <p className="text-center text-sm text-muted-foreground py-4">No vendors found</p>
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setShowQuickAssignDialog(false)
+              setQuickAssignTask(null)
+              setQuickAssignVendorId(null)
+              setQuickAssignSearchQuery('')
+            }}>
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleQuickAssignVendor}
+              disabled={!quickAssignVendorId || isQuickAssigning}
+            >
+              {isQuickAssigning ? 'Assigning...' : 'Assign Vendor'}
             </Button>
           </DialogFooter>
         </DialogContent>
