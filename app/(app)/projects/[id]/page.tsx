@@ -1410,6 +1410,14 @@ const handleCancelEdit = () => {
                                         ? `${task.sourceLanguage} → ${task.targetLanguage}` 
                                         : task.targetLanguage || task.sourceLanguage || ''}
                                     </p>
+                                    {/* Update PROJ-001: "From creation" badge for pre-assigned vendors */}
+                                    {task.fromCreation && task.assignedVendor && (
+                                      <div className="absolute top-1 right-1">
+                                        <span className="text-[8px] bg-blue-100 text-blue-700 px-1 py-0.5 rounded font-medium">
+                                          From creation
+                                        </span>
+                                      </div>
+                                    )}
                                     {/* Assignee Badge - positioned at bottom with tooltip for full name */}
                                     <div className="absolute -bottom-3 left-1/2 -translate-x-1/2">
                                       <TooltipProvider>
