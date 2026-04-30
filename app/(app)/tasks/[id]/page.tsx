@@ -196,8 +196,42 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   }
 
   const handleStatusChange = (newStatus: TaskStatus) => {
+    const previousStatus = currentStatus
     setCurrentStatus(newStatus)
-    // In a real app, this would call an API
+    
+    // TASK-002: Audit logging - In production, this is recorded in the audit_log table
+    // with actor (userName), timestamp, task_id, previous_status, new_status
+    console.log('[Audit] Status transition:', {
+      taskId: task.id,
+      actor: userName,
+      timestamp: new Date().toISOString(),
+      previousStatus,
+      newStatus,
+    })
+    
+    // TASK-002: Notifications on key transitions
+    // In production, these trigger email + in-app notifications via notification service
+    const notificationMessages: Record<string, string> = {
+      'open_for_offers': 'Task posted to Offers Board. Matching vendors notified.',
+      'assigned': task.assignedVendor 
+        ? `${task.assignedVendor} has been notified of assignment.`
+        : 'Vendor assignment notification sent.',
+      'submitted': 'PM notified: Task submitted for review.',
+      'in_progress': previousStatus === 'submitted' 
+        ? 'Vendor notified: Task sent back for rework.'
+        : 'Task started.',
+      'complete': 'Task completed. PM notified.',
+      'unassigned': previousStatus === 'open_for_offers'
+        ? 'Offer withdrawn from board.'
+        : 'Task unassigned.',
+    }
+    
+    if (notificationMessages[newStatus]) {
+      toast({
+        title: `Status: ${newStatus.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}`,
+        description: notificationMessages[newStatus],
+      })
+    }
   }
 
   const handleDeleteTask = async () => {

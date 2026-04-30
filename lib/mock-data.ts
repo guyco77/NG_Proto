@@ -1347,13 +1347,14 @@ export function getStatusColor(status: string): string {
     draft: 'bg-muted text-muted-foreground',
     quoted: 'bg-amber-100 text-amber-800 border border-amber-200',
     approved: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
-    in_progress: 'bg-blue-100 text-blue-800 border border-blue-200',
+    in_progress: 'bg-yellow-100 text-yellow-800 border border-yellow-200', // Yellow per TASK-002 spec (shared with tasks)
     in_review: 'bg-purple-100 text-purple-800 border border-purple-200',
     delivered: 'bg-cyan-100 text-cyan-800 border border-cyan-200',
     invoiced: 'bg-indigo-100 text-indigo-800 border border-indigo-200',
     closed: 'bg-gray-100 text-gray-800 border border-gray-200',
     cancelled: 'bg-red-100 text-red-800 border border-red-200',
-    // Task statuses (TASK-002)
+    // Task statuses (TASK-002) - Note: in_progress uses project color (blue) above
+    // Task-specific statuses that don't conflict with project statuses:
     unassigned: 'bg-gray-100 text-gray-800 border border-gray-200',
     open_for_offers: 'bg-orange-100 text-orange-800 border border-orange-200',
     assigned: 'bg-blue-100 text-blue-800 border border-blue-200',
