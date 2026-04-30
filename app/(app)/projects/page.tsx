@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Plus,
   Search,
@@ -451,15 +451,19 @@ const CANCELLABLE_STATUSES = ['draft', 'quoted', 'approved', 'in_progress', 'in_
 export default function ProjectsPage() {
   const { toast } = useToast()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { currentRole } = useRole()
   
   // Role-based flags
   const isClient = currentRole === 'client_admin' || currentRole === 'task_owner' || currentRole === 'reviewer' || currentRole === 'viewer'
   const isClientAdmin = currentRole === 'client_admin'
   
+  // Read initial show filter from URL param (from Show breadcrumb click)
+  const initialShowFilter = searchParams.get('show')
+  
   // Filters
   const [searchQuery, setSearchQuery] = useState('')
-  const [showFilters, setShowFilters] = useState<string[]>([]) // Update PROJ-005: Show filter
+  const [showFilters, setShowFilters] = useState<string[]>(initialShowFilter ? [initialShowFilter] : []) // Update PROJ-005: Show filter
   const [statusFilters, setStatusFilters] = useState<string[]>([])
   const [serviceFilters, setServiceFilters] = useState<string[]>([])
   const [taskTypeFilters, setTaskTypeFilters] = useState<string[]>([])

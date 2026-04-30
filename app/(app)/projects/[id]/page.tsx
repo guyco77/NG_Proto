@@ -768,10 +768,11 @@ const handleCancelEdit = () => {
         <div className="flex items-start justify-between">
           <div>
             {/* Update PROJ-004: Show › Scene breadcrumb header */}
+            {/* Link navigates to projects list filtered by this Show */}
             <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
               <Film className="h-4 w-4" />
               <Link 
-                href={`/shows/${projectShow?.id}`} 
+                href={`/projects?show=${projectShow?.id}`} 
                 className="hover:text-foreground hover:underline transition-colors"
               >
                 {selectedShow?.name || projectShow?.name || 'Unknown Show'}
@@ -1042,12 +1043,12 @@ const handleCancelEdit = () => {
                           </PopoverContent>
                         </Popover>
                       ) : (
-                        <Link 
-                          href={`/shows/${projectShow?.id}`}
-                          className="text-sm font-medium hover:text-primary hover:underline transition-colors"
-                        >
-                          {projectShow?.name || '-'}
-                        </Link>
+<Link
+                    href={`/projects?show=${projectShow?.id}`}
+                    className="text-sm font-medium hover:text-primary hover:underline transition-colors"
+                  >
+                    {projectShow?.name || '-'}
+                  </Link>
                       )}
                     </div>
                     
