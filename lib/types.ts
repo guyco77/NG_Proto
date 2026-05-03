@@ -268,6 +268,9 @@ export interface Client {
   paymentTerms: PaymentTerms
   defaultCurrency: BillingCurrency
   taxDetails?: string
+  // Update-001: Client Discount (visible to Admin/PM/Finance only)
+  discountPercent?: number // 0-100, up to 2 decimal places
+  discountNotes?: string // internal context for the discount
   // Communication Preferences
   preferredChannel: 'email' | 'phone'
   notificationRecipients?: string[] // email addresses

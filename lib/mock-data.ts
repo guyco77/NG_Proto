@@ -614,6 +614,8 @@ export const mockClients: Client[] = [
     paymentTerms: 'net_30',
     defaultCurrency: 'USD',
     taxDetails: 'Tax Exempt - Media Production',
+    discountPercent: 10,
+    discountNotes: 'Long-term partner — 10% standing discount',
     preferredChannel: 'email',
     notificationRecipients: ['jsmith@netflix.com', 'dlee@netflix.com'],
     rateCard: [
@@ -638,6 +640,8 @@ export const mockClients: Client[] = [
     billingAddress: '500 S Buena Vista St, Burbank, CA 91521, USA',
     paymentTerms: 'net_45',
     defaultCurrency: 'USD',
+    discountPercent: 5,
+    discountNotes: 'Volume discount for multi-series contracts',
     preferredChannel: 'email',
     rateCard: [
       { serviceType: 'Dubbing with AI Transcript', rate: 800, currency: 'USD' },

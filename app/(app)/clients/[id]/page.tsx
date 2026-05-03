@@ -103,6 +103,9 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
     paymentTerms: client.paymentTerms,
     defaultCurrency: client.defaultCurrency,
     taxDetails: client.taxDetails || '',
+    // Update-001: Client Discount fields
+    discountPercent: client.discountPercent ?? 0,
+    discountNotes: client.discountNotes || '',
     preferredChannel: client.preferredChannel,
     internalNotes: client.internalNotes || '',
     rateCard: [...client.rateCard],
@@ -565,6 +568,42 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                         onChange={(e) => setEditForm({ ...editForm, taxDetails: e.target.value })}
                       />
                     </div>
+                    {/* Update-001: Client Discount - Admin/PM only */}
+                    {(isAdmin || isPM) && (
+                      <div className="border-t pt-4 mt-4">
+                        <p className="text-sm font-medium mb-3">Client Discount</p>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Discount (%)</label>
+                            <Input
+                              type="number"
+                              min={0}
+                              max={100}
+                              step={0.01}
+                              value={editForm.discountPercent}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value)
+                                if (!isNaN(val) && val >= 0 && val <= 100) {
+                                  setEditForm({ ...editForm, discountPercent: val })
+                                } else if (e.target.value === '') {
+                                  setEditForm({ ...editForm, discountPercent: 0 })
+                                }
+                              }}
+                              placeholder="0"
+                            />
+                            <p className="text-xs text-muted-foreground">0–100, applied to new quotes</p>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-sm font-medium">Discount Notes</label>
+                            <Input
+                              value={editForm.discountNotes}
+                              onChange={(e) => setEditForm({ ...editForm, discountNotes: e.target.value })}
+                              placeholder="e.g. Long-term partner — 10% standing discount"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </>
                 ) : (
                   <>
@@ -583,6 +622,19 @@ export default function ClientDetailPage({ params }: { params: Promise<{ id: str
                     </div>
                     {client.taxDetails && (
                       <p className="text-sm text-muted-foreground">{client.taxDetails}</p>
+                    )}
+                    {/* Update-001: Client Discount display - Admin/PM/Finance only */}
+                    {(isAdmin || isPM || isFinance) && (client.discountPercent ?? 0) > 0 && (
+                      <div className="border-t pt-3 mt-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium text-primary">
+                            {client.discountPercent}% Discount
+                          </span>
+                        </div>
+                        {client.discountNotes && (
+                          <p className="text-xs text-muted-foreground mt-1">{client.discountNotes}</p>
+                        )}
+                      </div>
                     )}
                   </>
                 )}
