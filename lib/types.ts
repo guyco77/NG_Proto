@@ -243,9 +243,15 @@ export interface ClientContact {
   id: string
   name: string
   email: string
-  phone?: string
+  // Update-003: Phone with country code (E.164 format)
+  phoneCountryCode?: string // e.g. '+972', '+1', '+44'
+  phoneNumber?: string // local number without country code
+  phone?: string // DEPRECATED: legacy field, use phoneCountryCode + phoneNumber
   role?: string // role/department at the client company
   isPrimary: boolean
+  // Update-003: Per-contact communication preferences
+  preferredChannel?: 'email' | 'phone' | 'whatsapp'
+  receiveNotifications?: boolean
 }
 
 export interface ClientRateCard {

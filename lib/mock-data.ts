@@ -1665,6 +1665,10 @@ export function getStatusColor(status: string): string {
     inactive: 'bg-muted text-muted-foreground',
     active: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
     on_hold: 'bg-amber-100 text-amber-800 border border-amber-200',
+    // Update-004: Show statuses
+    not_started: 'bg-gray-100 text-gray-600 border border-gray-200',
+    blocked: 'bg-red-100 text-red-800 border border-red-200',
+    done: 'bg-emerald-100 text-emerald-800 border border-emerald-200',
   }
   return colors[status] || 'bg-muted text-muted-foreground'
 }
