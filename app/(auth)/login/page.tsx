@@ -100,7 +100,7 @@ export default function LoginPage() {
                       </Link>
                     </div>
                     <InputGroup>
-                      <InputGroupAddon>
+                      <InputGroupAddon align="inline-start">
                         <Lock className="h-4 w-4 text-muted-foreground" />
                       </InputGroupAddon>
                       <InputGroupInput
@@ -115,7 +115,8 @@ export default function LoginPage() {
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="text-muted-foreground hover:text-foreground"
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                          aria-label={showPassword ? 'Hide password' : 'Show password'}
                         >
                           {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
