@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import Link from 'next/link'
 import {
   Search,
   Plus,
@@ -10,11 +11,15 @@ import {
   AlertCircle,
   DollarSign,
   Settings,
+  GripVertical,
+  ExternalLink,
+  ShieldCheck,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { Badge } from '@/components/ui/badge'
 import {
   Select,
   SelectContent,
@@ -48,6 +53,23 @@ const CURRENCIES: { value: BillingCurrency; label: string }[] = [
 ]
 
 /**
+ * Update-002: Task Types from the Task Types sub-tab (Update-003)
+ * These are sourced from the Task Types management and used for workflow step types.
+ */
+const TASK_TYPES_FROM_TAB = [
+  { id: 'tt-1', code: 'TRN', name: 'Transcription', isHumanOnly: true },
+  { id: 'tt-2', code: 'QC', name: 'Quality Control', isHumanOnly: true },
+  { id: 'tt-3', code: 'SUB', name: 'Subtitling', isHumanOnly: false },
+  { id: 'tt-4', code: 'TRL', name: 'Translation', isHumanOnly: true },
+  { id: 'tt-5', code: 'QC2', name: 'QC Level 2', isHumanOnly: true },
+  { id: 'tt-6', code: 'ENG', name: 'Engineering', isHumanOnly: false },
+  { id: 'tt-7', code: 'MIX', name: 'Audio Mix', isHumanOnly: true },
+  { id: 'tt-8', code: 'DUB', name: 'Dubbing', isHumanOnly: true },
+  { id: 'tt-9', code: 'ADR', name: 'ADR Recording', isHumanOnly: true },
+  { id: 'tt-10', code: 'RVW', name: 'Review', isHumanOnly: false },
+]
+
+/**
  * Update-002: Services Sub-Tab
  * 
  * Manages service definitions with workflow steps.
@@ -63,6 +85,9 @@ export function ServicesTab() {
   const [isCreatingNew, setIsCreatingNew] = useState(false)
   const [confirmArchiveId, setConfirmArchiveId] = useState<string | null>(null)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  
+  // Update-002: Drag-to-reorder state
+  const [draggedStepId, setDraggedStepId] = useState<string | null>(null)
 
   // Group services by category
   const servicesByCategory = useMemo(() => {
@@ -181,11 +206,14 @@ export function ServicesTab() {
   // Workflow step management
   const handleAddStep = () => {
     if (!editingService) return
+    // Update-002: Default to first Task Type from the Task Types sub-tab
+    const defaultTaskType = TASK_TYPES_FROM_TAB[0]
     const newStep: WorkflowStep = {
       id: `step-${Date.now()}`,
       name: '',
-      type: 'other',
+      type: defaultTaskType?.code || 'TRN',
       order: editingService.workflow.length + 1,
+      isHumanOnly: defaultTaskType?.isHumanOnly || false,
     }
     setEditingService({
       ...editingService,
@@ -196,8 +224,9 @@ export function ServicesTab() {
 
   const handleUpdateStep = (stepId: string, updates: Partial<WorkflowStep>) => {
     if (!editingService) return
-    const stepType = WORKFLOW_STEP_TYPES.find((t) => t.value === (updates.type || ''))
-    const isHumanOnly = stepType?.isHumanOnly || false
+    // Update-002: Source isHumanOnly from Task Types sub-tab data
+    const taskType = TASK_TYPES_FROM_TAB.find((t) => t.code === (updates.type || ''))
+    const isHumanOnly = taskType?.isHumanOnly || false
     setEditingService({
       ...editingService,
       workflow: editingService.workflow.map((s) =>
@@ -216,6 +245,35 @@ export function ServicesTab() {
         .map((s, i) => ({ ...s, order: i + 1 })),
     })
     setHasUnsavedChanges(true)
+  }
+  
+  // Update-002: Drag-to-reorder workflow steps
+  const handleDragStart = (stepId: string) => {
+    setDraggedStepId(stepId)
+  }
+  
+  const handleDragOver = (e: React.DragEvent, targetStepId: string) => {
+    e.preventDefault()
+    if (!editingService || !draggedStepId || draggedStepId === targetStepId) return
+    
+    const draggedIndex = editingService.workflow.findIndex((s) => s.id === draggedStepId)
+    const targetIndex = editingService.workflow.findIndex((s) => s.id === targetStepId)
+    
+    if (draggedIndex === -1 || targetIndex === -1) return
+    
+    const newWorkflow = [...editingService.workflow]
+    const [draggedItem] = newWorkflow.splice(draggedIndex, 1)
+    newWorkflow.splice(targetIndex, 0, draggedItem)
+    
+    // Update order numbers
+    const reorderedWorkflow = newWorkflow.map((s, i) => ({ ...s, order: i + 1 }))
+    
+    setEditingService({ ...editingService, workflow: reorderedWorkflow })
+    setHasUnsavedChanges(true)
+  }
+  
+  const handleDragEnd = () => {
+    setDraggedStepId(null)
   }
 
   const displayService = editingService || selectedService
@@ -373,6 +431,7 @@ export function ServicesTab() {
                   </div>
                 </div>
 
+                {/* Update-002: Pricing fields are read-only; owned by Pricing sub-tab */}
                 <div className="grid grid-cols-3 gap-4">
                   <div>
                     <Label htmlFor="pricing">Pricing Model</Label>
@@ -397,78 +456,66 @@ export function ServicesTab() {
                     </Select>
                   </div>
                   <div>
-                    <Label htmlFor="rate">Default Base Rate</Label>
-                    <input
-                      id="rate"
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={editingService?.defaultBaseRate ?? displayService.defaultBaseRate}
-                      onChange={(e) =>
-                        editingService &&
-                        setEditingService({
-                          ...editingService,
-                          defaultBaseRate: parseFloat(e.target.value) || 0,
-                        })
-                      }
-                      disabled={!editingService}
-                      className="mt-1 h-9 w-full rounded-lg border border-input bg-background px-3 text-sm disabled:bg-muted disabled:cursor-not-allowed"
-                    />
+                    <Label htmlFor="rate" className="flex items-center gap-1">
+                      Default Base Rate
+                      <span className="text-xs text-muted-foreground">(read-only)</span>
+                    </Label>
+                    <div className="mt-1 h-9 w-full rounded-lg border border-input bg-muted px-3 flex items-center text-sm">
+                      {displayService.defaultBaseRate.toFixed(2)}
+                    </div>
                   </div>
                   <div>
-                    <Label htmlFor="currency">Currency</Label>
-                    <Select
-                      value={editingService?.rateCurrency ?? displayService.rateCurrency}
-                      onValueChange={(v) =>
-                        editingService &&
-                        setEditingService({ ...editingService, rateCurrency: v as BillingCurrency })
-                      }
-                      disabled={!editingService}
-                    >
-                      <SelectTrigger id="currency" className="mt-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {CURRENCIES.map((c) => (
-                          <SelectItem key={c.value} value={c.value}>
-                            {c.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Label htmlFor="currency" className="flex items-center gap-1">
+                      Currency
+                      <span className="text-xs text-muted-foreground">(read-only)</span>
+                    </Label>
+                    <div className="mt-1 h-9 w-full rounded-lg border border-input bg-muted px-3 flex items-center text-sm">
+                      {displayService.rateCurrency}
+                    </div>
+                  </div>
+                </div>
+                
+                {/* Update-002: Cross-link to Pricing tab */}
+                <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-start gap-2">
+                      <DollarSign className="h-4 w-4 mt-0.5 text-primary" />
+                      <div className="text-sm">
+                        <p className="font-medium">Pricing is managed in the Pricing tab</p>
+                        <p className="text-muted-foreground">
+                          Base rates, currencies, and rate notes are configured centrally.
+                        </p>
+                      </div>
+                    </div>
+                    <Link href="/settings/service-configuration?tab=pricing">
+                      <Button variant="outline" size="sm" className="gap-1">
+                        Go to Pricing
+                        <ExternalLink className="h-3 w-3" />
+                      </Button>
+                    </Link>
                   </div>
                 </div>
 
-                <div>
-                  <Label htmlFor="notes">Rate Notes (optional)</Label>
-                  <Textarea
-                    id="notes"
-                    value={editingService?.rateNotes ?? displayService.rateNotes ?? ''}
-                    onChange={(e) =>
-                      editingService &&
-                      setEditingService({ ...editingService, rateNotes: e.target.value })
-                    }
-                    disabled={!editingService}
-                    placeholder="Additional pricing notes..."
-                    className="mt-1"
-                    rows={2}
-                  />
-                </div>
-
-                {/* Translation Language Overrides Note */}
+                {/* Update-002: Translation Language Overrides - cross-link to Pricing tab */}
                 {(editingService?.category === 'translation' ||
                   displayService.category === 'translation') && (
                   <div className="p-3 bg-muted rounded-lg">
-                    <div className="flex items-start gap-2">
-                      <DollarSign className="h-4 w-4 mt-0.5 text-muted-foreground" />
-                      <div className="text-sm">
-                        <p className="font-medium">Translation Language Overrides</p>
-                        <p className="text-muted-foreground">
-                          Language-pair pricing is configured in the Pricing tab.
-                          When a project has source/target languages defined, the rate card will
-                          override the default base rate.
-                        </p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-start gap-2">
+                        <DollarSign className="h-4 w-4 mt-0.5 text-muted-foreground" />
+                        <div className="text-sm">
+                          <p className="font-medium">Translation Language Overrides</p>
+                          <p className="text-muted-foreground">
+                            Language-pair pricing is configured in the Translation Rate Card.
+                          </p>
+                        </div>
                       </div>
+                      <Link href="/settings/service-configuration?tab=pricing">
+                        <Button variant="ghost" size="sm" className="gap-1 text-primary">
+                          View Rate Card
+                          <ExternalLink className="h-3 w-3" />
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 )}
@@ -492,63 +539,99 @@ export function ServicesTab() {
                 )}
               </CardHeader>
               <CardContent>
+                {/* Update-002: Workflow steps with drag-to-reorder and Human only badges */}
                 {displayService.workflow.length === 0 ? (
                   <div className="py-8 text-center text-sm text-muted-foreground">
                     No workflow steps defined. {editingService && 'Click "Add Step" to create one.'}
                   </div>
                 ) : (
                   <div className="space-y-3">
-                    {(editingService?.workflow || displayService.workflow).map((step, idx) => (
-                      <div
-                        key={step.id}
-                        className="flex items-center gap-3 p-3 border border-border rounded-lg"
-                      >
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-medium">
-                          {idx + 1}
-                        </span>
-                        {editingService ? (
-                          <>
-                            <input
-                              type="text"
-                              value={step.name}
-                              onChange={(e) => handleUpdateStep(step.id, { name: e.target.value })}
-                              placeholder="Step name"
-                              className="h-8 flex-1 rounded border border-input bg-background px-2 text-sm"
-                            />
-                            <Select
-                              value={step.type}
-                              onValueChange={(v) => handleUpdateStep(step.id, { type: v as WorkflowStep['type'] })}
-                            >
-                              <SelectTrigger className="h-8 w-40">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {WORKFLOW_STEP_TYPES.map((t) => (
-                                  <SelectItem key={t.value} value={t.value}>
-                                    {t.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                              onClick={() => handleRemoveStep(step.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        ) : (
-                          <>
-                            <span className="flex-1 text-sm font-medium">{step.name}</span>
-                            <span className="text-xs text-muted-foreground capitalize">
-                              {WORKFLOW_STEP_TYPES.find((t) => t.value === step.type)?.label || step.type}
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    ))}
+                    {(editingService?.workflow || displayService.workflow).map((step, idx) => {
+                      const taskType = TASK_TYPES_FROM_TAB.find((t) => t.code === step.type)
+                      const isQCStep = step.type === 'QC' || step.type === 'QC2'
+                      const isHumanOnly = taskType?.isHumanOnly || isQCStep
+                      
+                      return (
+                        <div
+                          key={step.id}
+                          draggable={!!editingService}
+                          onDragStart={() => editingService && handleDragStart(step.id)}
+                          onDragOver={(e) => editingService && handleDragOver(e, step.id)}
+                          onDragEnd={handleDragEnd}
+                          className={`flex items-center gap-3 p-3 border border-border rounded-lg transition-all ${
+                            editingService ? 'cursor-grab active:cursor-grabbing' : ''
+                          } ${draggedStepId === step.id ? 'opacity-50 border-dashed' : ''}`}
+                        >
+                          {editingService && (
+                            <GripVertical className="h-4 w-4 text-muted-foreground shrink-0" />
+                          )}
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-muted text-xs font-medium shrink-0">
+                            {idx + 1}
+                          </span>
+                          {editingService ? (
+                            <>
+                              <input
+                                type="text"
+                                value={step.name}
+                                onChange={(e) => handleUpdateStep(step.id, { name: e.target.value })}
+                                placeholder="Step name"
+                                className="h-8 flex-1 rounded border border-input bg-background px-2 text-sm"
+                              />
+                              {/* Update-002: Step types sourced from Task Types sub-tab */}
+                              <Select
+                                value={step.type}
+                                onValueChange={(v) => handleUpdateStep(step.id, { type: v as WorkflowStep['type'] })}
+                              >
+                                <SelectTrigger className="h-8 w-40">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {TASK_TYPES_FROM_TAB.map((t) => (
+                                    <SelectItem key={t.code} value={t.code}>
+                                      <span className="flex items-center gap-2">
+                                        {t.name}
+                                        {t.isHumanOnly && (
+                                          <ShieldCheck className="h-3 w-3 text-amber-600" />
+                                        )}
+                                      </span>
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                              {/* Update-002: Human only badge (non-editable) */}
+                              {isHumanOnly && (
+                                <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50 shrink-0">
+                                  <ShieldCheck className="h-3 w-3 mr-1" />
+                                  Human only
+                                </Badge>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-destructive shrink-0"
+                                onClick={() => handleRemoveStep(step.id)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          ) : (
+                            <>
+                              <span className="flex-1 text-sm font-medium">{step.name}</span>
+                              <span className="text-xs text-muted-foreground">
+                                {taskType?.name || step.type}
+                              </span>
+                              {/* Update-002: Human only badge in read mode */}
+                              {isHumanOnly && (
+                                <Badge variant="outline" className="text-amber-600 border-amber-300 bg-amber-50">
+                                  <ShieldCheck className="h-3 w-3 mr-1" />
+                                  Human only
+                                </Badge>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )}
               </CardContent>
