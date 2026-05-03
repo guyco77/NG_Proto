@@ -701,7 +701,7 @@ const handleInviteMember = async () => {
                     </div>
                   ))
                 ) : (
-                  {/* Update-003: Contact display with per-contact preferences */}
+                  /* Update-003: Contact display with per-contact preferences */
                   client.contacts.map((contact) => (
                     <div key={contact.id} className="space-y-2 p-3 border rounded-lg">
                       <div className="flex items-center gap-2">
