@@ -44,10 +44,10 @@ const settingsLinks: SettingsLink[] = [
     roles: ['admin', 'pm'],
   },
   {
-    href: '/settings/project-templates',
+    href: '/settings/templates',
     icon: FileStack,
-    title: 'Project Templates',
-    description: 'Create and manage reusable project configurations',
+    title: 'Templates',
+    description: 'Create and manage reusable project templates with workflow and vendor assignments',
     roles: ['admin', 'pm'],
   },
   {
