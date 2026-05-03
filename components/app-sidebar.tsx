@@ -74,7 +74,7 @@ const NAV_VISIBILITY: Record<string, UserRole[]> = {
   '/settings/profile': ['admin', 'pm', 'client', 'vendor', 'finance', 'it'], // SET-005: All roles
   '/settings/notifications': ['admin', 'pm', 'client', 'vendor', 'finance', 'it'], // SET-007: All roles
   '/settings/company': ['admin'], // SET-001: Admin only
-  '/settings/services': ['admin', 'pm'], // SET-002/SERV-001: Admin, PM
+  '/settings/service-configuration': ['admin', 'pm'], // SET-002/SERV-001: Admin, PM
   '/settings/billing': ['admin', 'finance'], // SET-006: Admin, Finance
   '/settings/editor-integration': ['admin', 'it'], // SET-003: Admin, IT
   '/settings/email-templates': ['admin'], // SET-004: Admin only
@@ -93,7 +93,7 @@ function canSeeSettings(role: UserRole): boolean {
     canSee('/settings/profile', role) ||
     canSee('/settings/notifications', role) ||
     canSee('/settings/company', role) ||
-    canSee('/settings/services', role) ||
+    canSee('/settings/service-configuration', role) ||
     canSee('/settings/billing', role) ||
     canSee('/settings/editor-integration', role) ||
     canSee('/settings/email-templates', role) ||
@@ -118,7 +118,7 @@ const settingsNavItems = [
   { href: '/settings/profile', label: 'My Profile', icon: User },
   { href: '/settings/notifications', label: 'Notifications', icon: Bell },
   { href: '/settings/company', label: 'Company', icon: Building2 },
-  { href: '/settings/services', label: 'Services', icon: FileText },
+  { href: '/settings/service-configuration', label: 'Service Config', icon: FileText },
   { href: '/settings/billing', label: 'Billing', icon: CreditCard },
   { href: '/settings/editor-integration', label: 'Editor', icon: Plug },
   { href: '/settings/email-templates', label: 'Email Templates', icon: Mail },
