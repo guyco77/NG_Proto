@@ -47,6 +47,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { Progress } from '@/components/ui/progress'
 import { mockVendors, mockTasks, mockVendorPayments, VENDOR_AVAILABILITY_OPTIONS, LANGUAGE_PAIRS, formatCurrency, formatDate } from '@/lib/mock-data'
 import { useRole } from '../../layout'
@@ -300,6 +306,7 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
                   Edit
                 </Button>
               )}
+              {/* UPDATE-005: Archive Vendor with tooltip for disabled state */}
               {canArchive && (
                 isArchived ? (
                   <Button onClick={() => setReactivateDialogOpen(true)}>
@@ -307,14 +314,27 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
                     Reactivate Vendor
                   </Button>
                 ) : (
-                  <Button 
-                    variant="outline" 
-                    onClick={handleArchive}
-                    disabled={activeTasks.length > 0}
-                  >
-                    <Archive className="mr-2 h-4 w-4" />
-                    Archive
-                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button 
+                            variant="outline" 
+                            onClick={handleArchive}
+                            disabled={activeTasks.length > 0}
+                          >
+                            <Archive className="mr-2 h-4 w-4" />
+                            Archive Vendor
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {activeTasks.length > 0 && (
+                        <TooltipContent>
+                          <p>Complete or reassign all tasks before archiving.</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 )
               )}
             </>

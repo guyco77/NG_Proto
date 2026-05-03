@@ -259,8 +259,9 @@ export default function VendorsPage() {
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Vendor Name
                   </th>
+                  {/* UPDATE-001: Renamed from "Services" */}
                   <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Services
+                    Task Types
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Availability
@@ -268,9 +269,7 @@ export default function VendorsPage() {
                   <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Active Tasks
                   </th>
-                  <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    On-Time %
-                  </th>
+                  {/* UPDATE-001: Removed On-Time % column */}
                   <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
                     Actions
                   </th>
@@ -342,19 +341,7 @@ export default function VendorsPage() {
                           {activeTasksCount}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        {vendor.tasksDelivered > 0 ? (
-                          <span className={cn(
-                            'text-sm font-medium',
-                            vendor.onTimeRate >= 95 ? 'text-green-600' :
-                            vendor.onTimeRate >= 85 ? 'text-amber-600' : 'text-red-600'
-                          )}>
-                            {vendor.onTimeRate}%
-                          </span>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">—</span>
-                        )}
-                      </td>
+                      {/* UPDATE-001: Removed On-Time % column */}
                       <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
