@@ -231,7 +231,7 @@ export interface VendorPayment {
   period?: string // YYYY-MM for monthly payments
   createdAt: string
   paidAt?: string
-  mekanoSyncError?: string // flag if Mekano failed
+  meckanoSyncError?: string // flag if Meckano failed
 }
 
 // CLIENT-001: Client Profile
@@ -243,9 +243,15 @@ export interface ClientContact {
   id: string
   name: string
   email: string
-  phone?: string
+  // Update-003: Phone with country code (E.164 format)
+  phoneCountryCode?: string // e.g. '+972', '+1', '+44'
+  phoneNumber?: string // local number without country code
+  phone?: string // DEPRECATED: legacy field, use phoneCountryCode + phoneNumber
   role?: string // role/department at the client company
   isPrimary: boolean
+  // Update-003: Per-contact communication preferences
+  preferredChannel?: 'email' | 'phone' | 'whatsapp'
+  receiveNotifications?: boolean
 }
 
 export interface ClientRateCard {
@@ -268,6 +274,9 @@ export interface Client {
   paymentTerms: PaymentTerms
   defaultCurrency: BillingCurrency
   taxDetails?: string
+  // Update-001: Client Discount (visible to Admin/PM/Finance only)
+  discountPercent?: number // 0-100, up to 2 decimal places
+  discountNotes?: string // internal context for the discount
   // Communication Preferences
   preferredChannel: 'email' | 'phone'
   notificationRecipients?: string[] // email addresses

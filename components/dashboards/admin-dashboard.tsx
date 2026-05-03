@@ -43,14 +43,14 @@ const billingFlags = [
 
 // Mock activity feed - only workspace events, no auth events
 const activityFeed = [
-  { id: 'a1', type: 'project_created', actor: 'Noa PM', target: 'Breaking News Coverage', time: '10 min ago' },
+  { id: 'a1', type: 'show_created', actor: 'Noa PM', target: 'Breaking News Coverage', time: '10 min ago' },
   { id: 'a2', type: 'task_completed', actor: 'Carlos R.', target: 'Translation (PT)', time: '1h ago' },
   { id: 'a3', type: 'quote_sent', actor: 'System', target: 'Q-2024-042', time: '2h ago' },
   { id: 'a4', type: 'invoice_paid', actor: 'Acme Corp', target: 'INV-2024-089', time: '3h ago' },
   { id: 'a5', type: 'vendor_payable_approved', actor: 'Finance', target: 'Maria Garcia', time: '5h ago' },
   { id: 'a6', type: 'task_assigned', actor: 'Noa PM', target: 'Subtitling ES', time: '6h ago' },
   { id: 'a7', type: 'quote_approved', actor: 'Netflix Inc.', target: 'Q-2024-041', time: '8h ago' },
-  { id: 'a8', type: 'project_status_changed', actor: 'System', target: 'HBO Max Documentary', time: '12h ago' },
+  { id: 'a8', type: 'show_status_changed', actor: 'System', target: 'HBO Max Documentary', time: '12h ago' },
   { id: 'a9', type: 'user_role_changed', actor: 'Admin', target: 'Lisa Translator', time: '1d ago' },
   { id: 'a10', type: 'invoice_sent', actor: 'Finance', target: 'INV-2024-092', time: '1d ago' },
 ]
@@ -107,7 +107,7 @@ export function AdminDashboard() {
           <Link href="/projects/new" prefetch={true}>
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
-              New Project
+              New Show
             </Button>
           </Link>
         </div>
@@ -121,7 +121,7 @@ export function AdminDashboard() {
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              Active Projects
+              Active Shows
               <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                 {activeProjects.length}
               </span>
@@ -188,7 +188,7 @@ export function AdminDashboard() {
                             <Link href={`/projects/${project.id}`}>View Details</Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
-                            <Link href={`/projects/${project.id}`}>Edit Project</Link>
+                            <Link href={`/projects/${project.id}`}>Edit Show</Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
                             <Link href={`/tasks?project=${project.id}`}>View Tasks</Link>

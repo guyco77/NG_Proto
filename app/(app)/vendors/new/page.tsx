@@ -58,10 +58,29 @@ export default function NewVendorPage() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [phone, setPhone] = useState('')
+  const [whatsapp, setWhatsapp] = useState('')
   const [timezone, setTimezone] = useState('')
   const [location, setLocation] = useState('')
+  // UPDATE-003: Legal/Tax details
+  const [taxId, setTaxId] = useState('')
+  const [invoicingEntity, setInvoicingEntity] = useState('')
+  const [taxCountry, setTaxCountry] = useState('')
+  // Payment method details
   const [paymentMethod, setPaymentMethod] = useState<string>('')
   const [paymentDetails, setPaymentDetails] = useState('')
+  // Bank transfer specific fields
+  const [bankName, setBankName] = useState('')
+  const [accountHolder, setAccountHolder] = useState('')
+  const [accountNumber, setAccountNumber] = useState('')
+  const [swiftBic, setSwiftBic] = useState('')
+  const [bankBranch, setBankBranch] = useState('')
+  const [accountCurrency, setAccountCurrency] = useState('USD')
+  // Payoneer specific fields
+  const [payoneerEmail, setPayoneerEmail] = useState('')
+  // Other payment method
+  const [otherPaymentMethod, setOtherPaymentMethod] = useState('')
+  const [otherPaymentDetails, setOtherPaymentDetails] = useState('')
+  // Internal notes
   const [internalNotes, setInternalNotes] = useState('')
   
   // Service types (multi-select via checkboxes)
@@ -199,9 +218,10 @@ export default function NewVendorPage() {
                 />
               </div>
             </div>
+            {/* UPDATE-003: Separate Phone and WhatsApp fields */}
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="phone">Phone / WhatsApp</Label>
+                <Label htmlFor="phone">Phone</Label>
                 <Input
                   id="phone"
                   value={phone}
@@ -209,6 +229,17 @@ export default function NewVendorPage() {
                   placeholder="+1 555 123 4567"
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp">WhatsApp</Label>
+                <Input
+                  id="whatsapp"
+                  value={whatsapp}
+                  onChange={(e) => setWhatsapp(e.target.value)}
+                  placeholder="+1 555 123 4567"
+                />
+              </div>
+            </div>
+            <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="timezone">Timezone</Label>
                 <Input
@@ -218,14 +249,53 @@ export default function NewVendorPage() {
                   placeholder="e.g. America/New_York"
                 />
               </div>
+              <div className="space-y-2">
+                <Label htmlFor="location">Location / Address</Label>
+                <Input
+                  id="location"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="City, Country"
+                />
+              </div>
+            </div>
+            </CardContent>
+        </Card>
+
+        {/* UPDATE-003: Legal / Tax Details */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Legal / Tax Details (Optional)</CardTitle>
+            <CardDescription>Information needed to legally issue payment to the vendor</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="taxId">Tax ID / VAT Number</Label>
+                <Input
+                  id="taxId"
+                  value={taxId}
+                  onChange={(e) => setTaxId(e.target.value)}
+                  placeholder="e.g. 123-45-6789"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="invoicingEntity">Invoicing Entity Name</Label>
+                <Input
+                  id="invoicingEntity"
+                  value={invoicingEntity}
+                  onChange={(e) => setInvoicingEntity(e.target.value)}
+                  placeholder="Business or personal name"
+                />
+              </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="location">Location / Address</Label>
+              <Label htmlFor="taxCountry">Country of Tax Residence</Label>
               <Input
-                id="location"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="City, Country"
+                id="taxCountry"
+                value={taxCountry}
+                onChange={(e) => setTaxCountry(e.target.value)}
+                placeholder="e.g. United States"
               />
             </div>
           </CardContent>
@@ -389,35 +459,129 @@ export default function NewVendorPage() {
           </CardContent>
         </Card>
 
-        {/* Payment Method */}
+        {/* UPDATE-003: Payment Method with detailed fields */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Payment Method (Optional)</CardTitle>
             <CardDescription>How the vendor will receive payments</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label>Payment Method</Label>
-                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select method" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="payoneer">Payoneer</SelectItem>
-                    <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Account Details</Label>
-                <Input
-                  value={paymentDetails}
-                  onChange={(e) => setPaymentDetails(e.target.value)}
-                  placeholder="Enter account details"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>Payment Method</Label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select method" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bank_transfer">Bank Transfer</SelectItem>
+                  <SelectItem value="payoneer">Payoneer</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+            
+            {/* Bank Transfer Fields */}
+            {paymentMethod === 'bank_transfer' && (
+              <div className="space-y-4 pt-2 border-t">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Bank Name</Label>
+                    <Input
+                      value={bankName}
+                      onChange={(e) => setBankName(e.target.value)}
+                      placeholder="e.g. Chase Bank"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Account Holder Name</Label>
+                    <Input
+                      value={accountHolder}
+                      onChange={(e) => setAccountHolder(e.target.value)}
+                      placeholder="Name on account"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Account Number / IBAN</Label>
+                    <Input
+                      value={accountNumber}
+                      onChange={(e) => setAccountNumber(e.target.value)}
+                      placeholder="Account number or IBAN"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>SWIFT / BIC</Label>
+                    <Input
+                      value={swiftBic}
+                      onChange={(e) => setSwiftBic(e.target.value)}
+                      placeholder="e.g. CHASUS33"
+                    />
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label>Branch</Label>
+                    <Input
+                      value={bankBranch}
+                      onChange={(e) => setBankBranch(e.target.value)}
+                      placeholder="Branch name or code"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Account Currency</Label>
+                    <Select value={accountCurrency} onValueChange={setAccountCurrency}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="USD">USD</SelectItem>
+                        <SelectItem value="EUR">EUR</SelectItem>
+                        <SelectItem value="ILS">ILS</SelectItem>
+                        <SelectItem value="GBP">GBP</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {/* Payoneer Fields */}
+            {paymentMethod === 'payoneer' && (
+              <div className="space-y-4 pt-2 border-t">
+                <div className="space-y-2">
+                  <Label>Payoneer Email / Account ID</Label>
+                  <Input
+                    value={payoneerEmail}
+                    onChange={(e) => setPayoneerEmail(e.target.value)}
+                    placeholder="email@example.com"
+                  />
+                </div>
+              </div>
+            )}
+            
+            {/* Other Payment Method */}
+            {paymentMethod === 'other' && (
+              <div className="space-y-4 pt-2 border-t">
+                <div className="space-y-2">
+                  <Label>Payment Method Name</Label>
+                  <Input
+                    value={otherPaymentMethod}
+                    onChange={(e) => setOtherPaymentMethod(e.target.value)}
+                    placeholder="e.g. Wise, Paypal, Crypto"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Payment Details</Label>
+                  <Textarea
+                    value={otherPaymentDetails}
+                    onChange={(e) => setOtherPaymentDetails(e.target.value)}
+                    placeholder="Enter payment details..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

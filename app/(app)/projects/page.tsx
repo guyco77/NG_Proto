@@ -910,11 +910,11 @@ export default function ProjectsPage() {
       {/* Page Header */}
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          {/* PROJ-005-Client: "My Projects" for clients, "Projects" for admin/PM */}
-          <h1 className="text-2xl font-semibold text-foreground">{isClient ? 'My Projects' : 'Projects'}</h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {filteredProjects.length} of {projects.length} projects
-          </p>
+{/* Update-001: "My Shows" for clients, "Shows" for admin/PM */}
+            <h1 className="text-2xl font-semibold text-foreground">{isClient ? 'My Shows' : 'Shows'}</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {filteredProjects.length} of {projects.length} shows
+            </p>
         </div>
 {/* PROJ-005-Client: + New Project only visible to Client Admin (or admin/PM) */}
   {/* PROJ-013: Admin/PM see modal with template option; Client Admin goes directly to wizard */}
@@ -923,17 +923,17 @@ export default function ProjectsPage() {
   {isClient ? (
     // Client Admin: Direct link to wizard (no template option)
     <Link href="/projects/new" prefetch={true}>
-      <Button className="gap-1.5">
-        <Plus className="h-4 w-4" />
-        New Project
-      </Button>
-    </Link>
-  ) : (
-    // Admin/PM: Open New Project Modal with template option
-    <Button className="gap-1.5" onClick={() => setShowNewProjectModal(true)}>
-      <Plus className="h-4 w-4" />
-      New Project
-    </Button>
+<Button className="gap-1.5">
+                  <Plus className="h-4 w-4" />
+                  New Show
+                </Button>
+              </Link>
+            ) : (
+              // Admin/PM: Open New Show Modal with template option
+              <Button className="gap-1.5" onClick={() => setShowNewProjectModal(true)}>
+                <Plus className="h-4 w-4" />
+                New Show
+              </Button>
   )}
   </div>
   )}
@@ -1772,9 +1772,9 @@ export default function ProjectsPage() {
                 ? (searchQuery ? "No projects match your search." : "No projects match these filters.")
                 : isClient 
                   ? (isClientAdmin 
-                      ? "You don't have any projects yet. Click + New Project to create one."
-                      : "You don't have any projects yet. Your Client Admin will create projects for your team.")
-                  : "No projects yet"}
+? "You don't have any shows yet. Click + New Show to create one."
+                  : "You don't have any shows yet. Your Client Admin will create shows for your team.")
+                : "No shows yet"}
             </p>
             {(searchQuery || activeFilterCount > 0) ? (
               <Button variant="outline" className="mt-4" onClick={clearAllFilters}>
@@ -1784,7 +1784,7 @@ export default function ProjectsPage() {
               <Link href="/projects/new" prefetch={true}>
                 <Button className="mt-4 gap-1.5">
                   <Plus className="h-4 w-4" />
-                  {isClient ? 'New Project' : 'Create First Project'}
+                  {isClient ? 'New Show' : 'Create First Show'}
                 </Button>
               </Link>
             ) : null}
@@ -1796,7 +1796,7 @@ export default function ProjectsPage() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredProjects.length)} of {filteredProjects.length} projects
+            Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1} to {Math.min(currentPage * ITEMS_PER_PAGE, filteredProjects.length)} of {filteredProjects.length} shows
           </p>
           <div className="flex items-center gap-2">
             <Button

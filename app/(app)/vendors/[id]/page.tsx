@@ -22,6 +22,9 @@ import {
   TrendingUp,
   BarChart3,
   FileText,
+  Upload,
+  Eye,
+  Filter,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -44,6 +47,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { Progress } from '@/components/ui/progress'
 import { mockVendors, mockTasks, mockVendorPayments, VENDOR_AVAILABILITY_OPTIONS, LANGUAGE_PAIRS, formatCurrency, formatDate } from '@/lib/mock-data'
 import { useRole } from '../../layout'
@@ -78,6 +87,14 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
   const [blackoutEndDate, setBlackoutEndDate] = useState('')
   const [blackoutNotes, setBlackoutNotes] = useState('')
   
+  // UPDATE-006 & UPDATE-007: Vendor payment view with receipt upload
+  const [paymentStatusFilter, setPaymentStatusFilter] = useState<'all' | 'pending' | 'paid'>('all')
+  const [paymentPeriodFilter, setPaymentPeriodFilter] = useState<string>('all')
+  const [showUploadReceiptDialog, setShowUploadReceiptDialog] = useState(false)
+  const [selectedPaymentForUpload, setSelectedPaymentForUpload] = useState<string | null>(null)
+  const [showPaymentDetailDialog, setShowPaymentDetailDialog] = useState(false)
+  const [selectedPaymentForDetail, setSelectedPaymentForDetail] = useState<typeof vendorPayments[0] | null>(null)
+  
   // Edit form state
   const [editForm, setEditForm] = useState({
     name: vendor.name,
@@ -96,6 +113,7 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
   const isAdmin = currentRole === 'admin'
   const isPM = currentRole === 'pm'
   const isFinance = currentRole === 'finance'
+  const isVendor = currentRole === 'vendor' // UPDATE-006: Vendor role viewing their own data
   const canEdit = isAdmin || isPM
   const canArchive = isAdmin
   const isArchived = vendor.status === 'archived'
@@ -112,6 +130,27 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
   const vendorPayments = useMemo(() => {
     return mockVendorPayments.filter(p => p.vendorId === vendor.id)
   }, [vendor.id])
+  
+  // UPDATE-006: Get unique payment periods for filter
+  const paymentPeriods = useMemo(() => {
+    const periods = new Set<string>()
+    vendorPayments.forEach(p => {
+      if (p.period) periods.add(p.period)
+    })
+    return Array.from(periods).sort().reverse()
+  }, [vendorPayments])
+  
+  // UPDATE-006: Filtered payments for vendor view
+  const filteredVendorPayments = useMemo(() => {
+    let filtered = [...vendorPayments]
+    if (paymentStatusFilter !== 'all') {
+      filtered = filtered.filter(p => p.status === paymentStatusFilter)
+    }
+    if (paymentPeriodFilter !== 'all') {
+      filtered = filtered.filter(p => p.period === paymentPeriodFilter)
+    }
+    return filtered
+  }, [vendorPayments, paymentStatusFilter, paymentPeriodFilter])
 
   const handleSave = () => {
     toast({
@@ -166,6 +205,27 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
     setReactivateDialogOpen(false)
   }
 
+  // UPDATE-007: Handle receipt/invoice upload
+  const handleOpenUploadReceipt = (paymentId: string) => {
+    setSelectedPaymentForUpload(paymentId)
+    setShowUploadReceiptDialog(true)
+  }
+  
+  const handleUploadReceipt = () => {
+    toast({
+      title: 'Receipt uploaded',
+      description: 'Your invoice/receipt has been attached to the payment record.',
+    })
+    setShowUploadReceiptDialog(false)
+    setSelectedPaymentForUpload(null)
+  }
+  
+  // UPDATE-006: Open payment detail dialog
+  const handleViewPaymentDetail = (payment: typeof vendorPayments[0]) => {
+    setSelectedPaymentForDetail(payment)
+    setShowPaymentDetailDialog(true)
+  }
+  
   // VENDOR-002: Add blackout period
   const handleAddBlackout = () => {
     if (!blackoutStartDate || !blackoutEndDate) {
@@ -246,6 +306,7 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
                   Edit
                 </Button>
               )}
+              {/* UPDATE-005: Archive Vendor with tooltip for disabled state */}
               {canArchive && (
                 isArchived ? (
                   <Button onClick={() => setReactivateDialogOpen(true)}>
@@ -253,14 +314,27 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
                     Reactivate Vendor
                   </Button>
                 ) : (
-                  <Button 
-                    variant="outline" 
-                    onClick={handleArchive}
-                    disabled={activeTasks.length > 0}
-                  >
-                    <Archive className="mr-2 h-4 w-4" />
-                    Archive
-                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <Button 
+                            variant="outline" 
+                            onClick={handleArchive}
+                            disabled={activeTasks.length > 0}
+                          >
+                            <Archive className="mr-2 h-4 w-4" />
+                            Archive Vendor
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {activeTasks.length > 0 && (
+                        <TooltipContent>
+                          <p>Complete or reassign all tasks before archiving.</p>
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 )
               )}
             </>
@@ -762,32 +836,66 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
           </Card>
         </TabsContent>
 
-        {/* Payment History Tab */}
+        {/* Payment History Tab - UPDATE-006 & UPDATE-007 */}
         <TabsContent value="payments">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Payment History</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-base">{isVendor ? 'My Payments' : 'Payment History'}</CardTitle>
+              {/* UPDATE-006: Filters for vendor view */}
+              <div className="flex items-center gap-2">
+                <Select value={paymentStatusFilter} onValueChange={(v) => setPaymentStatusFilter(v as typeof paymentStatusFilter)}>
+                  <SelectTrigger className="w-[120px] h-8">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="paid">Paid</SelectItem>
+                  </SelectContent>
+                </Select>
+                {paymentPeriods.length > 0 && (
+                  <Select value={paymentPeriodFilter} onValueChange={setPaymentPeriodFilter}>
+                    <SelectTrigger className="w-[120px] h-8">
+                      <SelectValue placeholder="Period" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Periods</SelectItem>
+                      {paymentPeriods.map(period => (
+                        <SelectItem key={period} value={period}>{period}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
             </CardHeader>
             <CardContent className="px-6 pb-6 pt-2">
-              {vendorPayments.length > 0 ? (
+              {filteredVendorPayments.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border">
-                        <th className="px-4 py-2 text-left font-medium text-muted-foreground">Task / Period</th>
-                        <th className="px-4 py-2 text-left font-medium text-muted-foreground">Type</th>
+                        {/* UPDATE-006: Vendor View columns: task, project, amount, status, date */}
+                        <th className="px-4 py-2 text-left font-medium text-muted-foreground">Task</th>
+                        <th className="px-4 py-2 text-left font-medium text-muted-foreground">Project</th>
                         <th className="px-4 py-2 text-right font-medium text-muted-foreground">Amount</th>
                         <th className="px-4 py-2 text-left font-medium text-muted-foreground">Status</th>
                         <th className="px-4 py-2 text-left font-medium text-muted-foreground">Date</th>
+                        <th className="px-4 py-2 text-left font-medium text-muted-foreground">Actions</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {vendorPayments.map(payment => (
+                      {filteredVendorPayments.map(payment => (
                         <tr key={payment.id} className="hover:bg-muted/30">
                           <td className="px-4 py-2">
                             {payment.taskName || payment.period || '—'}
                           </td>
-                          <td className="px-4 py-2 capitalize">{payment.rateType.replace('_', ' ')}</td>
+                          <td className="px-4 py-2">
+                            {payment.projectName ? (
+                              <Link href={`/projects/${payment.projectId}`} className="text-primary hover:underline">
+                                {payment.projectName}
+                              </Link>
+                            ) : '—'}
+                          </td>
                           <td className="px-4 py-2 text-right font-medium">
                             {payment.currency} {payment.amount.toLocaleString()}
                           </td>
@@ -802,13 +910,37 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
                           <td className="px-4 py-2 text-muted-foreground">
                             {formatDate(payment.paidAt || payment.createdAt)}
                           </td>
+                          <td className="px-4 py-2">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2"
+                                onClick={() => handleViewPaymentDetail(payment)}
+                              >
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              {/* UPDATE-007: Upload receipt for paid payments */}
+                              {payment.status === 'paid' && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-7 px-2 gap-1"
+                                  onClick={() => handleOpenUploadReceipt(payment.id)}
+                                >
+                                  <Upload className="h-4 w-4" />
+                                  <span className="hidden sm:inline">Upload Receipt</span>
+                                </Button>
+                              )}
+                            </div>
+                          </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
               ) : (
-                <p className="text-sm text-muted-foreground">No payment records yet.</p>
+                <p className="text-sm text-muted-foreground">No payment records found.</p>
               )}
             </CardContent>
           </Card>
@@ -895,6 +1027,96 @@ export default function VendorDetailPage({ params }: { params: Promise<{ id: str
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowBlackoutDialog(false)}>Cancel</Button>
             <Button onClick={handleAddBlackout}>Add Blackout Period</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* UPDATE-006: Payment Detail Dialog */}
+      <Dialog open={showPaymentDetailDialog} onOpenChange={setShowPaymentDetailDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Payment Details</DialogTitle>
+          </DialogHeader>
+          {selectedPaymentForDetail && (
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Task</p>
+                  <p className="font-medium">{selectedPaymentForDetail.taskName || selectedPaymentForDetail.period || '—'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Project</p>
+                  <p className="font-medium">{selectedPaymentForDetail.projectName || '—'}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Amount</p>
+                  <p className="font-semibold text-lg">{selectedPaymentForDetail.currency} {selectedPaymentForDetail.amount.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <span className={cn(
+                    'rounded px-2 py-0.5 text-xs font-medium',
+                    selectedPaymentForDetail.status === 'paid' ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                  )}>
+                    {selectedPaymentForDetail.status}
+                  </span>
+                </div>
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Date</p>
+                <p className="font-medium">{formatDate(selectedPaymentForDetail.paidAt || selectedPaymentForDetail.createdAt)}</p>
+              </div>
+              {/* UPDATE-007: Upload receipt button in detail view */}
+              {selectedPaymentForDetail.status === 'paid' && (
+                <div className="pt-4 border-t">
+                  <Button 
+                    className="w-full gap-2" 
+                    onClick={() => {
+                      setShowPaymentDetailDialog(false)
+                      handleOpenUploadReceipt(selectedPaymentForDetail.id)
+                    }}
+                  >
+                    <Upload className="h-4 w-4" />
+                    Upload Invoice/Receipt
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowPaymentDetailDialog(false)}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      
+      {/* UPDATE-007: Upload Receipt/Invoice Dialog */}
+      <Dialog open={showUploadReceiptDialog} onOpenChange={setShowUploadReceiptDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload Invoice/Receipt</DialogTitle>
+            <DialogDescription>
+              Attach your invoice or receipt for this payment. This helps with record keeping.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="receiptFile">Invoice/Receipt File</Label>
+              <Input
+                id="receiptFile"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+              />
+              <p className="text-xs text-muted-foreground">Accepted formats: PDF, JPG, PNG</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowUploadReceiptDialog(false)}>Cancel</Button>
+            <Button onClick={handleUploadReceipt}>
+              <Upload className="mr-2 h-4 w-4" />
+              Upload
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

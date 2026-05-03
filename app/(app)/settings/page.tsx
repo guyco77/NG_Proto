@@ -1,6 +1,6 @@
 'use client'
 
-import { Building2, Server, Mail, User, CreditCard, Bell, ChevronRight, FileText, FileStack } from 'lucide-react'
+import { Building2, Server, Mail, User, CreditCard, Bell, ChevronRight, FileText, FileStack, ListChecks } from 'lucide-react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { useRole } from '../layout'
@@ -39,22 +39,29 @@ const settingsLinks: SettingsLink[] = [
   {
     href: '/settings/services',
     icon: FileText,
-    title: 'Services Catalog',
-    description: 'Manage service definitions, workflows, and pricing',
+    title: 'Services',
+    description: 'Manage service definitions, default workflows, and pricing rate cards',
     roles: ['admin', 'pm'],
   },
   {
-    href: '/settings/project-templates',
+    href: '/settings/task-types',
+    icon: ListChecks,
+    title: 'Task Types',
+    description: 'Define task types for Admin/PM and Client workflows',
+    roles: ['admin', 'pm'],
+  },
+  {
+    href: '/settings/templates',
     icon: FileStack,
-    title: 'Project Templates',
-    description: 'Create and manage reusable project configurations',
+    title: 'Templates',
+    description: 'Create reusable project templates with workflows and vendor assignments',
     roles: ['admin', 'pm'],
   },
   {
     href: '/settings/billing',
     icon: CreditCard,
     title: 'Billing Settings',
-    description: 'iCount and Mekano API credentials, payment terms',
+    description: 'iCount and Meckano API credentials, payment terms',
     roles: ['admin', 'finance'],
   },
   {

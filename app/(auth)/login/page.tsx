@@ -111,7 +111,7 @@ export default function LoginPage() {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                       />
-                      <InputGroupAddon>
+                      <InputGroupAddon align="inline-end">
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}

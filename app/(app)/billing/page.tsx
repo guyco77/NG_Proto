@@ -101,6 +101,19 @@ export default function BillingPage() {
   const [dateRangeOpen, setDateRangeOpen] = useState(false)
   const [dateRange, setDateRange] = useState<{ from: string; to: string }>({ from: '', to: '' })
   const pageSize = 25
+  
+  // UPDATE-002: Local invoice list state for optimistic UI
+  const [localInvoices, setLocalInvoices] = useState<Invoice[]>(mockInvoices)
+  const [highlightedInvoiceId, setHighlightedInvoiceId] = useState<string | null>(null)
+  
+  // Upload form state
+  const [uploadForm, setUploadForm] = useState({
+    invoiceNumber: '',
+    amount: '',
+    currency: 'USD' as 'ILS' | 'USD' | 'EUR',
+    dueDate: '',
+    clientId: '',
+  })
 
   const isAdmin = currentRole === 'admin'
   const isFinance = currentRole === 'finance'
@@ -108,9 +121,9 @@ export default function BillingPage() {
   const canManageInvoices = isAdmin || isFinance
   const canMarkSent = isAdmin || isPM
 
-  // Filter invoices
+  // Filter invoices - UPDATE-002: Use localInvoices for optimistic UI
   const filteredInvoices = useMemo(() => {
-    let filtered = [...mockInvoices]
+    let filtered = [...localInvoices]
     if (statusFilter !== 'all') {
       filtered = filtered.filter((i) => i.status === statusFilter)
     }
@@ -128,14 +141,14 @@ export default function BillingPage() {
       filtered = filtered.filter((i) => i.dueDate <= dateRange.to)
     }
     return filtered
-  }, [statusFilter, clientFilter, currencyFilter, dateRange])
+  }, [localInvoices, statusFilter, clientFilter, currencyFilter, dateRange])
 
   // Pagination
   const paginatedInvoices = filteredInvoices.slice((currentPage - 1) * pageSize, currentPage * pageSize)
   const totalPages = Math.ceil(filteredInvoices.length / pageSize)
 
-  // Unique clients for filter
-  const clients = Array.from(new Map(mockInvoices.map((i) => [i.clientId, { id: i.clientId, name: i.clientName }])).values())
+  // Unique clients for filter - use mockClients for complete list
+  const clients = mockClients.map(c => ({ id: c.id, name: c.displayName }))
 
   // Handle iCount sync
   const handleSyncFromICount = async () => {
@@ -149,12 +162,55 @@ export default function BillingPage() {
     })
   }
 
-  // Handle manual upload
+  // Handle manual upload - UPDATE-002: Add to local state for immediate display
   const handleUpload = () => {
+    if (!uploadForm.clientId || !uploadForm.invoiceNumber || !uploadForm.amount) {
+      toast({
+        title: 'Missing required fields',
+        description: 'Please fill in all required fields.',
+        variant: 'destructive',
+      })
+      return
+    }
+    
+    const selectedClient = mockClients.find(c => c.id === uploadForm.clientId)
+    const newInvoiceId = `inv-new-${Date.now()}`
+    
+    // Create new invoice record
+    const newInvoice: Invoice = {
+      id: newInvoiceId,
+      invoiceNumber: uploadForm.invoiceNumber,
+      clientId: uploadForm.clientId,
+      clientName: selectedClient?.displayName || 'Unknown Client',
+      projectId: '',
+      projectName: '-',
+      amount: parseFloat(uploadForm.amount) || 0,
+      currency: uploadForm.currency,
+      status: 'draft',
+      dueDate: uploadForm.dueDate || new Date().toISOString().split('T')[0],
+      createdAt: new Date().toISOString(),
+    }
+    
+    // Add to top of list
+    setLocalInvoices(prev => [newInvoice, ...prev])
+    setHighlightedInvoiceId(newInvoiceId)
+    
+    // Clear highlight after animation
+    setTimeout(() => setHighlightedInvoiceId(null), 2000)
+    
+    // Reset form and close dialog
     setShowUploadDialog(false)
+    setUploadForm({
+      invoiceNumber: '',
+      amount: '',
+      currency: 'USD',
+      dueDate: '',
+      clientId: '',
+    })
+    
     toast({
       title: 'Invoice uploaded',
-      description: 'Invoice has been stored successfully.',
+      description: `Invoice ${uploadForm.invoiceNumber} has been stored successfully.`,
     })
   }
 
@@ -398,9 +454,10 @@ export default function BillingPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    {/* UPDATE-003: Renamed Project to Show */}
                     <TableHead>Invoice #</TableHead>
                     <TableHead>Client</TableHead>
-                    <TableHead>Project</TableHead>
+                    <TableHead>Show</TableHead>
                     <TableHead>Amount</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Due Date</TableHead>
@@ -417,7 +474,12 @@ export default function BillingPage() {
                     </TableRow>
                   ) : (
                     paginatedInvoices.map((invoice) => (
-                      <TableRow key={invoice.id}>
+                      <TableRow 
+                        key={invoice.id}
+                        className={cn(
+                          highlightedInvoiceId === invoice.id && 'bg-primary/10 animate-pulse'
+                        )}
+                      >
                         <TableCell>
                           <Link 
                             href={`/billing/invoices/${invoice.id}`}
@@ -563,18 +625,30 @@ export default function BillingPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Invoice Number</Label>
-                <Input placeholder="INV-2024-XXX" />
+                <Label>Invoice Number *</Label>
+                <Input 
+                  placeholder="INV-2024-XXX" 
+                  value={uploadForm.invoiceNumber}
+                  onChange={(e) => setUploadForm(prev => ({ ...prev, invoiceNumber: e.target.value }))}
+                />
               </div>
               <div className="space-y-2">
-                <Label>Amount</Label>
-                <Input type="number" placeholder="0.00" />
+                <Label>Amount *</Label>
+                <Input 
+                  type="number" 
+                  placeholder="0.00" 
+                  value={uploadForm.amount}
+                  onChange={(e) => setUploadForm(prev => ({ ...prev, amount: e.target.value }))}
+                />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Currency</Label>
-                <Select defaultValue="USD">
+                <Select 
+                  value={uploadForm.currency}
+                  onValueChange={(value: 'ILS' | 'USD' | 'EUR') => setUploadForm(prev => ({ ...prev, currency: value }))}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -587,19 +661,26 @@ export default function BillingPage() {
               </div>
               <div className="space-y-2">
                 <Label>Due Date</Label>
-                <Input type="date" />
+                <Input 
+                  type="date" 
+                  value={uploadForm.dueDate}
+                  onChange={(e) => setUploadForm(prev => ({ ...prev, dueDate: e.target.value }))}
+                />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Client</Label>
-              <Select>
+              <Label>Client *</Label>
+              <Select 
+                value={uploadForm.clientId}
+                onValueChange={(value) => setUploadForm(prev => ({ ...prev, clientId: value }))}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select client" />
                 </SelectTrigger>
                 <SelectContent>
                   {mockClients.map((client) => (
                     <SelectItem key={client.id} value={client.id}>
-                      {client.name}
+                      {client.displayName}
                     </SelectItem>
                   ))}
                 </SelectContent>

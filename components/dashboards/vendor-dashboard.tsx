@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import {
   ListTodo,
@@ -17,12 +17,23 @@ import {
   Mic,
   Languages,
   FileText,
+  CalendarDays,
 } from 'lucide-react'
 import { OpenInEditorButton } from '@/components/open-in-editor-button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { StatsCard } from '@/components/stats-card'
 import { StatusBadge } from '@/components/status-badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import {
   mockTasks,
   mockVendorPayables,
@@ -32,6 +43,15 @@ import {
 import { cn } from '@/lib/utils'
 import { useToast } from '@/hooks/use-toast'
 import { DashboardRefresh } from '@/components/dashboard-refresh'
+
+// UPDATE-004: Period filter options
+const PERIOD_OPTIONS = [
+  { value: '30', label: 'Last 30 days' },
+  { value: '90', label: 'Last 90 days' },
+  { value: '365', label: 'Last year' },
+  { value: 'all', label: 'All time' },
+  { value: 'custom', label: 'Custom' },
+]
 
 // Task type icon configuration
 const taskTypeIcons: Record<string, React.ElementType> = {
@@ -45,7 +65,7 @@ const taskTypeIcons: Record<string, React.ElementType> = {
 interface NewlyAcceptedAssignment {
   id: string
   name: string
-  projectName: string
+  showName: string
   taskType: string
   languagePair: string
   dueDate: string
@@ -58,6 +78,12 @@ export function VendorDashboard() {
   const [animatingOutId, setAnimatingOutId] = useState<string | null>(null)
   const [newlyAcceptedAssignments, setNewlyAcceptedAssignments] = useState<NewlyAcceptedAssignment[]>([])
   const { toast } = useToast()
+  
+  // UPDATE-004: Period filter state
+  const [periodFilter, setPeriodFilter] = useState('30')
+  const [customStartDate, setCustomStartDate] = useState('')
+  const [customEndDate, setCustomEndDate] = useState('')
+  const [showCustomDatePicker, setShowCustomDatePicker] = useState(false)
 
   const handleAcceptOffer = async (offer: typeof taskOffers[0]) => {
     setAcceptingId(offer.id)
@@ -75,7 +101,7 @@ export function VendorDashboard() {
       const newAssignment: NewlyAcceptedAssignment = {
         id: `new-${offer.id}`,
         name: `${offer.type} — ${offer.languagePair}`,
-        projectName: offer.project,
+        showName: offer.project,
         taskType: offer.type,
         languagePair: offer.languagePair,
         dueDate: offer.deadline,
@@ -122,7 +148,7 @@ export function VendorDashboard() {
     { 
       id: 'extra1', 
       name: 'Episode 12 — The Final Chapter', 
-      projectName: 'Dark Matter S2', 
+      showName: 'Dark Matter S2', 
       service: 'Translation',
       sourceLanguage: 'EN',
       targetLanguage: 'ES',
@@ -132,7 +158,7 @@ export function VendorDashboard() {
     { 
       id: 'extra2', 
       name: 'Episode 5 — New Horizons', 
-      projectName: 'Space Explorers', 
+      showName: 'Space Explorers', 
       service: 'Review',
       sourceLanguage: 'EN',
       targetLanguage: 'FR',
@@ -142,7 +168,7 @@ export function VendorDashboard() {
     { 
       id: 'extra3', 
       name: 'Trailer — Summer Campaign', 
-      projectName: 'Brand Launch 2026', 
+      showName: 'Brand Launch 2026', 
       service: 'Transcription',
       sourceLanguage: 'EN',
       targetLanguage: null,
@@ -191,24 +217,85 @@ return (
   <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
     <div>
       <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
-      <p className="text-sm text-muted-foreground mt-1">Your assignments and earnings</p>
+      <p className="text-sm text-muted-foreground mt-1">Your tasks and earnings</p>
     </div>
-    <DashboardRefresh />
+    <div className="flex items-center gap-3 mt-4 sm:mt-0">
+      {/* UPDATE-004: Period filter */}
+      <Popover open={showCustomDatePicker} onOpenChange={setShowCustomDatePicker}>
+        <Select 
+          value={periodFilter} 
+          onValueChange={(value) => {
+            if (value === 'custom') {
+              setShowCustomDatePicker(true)
+            } else {
+              setPeriodFilter(value)
+            }
+          }}
+        >
+          <SelectTrigger className="w-[160px]">
+            <CalendarDays className="h-4 w-4 mr-2 text-muted-foreground" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PERIOD_OPTIONS.map(opt => (
+              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <PopoverContent className="w-80" align="end">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Start Date</Label>
+              <Input
+                type="date"
+                value={customStartDate}
+                onChange={(e) => setCustomStartDate(e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>End Date</Label>
+              <Input
+                type="date"
+                value={customEndDate}
+                onChange={(e) => setCustomEndDate(e.target.value)}
+              />
+            </div>
+            <Button 
+              className="w-full" 
+              onClick={() => {
+                setPeriodFilter('custom')
+                setShowCustomDatePicker(false)
+              }}
+              disabled={!customStartDate || !customEndDate}
+            >
+              Apply Range
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+      <DashboardRefresh />
+    </div>
   </div>
 
   {/* Stats */}
   <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <StatsCard
-          title="Task Offers"
-          value={visibleOffers.length}
-          icon={Inbox}
-          iconColor="text-primary"
-        />
-        <StatsCard
-          title="Open Assignments"
-          value={allOpenAssignments.length + newlyAcceptedAssignments.length}
-          icon={Clock}
-        />
+        {/* UPDATE-004: Clickable card linking to Task Offers page */}
+        <Link href="/task-offers">
+          <StatsCard
+            title="Task Offers"
+            value={visibleOffers.length}
+            icon={Inbox}
+            iconColor="text-primary"
+          />
+        </Link>
+        {/* UPDATE-004: Clickable card linking to My Tasks */}
+        <Link href="/tasks">
+          <StatsCard
+            title="Open Tasks"
+            value={allOpenAssignments.length + newlyAcceptedAssignments.length}
+            icon={Clock}
+          />
+        </Link>
         <StatsCard
           title="Due This Week"
           value={dueThisWeek.length}
@@ -225,10 +312,10 @@ return (
 
       {/* Main Content */}
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Open Assignments */}
+        {/* UPDATE-004: Renamed from Open Assignments to Open Tasks */}
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base font-semibold">Open Assignments</CardTitle>
+            <CardTitle className="text-base font-semibold">Open Tasks</CardTitle>
             <Link href="/tasks">
               <Button variant="ghost" size="sm" className="gap-1 text-primary">
                 View All
@@ -252,7 +339,7 @@ return (
                         </span>
                         <h4 className="font-medium text-foreground">{assignment.name}</h4>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">{assignment.projectName}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{assignment.showName}</p>
                     </div>
                     <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
                       <Sparkles className="h-3 w-3" />
@@ -277,11 +364,12 @@ return (
                 </div>
               ))}
               
-              {/* Existing Open Assignments */}
+              {/* UPDATE-004: Existing Open Tasks - now clickable to open task detail */}
               {allOpenAssignments.slice(0, 5).map((task) => (
                 <div
                   key={task.id}
-                  className="rounded-lg border border-border p-4"
+                  className="rounded-lg border border-border p-4 cursor-pointer hover:bg-muted/30 transition-colors"
+                  onClick={() => window.location.href = `/tasks/${task.id}`}
                 >
                   <div className="mb-3 flex items-start justify-between">
                     <div>
@@ -291,7 +379,7 @@ return (
                         </span>
                         <h4 className="font-medium text-foreground">{task.name}</h4>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">{task.projectName}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{task.showName}</p>
                     </div>
                     <StatusBadge status={task.status} />
                   </div>
@@ -330,9 +418,10 @@ return (
                   </div>
                 </div>
               ))}
+              {/* UPDATE-004: Updated empty state microcopy */}
               {allOpenAssignments.length === 0 && newlyAcceptedAssignments.length === 0 && (
                 <p className="py-8 text-center text-muted-foreground">
-                  No open assignments right now. Enjoy the break!
+                  No open tasks right now. Enjoy the break!
                 </p>
               )}
             </div>
@@ -424,7 +513,7 @@ return (
                         </span>
                         <div>
                           <p className="text-sm font-medium">{task.name}</p>
-                          <p className="text-xs opacity-70">{task.projectName}</p>
+                          <p className="text-xs opacity-70">{task.showName}</p>
                         </div>
                       </div>
                       <span className="text-xs font-medium whitespace-nowrap">

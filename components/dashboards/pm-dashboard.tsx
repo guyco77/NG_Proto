@@ -21,8 +21,8 @@ import { useToast } from '@/hooks/use-toast'
 import { mockVendors } from '@/lib/mock-data'
 import { DashboardRefresh } from '@/components/dashboard-refresh'
 
-// Newly assigned project awaiting vendor start
-interface NewlyAssignedProject {
+// Newly assigned show awaiting vendor start
+interface NewlyAssignedShow {
   id: string
   name: string
   client: string
@@ -59,7 +59,7 @@ interface PipelineStep {
   count?: number
 }
 
-interface ActiveProject {
+interface ActiveShow {
   name: string
   status: 'IN PROGRESS' | 'IN REVIEW'
   client: string
@@ -69,7 +69,7 @@ interface ActiveProject {
   pipeline: PipelineStep[]
 }
 
-const activeProjects: ActiveProject[] = [
+const activeShows: ActiveShow[] = [
   {
     name: 'Product Launch Campaign',
     status: 'IN PROGRESS',
@@ -133,7 +133,7 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState<AssignTask | null>(null)
   const [assignedJobIds, setAssignedJobIds] = useState<string[]>([])
-  const [newlyAssignedProjects, setNewlyAssignedProjects] = useState<NewlyAssignedProject[]>([])
+  const [newlyAssignedShows, setNewlyAssignedShows] = useState<NewlyAssignedShow[]>([])
   const [animatingOutId, setAnimatingOutId] = useState<string | null>(null)
   const { toast } = useToast()
 
@@ -203,7 +203,7 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
   <Link href="/projects/new" prefetch={true}>
   <Button className="gap-2">
   <Plus className="h-4 w-4" />
-  New Project
+  New Show
   </Button>
           </Link>
           <Link href="/quotes/new" prefetch={true}>
@@ -367,12 +367,12 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
         </Card>
       </div>
 
-      {/* Active Projects */}
+      {/* Active Shows */}
       <div>
-        <h2 className="mb-4 text-base font-semibold text-foreground">Active Projects</h2>
+        <h2 className="mb-4 text-base font-semibold text-foreground">Active Shows</h2>
         <div className="flex flex-col gap-5">
-          {/* Newly Assigned Projects - Awaiting Vendor Start */}
-          {newlyAssignedProjects.map((project) => (
+          {/* Newly Assigned Shows - Awaiting Vendor Start */}
+          {newlyAssignedShows.map((project) => (
             <Link key={project.id} href={`/projects/${project.id.replace('new-uj', 'p')}`}>
               <Card className="border border-amber-200 bg-amber-50/30 dark:border-amber-900/50 dark:bg-amber-950/20 hover:border-amber-300 transition-all duration-300 animate-in slide-in-from-top-2 fade-in cursor-pointer">
                 <CardContent className="p-6">
@@ -411,7 +411,7 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
           ))}
           
           {/* Existing Active Projects */}
-          {activeProjects.map((project, index) => (
+          {activeShows.map((project, index) => (
             <Link key={index} href={`/projects/p${index + 1}`}>
               <Card className="border border-border hover:border-primary/30 hover:bg-muted/20 transition-colors cursor-pointer">
                 <CardContent className="p-6">
@@ -496,7 +496,7 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
               </Card>
             </Link>
           ))}
-          {activeProjects.length === 0 && (
+          {activeShows.length === 0 && (
             <Card className="border border-dashed">
               <CardContent className="py-8 text-center">
                 <p className="text-muted-foreground">No active projects yet.</p>
