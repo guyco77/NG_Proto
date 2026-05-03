@@ -22,8 +22,8 @@ import { cn } from '@/lib/utils'
 interface BillingConfig {
   iCountApiKey: string
   iCountCompanyId: string
-  mekanoApiKey: string
-  mekanoCompanyId: string
+  meckanoApiKey: string
+  meckanoCompanyId: string
   defaultPaymentTerms: 'due_on_receipt' | 'net_15' | 'net_30' | 'net_45' | 'net_60'
   defaultTaxRate: number
 }
@@ -39,8 +39,8 @@ const PAYMENT_TERMS = [
 const mockBillingConfig: BillingConfig = {
   iCountApiKey: 'ik_live_xxxxxxxxxxxxxxxxxxxx',
   iCountCompanyId: 'IC-12345',
-  mekanoApiKey: 'mk_live_xxxxxxxxxxxxxxxxxxxx',
-  mekanoCompanyId: 'MK-67890',
+  meckanoApiKey: 'mk_live_xxxxxxxxxxxxxxxxxxxx',
+  meckanoCompanyId: 'MK-67890',
   defaultPaymentTerms: 'net_30',
   defaultTaxRate: 17,
 }
@@ -51,14 +51,14 @@ export default function BillingSettingsPage() {
   
   const [config, setConfig] = useState<BillingConfig>(mockBillingConfig)
   const [showICountKey, setShowICountKey] = useState(false)
-  const [showMekanoKey, setShowMekanoKey] = useState(false)
+  const [showMeckanoKey, setShowMeckanoKey] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   
   // Connection test states
   const [testingICount, setTestingICount] = useState(false)
-  const [testingMekano, setTestingMekano] = useState(false)
+  const [testingMeckano, setTestingMeckano] = useState(false)
   const [iCountStatus, setICountStatus] = useState<'success' | 'failure' | null>(null)
-  const [mekanoStatus, setMekanoStatus] = useState<'success' | 'failure' | null>(null)
+  const [meckanoStatus, setMeckanoStatus] = useState<'success' | 'failure' | null>(null)
 
   const isAdmin = currentRole === 'admin'
   const isFinance = currentRole === 'finance'
@@ -83,23 +83,23 @@ export default function BillingSettingsPage() {
     setTestingICount(false)
   }
 
-  const handleTestMekano = async () => {
-    setTestingMekano(true)
-    setMekanoStatus(null)
+  const handleTestMeckano = async () => {
+    setTestingMeckano(true)
+    setMeckanoStatus(null)
     
     // Simulate API test
     await new Promise(resolve => setTimeout(resolve, 1500))
     
     const success = Math.random() > 0.2 // 80% success rate for demo
-    setMekanoStatus(success ? 'success' : 'failure')
+    setMeckanoStatus(success ? 'success' : 'failure')
     
     toast({
-      title: success ? 'Mekano connection successful' : 'Mekano connection failed',
+      title: success ? 'Meckano connection successful' : 'Meckano connection failed',
       description: success ? 'API credentials are valid.' : 'Please check your API key and Company ID.',
       variant: success ? 'default' : 'destructive',
     })
     
-    setTestingMekano(false)
+    setTestingMeckano(false)
   }
 
   const handleSave = async () => {
@@ -134,7 +134,7 @@ export default function BillingSettingsPage() {
       <div>
         <h1 className="text-2xl font-semibold text-foreground">Billing Settings</h1>
         <p className="text-sm text-muted-foreground mt-1">
-          Configure iCount, Mekano, and default billing options
+          Configure iCount, Meckano, and default billing options
         </p>
       </div>
 
@@ -215,25 +215,25 @@ export default function BillingSettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Mekano Integration */}
+        {/* Meckano Integration */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-base">Mekano Integration</CardTitle>
+                <CardTitle className="text-base">Meckano Integration</CardTitle>
                 <CardDescription>Vendor hours and payments sync</CardDescription>
               </div>
-              {mekanoStatus && (
+              {meckanoStatus && (
                 <div className={cn(
                   'flex items-center gap-1 text-sm',
-                  mekanoStatus === 'success' ? 'text-green-600' : 'text-red-600'
+                  meckanoStatus === 'success' ? 'text-green-600' : 'text-red-600'
                 )}>
-                  {mekanoStatus === 'success' ? (
+                  {meckanoStatus === 'success' ? (
                     <CheckCircle2 className="h-4 w-4" />
                   ) : (
                     <XCircle className="h-4 w-4" />
                   )}
-                  {mekanoStatus === 'success' ? 'Connected' : 'Failed'}
+                  {meckanoStatus === 'success' ? 'Connected' : 'Failed'}
                 </div>
               )}
             </div>
@@ -242,13 +242,13 @@ export default function BillingSettingsPage() {
             <FieldGroup>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field>
-                  <FieldLabel>Mekano API Key</FieldLabel>
+                  <FieldLabel>Meckano API Key</FieldLabel>
                   <p className="text-xs text-muted-foreground mb-2">Stored encrypted at rest</p>
                   <div className="relative">
                     <Input
-                      type={showMekanoKey ? 'text' : 'password'}
-                      value={config.mekanoApiKey}
-                      onChange={(e) => setConfig({ ...config, mekanoApiKey: e.target.value })}
+                      type={showMeckanoKey ? 'text' : 'password'}
+                      value={config.meckanoApiKey}
+                      onChange={(e) => setConfig({ ...config, meckanoApiKey: e.target.value })}
                       placeholder="mk_live_..."
                       className="pr-10"
                     />
@@ -257,9 +257,9 @@ export default function BillingSettingsPage() {
                       variant="ghost"
                       size="sm"
                       className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 p-0"
-                      onClick={() => setShowMekanoKey(!showMekanoKey)}
+                      onClick={() => setShowMeckanoKey(!showMeckanoKey)}
                     >
-                      {showMekanoKey ? (
+                      {showMeckanoKey ? (
                         <EyeOff className="h-4 w-4 text-muted-foreground" />
                       ) : (
                         <Eye className="h-4 w-4 text-muted-foreground" />
@@ -268,11 +268,11 @@ export default function BillingSettingsPage() {
                   </div>
                 </Field>
                 <Field>
-                  <FieldLabel>Mekano Company ID</FieldLabel>
-                  <p className="text-xs text-muted-foreground mb-2">Your Mekano company identifier</p>
+                  <FieldLabel>Meckano Company ID</FieldLabel>
+                  <p className="text-xs text-muted-foreground mb-2">Your Meckano company identifier</p>
                   <Input
-                    value={config.mekanoCompanyId}
-                    onChange={(e) => setConfig({ ...config, mekanoCompanyId: e.target.value })}
+                    value={config.meckanoCompanyId}
+                    onChange={(e) => setConfig({ ...config, meckanoCompanyId: e.target.value })}
                     placeholder="MK-67890"
                   />
                 </Field>
@@ -281,11 +281,11 @@ export default function BillingSettingsPage() {
             <div className="mt-4">
               <Button
                 variant="outline"
-                onClick={handleTestMekano}
-                disabled={testingMekano}
+                onClick={handleTestMeckano}
+                disabled={testingMeckano}
               >
-                <RefreshCw className={cn('mr-2 h-4 w-4', testingMekano && 'animate-spin')} />
-                {testingMekano ? 'Testing...' : 'Test Mekano Connection'}
+                <RefreshCw className={cn('mr-2 h-4 w-4', testingMeckano && 'animate-spin')} />
+                {testingMeckano ? 'Testing...' : 'Test Meckano Connection'}
               </Button>
             </div>
           </CardContent>

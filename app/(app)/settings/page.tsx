@@ -54,7 +54,7 @@ const settingsLinks: SettingsLink[] = [
     href: '/settings/billing',
     icon: CreditCard,
     title: 'Billing Settings',
-    description: 'iCount and Mekano API credentials, payment terms',
+    description: 'iCount and Meckano API credentials, payment terms',
     roles: ['admin', 'finance'],
   },
   {

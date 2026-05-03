@@ -231,7 +231,7 @@ export interface VendorPayment {
   period?: string // YYYY-MM for monthly payments
   createdAt: string
   paidAt?: string
-  mekanoSyncError?: string // flag if Mekano failed
+  meckanoSyncError?: string // flag if Meckano failed
 }
 
 // CLIENT-001: Client Profile
