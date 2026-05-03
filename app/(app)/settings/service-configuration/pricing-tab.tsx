@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Trash2, Save, DollarSign } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { Plus, Trash2, Save, DollarSign, Calendar } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select,
@@ -64,9 +66,18 @@ const LANGUAGES = [
  * 
  * Manages pricing rates for video minutes and translation language pairs.
  * Part of the Service Configuration umbrella page.
+ * 
+ * Cross-linking: Supports highlighting a specific language pair row when
+ * navigated from Services sub-tab via ?highlight=EN-ES query param
  */
 export function PricingTab() {
   const { toast } = useToast()
+  const searchParams = useSearchParams()
+  
+  // Cross-linking: Get highlighted row from URL (e.g., ?highlight=EN-ES)
+  const highlightParam = searchParams.get('highlight')
+  const [highlightedRowId, setHighlightedRowId] = useState<string | null>(null)
+  const highlightedRowRef = useRef<HTMLTableRowElement>(null)
 
   // Video Minute Rates state
   const [videoRates, setVideoRates] = useState<VideoMinuteRate[]>(mockVideoMinuteRates)
@@ -75,13 +86,34 @@ export function PricingTab() {
   // Translation Rate Card state
   const [translationRates, setTranslationRates] = useState<TranslationRateCardEntry[]>(mockTranslationRateCard)
   const [addTranslationDialog, setAddTranslationDialog] = useState(false)
-  const [newTranslationEntry, setNewTranslationEntry] = useState<Partial<TranslationRateCardEntry>>({
-    sourceLanguage: 'EN',
-    targetLanguage: 'ES',
-    rate: 10,
-    rateUnit: 'per_minute',
-    currency: 'USD',
-  })
+  
+// Inner tab state (for cross-linking to translation tab)
+  const [innerTab, setInnerTab] = useState<string>(highlightParam ? 'translation' : 'video')
+  
+  // Update-004: Handle cross-link highlighting and scroll to row
+  useEffect(() => {
+    if (highlightParam) {
+      // Find the matching row (format: SOURCE-TARGET, e.g., EN-ES)
+      const [source, target] = highlightParam.split('-')
+      const matchingEntry = translationRates.find(
+        (r) => r.sourceLanguage === source && r.targetLanguage === target
+      )
+      if (matchingEntry) {
+        setHighlightedRowId(matchingEntry.id)
+        setInnerTab('translation')
+        // Clear highlight after 3 seconds
+        const timer = setTimeout(() => setHighlightedRowId(null), 3000)
+        return () => clearTimeout(timer)
+      }
+    }
+  }, [highlightParam, translationRates])
+  
+  // Scroll to highlighted row when it becomes visible
+  useEffect(() => {
+    if (highlightedRowId && highlightedRowRef.current) {
+      highlightedRowRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [highlightedRowId])
 
   const handleSaveVideoRate = (rate: VideoMinuteRate) => {
     setVideoRates(videoRates.map((r) => (r.id === rate.id ? { ...rate, updatedAt: new Date().toISOString().split('T')[0] } : r)))
@@ -153,7 +185,8 @@ export function PricingTab() {
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="video" className="space-y-6">
+      {/* Update-004: Inner tabs with controlled state for cross-linking */}
+      <Tabs value={innerTab} onValueChange={setInnerTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="video">Video Minute Rates</TabsTrigger>
           <TabsTrigger value="translation">Translation Rate Card</TabsTrigger>
@@ -327,6 +360,7 @@ export function PricingTab() {
             </CardHeader>
             <CardContent className="px-6 pb-4 pt-2">
               <Table>
+                {/* Update-004: Added Effective Date column per SERV-002 spec */}
                 <TableHeader>
                   <TableRow>
                     <TableHead>Source</TableHead>
@@ -334,97 +368,117 @@ export function PricingTab() {
                     <TableHead>Rate</TableHead>
                     <TableHead>Unit</TableHead>
                     <TableHead>Currency</TableHead>
+                    <TableHead>Effective Date</TableHead>
                     <TableHead>Notes</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
+                {/* Update-004: Table rows with cross-link highlighting support */}
                 <TableBody>
-                  {translationRates.map((entry) => (
-                    <TableRow key={entry.id}>
-                      <TableCell>
-                        <span className="font-medium">{entry.sourceLanguage}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-medium">{entry.targetLanguage}</span>
-                      </TableCell>
-                      <TableCell>
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={entry.rate}
-                          onChange={(e) =>
-                            handleUpdateTranslationRate(entry.id, {
-                              rate: parseFloat(e.target.value) || 0,
-                            })
-                          }
-                          className="h-8 w-20 rounded border border-input bg-background px-2 text-sm"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={entry.rateUnit}
-                          onValueChange={(v) =>
-                            handleUpdateTranslationRate(entry.id, { rateUnit: v as ServicePricingModel })
-                          }
-                        >
-                          <SelectTrigger className="h-8 w-32">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {PRICING_MODELS.map((pm) => (
-                              <SelectItem key={pm.value} value={pm.value}>
-                                {pm.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <Select
-                          value={entry.currency}
-                          onValueChange={(v) =>
-                            handleUpdateTranslationRate(entry.id, { currency: v as BillingCurrency })
-                          }
-                        >
-                          <SelectTrigger className="h-8 w-20">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {CURRENCIES.map((c) => (
-                              <SelectItem key={c.value} value={c.value}>
-                                {c.label}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell>
-                        <input
-                          type="text"
-                          value={entry.notes || ''}
-                          onChange={(e) =>
-                            handleUpdateTranslationRate(entry.id, { notes: e.target.value })
-                          }
-                          placeholder="—"
-                          className="h-8 w-32 rounded border border-input bg-background px-2 text-sm"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                          onClick={() => handleDeleteTranslationRate(entry.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {translationRates.map((entry) => {
+                    const isHighlighted = highlightedRowId === entry.id
+                    return (
+                      <TableRow 
+                        key={entry.id}
+                        ref={isHighlighted ? highlightedRowRef : null}
+                        className={isHighlighted ? 'bg-primary/10 animate-pulse' : ''}
+                      >
+                        <TableCell>
+                          <span className="font-medium">{entry.sourceLanguage}</span>
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium">{entry.targetLanguage}</span>
+                        </TableCell>
+                        <TableCell>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={entry.rate}
+                            onChange={(e) =>
+                              handleUpdateTranslationRate(entry.id, {
+                                rate: parseFloat(e.target.value) || 0,
+                              })
+                            }
+                            className="h-8 w-20 rounded border border-input bg-background px-2 text-sm"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={entry.rateUnit}
+                            onValueChange={(v) =>
+                              handleUpdateTranslationRate(entry.id, { rateUnit: v as ServicePricingModel })
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-32">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {PRICING_MODELS.map((pm) => (
+                                <SelectItem key={pm.value} value={pm.value}>
+                                  {pm.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        <TableCell>
+                          <Select
+                            value={entry.currency}
+                            onValueChange={(v) =>
+                              handleUpdateTranslationRate(entry.id, { currency: v as BillingCurrency })
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-20">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {CURRENCIES.map((c) => (
+                                <SelectItem key={c.value} value={c.value}>
+                                  {c.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
+                        {/* Update-004: Effective Date column */}
+                        <TableCell>
+                          <Input
+                            type="date"
+                            value={entry.effectiveDate || ''}
+                            onChange={(e) =>
+                              handleUpdateTranslationRate(entry.id, { effectiveDate: e.target.value })
+                            }
+                            className="h-8 w-32"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <input
+                            type="text"
+                            value={entry.notes || ''}
+                            onChange={(e) =>
+                              handleUpdateTranslationRate(entry.id, { notes: e.target.value })
+                            }
+                            placeholder="—"
+                            className="h-8 w-32 rounded border border-input bg-background px-2 text-sm"
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                            onClick={() => handleDeleteTranslationRate(entry.id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
                   {translationRates.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
                         No translation rates defined. Click &quot;Add Rate&quot; to create one.
                       </TableCell>
                     </TableRow>

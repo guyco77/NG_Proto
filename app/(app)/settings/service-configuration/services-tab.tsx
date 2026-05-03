@@ -496,7 +496,7 @@ export function ServicesTab() {
                   </div>
                 </div>
 
-                {/* Update-002: Translation Language Overrides - cross-link to Pricing tab */}
+                {/* Update-002/Update-004: Translation Language Overrides - cross-link to Pricing tab's Translation Rate Card */}
                 {(editingService?.category === 'translation' ||
                   displayService.category === 'translation') && (
                   <div className="p-3 bg-muted rounded-lg">
@@ -507,10 +507,12 @@ export function ServicesTab() {
                           <p className="font-medium">Translation Language Overrides</p>
                           <p className="text-muted-foreground">
                             Language-pair pricing is configured in the Translation Rate Card.
+                            Add ?highlight=SOURCE-TARGET to deep-link to a specific pair.
                           </p>
                         </div>
                       </div>
-                      <Link href="/settings/service-configuration?tab=pricing">
+                      {/* Update-004: Cross-link jumps directly to Translation Rate Card tab */}
+                      <Link href="/settings/service-configuration?tab=pricing&highlight=EN-ES">
                         <Button variant="ghost" size="sm" className="gap-1 text-primary">
                           View Rate Card
                           <ExternalLink className="h-3 w-3" />
