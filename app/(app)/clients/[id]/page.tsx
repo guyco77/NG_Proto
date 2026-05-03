@@ -588,8 +588,8 @@ const handleInviteMember = async () => {
                 )}
               </CardHeader>
               <CardContent className="space-y-4">
+                {/* Update-003: Contact editing with phone country code + communication preferences */}
                 {isEditing ? (
-                  {/* Update-003: Contact editing with phone country code + communication preferences */}
                   editForm.contacts.map((contact, index) => (
                     <div key={contact.id} className="space-y-3 p-4 border rounded-lg">
                       <div className="flex items-center justify-between">
