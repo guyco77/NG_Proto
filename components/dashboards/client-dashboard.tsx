@@ -47,8 +47,8 @@ const quotesAwaitingApproval = [
   { id: 'q2', projectName: 'Weekly News Recap — Transcription', submittedDate: 'Apr 26', amount: 340 },
 ]
 
-// NG Projects - managed by NG Broadcast with task progress
-const ngProjects = [
+// NG Shows - managed by NG Broadcast with task progress
+const ngShows = [
   { 
     id: 'ng1', 
     name: 'Product Launch Campaign', 
@@ -82,8 +82,8 @@ const ngProjects = [
   },
 ]
 
-// Self-Serve Projects - client's own team
-const selfServeProjects = [
+// Self-Serve Shows - client's own team
+const selfServeShows = [
   { 
     id: 'ss1', 
     name: 'Internal Training Video', 
@@ -107,19 +107,19 @@ export function ClientDashboard({ subRole = 'client_admin' }: ClientDashboardPro
   const clientInvoices = mockInvoices.filter((i) => i.clientId === 'c1' || i.clientId === 'c5')
 
   // Updated stats per DASH-003
-  const activeProjects = 3 // Fixed to 3 as per spec
+  const activeShows = 3 // Fixed to 3 as per spec
   const pendingQuotesCount = 2 // Fixed to 2 as per spec
   const unpaidInvoices = clientInvoices.filter((i) => i.status === 'sent' || i.status === 'overdue')
 
   // Sub-role widget visibility per CLIENT-002
   const canSeeQuotes = subRole === 'client_admin'
   const canSeeInvoices = subRole === 'client_admin'
-  const canSeeNewProject = subRole === 'client_admin'
+  const canSeeNewShow = subRole === 'client_admin'
   const canApprove = subRole === 'client_admin' || subRole === 'reviewer'
   const isReadOnly = subRole === 'viewer'
 
-  // For task_owner and reviewer, filter to "My Projects" only
-  const displayedProjects = subRole === 'task_owner' || subRole === 'reviewer'
+  // For task_owner and reviewer, filter to "My Shows" only
+  const displayedShows = subRole === 'task_owner' || subRole === 'reviewer'
     ? clientProjects.filter((p) => p.assignedToCurrentUser) // In real app, check assignment
     : clientProjects
 
@@ -129,15 +129,15 @@ export function ClientDashboard({ subRole = 'client_admin' }: ClientDashboardPro
       <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">Track your projects and deliverables</p>
+          <p className="text-sm text-muted-foreground mt-1">Track your shows and deliverables</p>
         </div>
         <div className="flex items-center gap-3 mt-4 sm:mt-0">
           <DashboardRefresh />
-          {canSeeNewProject && (
+          {canSeeNewShow && (
             <Link href="/projects/new" prefetch={true}>
               <Button className="gap-2">
                 <Plus className="h-4 w-4" />
-                New Project
+                New Show
               </Button>
             </Link>
           )}
@@ -150,8 +150,8 @@ export function ClientDashboard({ subRole = 'client_admin' }: ClientDashboardPro
         canSeeQuotes && canSeeInvoices ? 'md:grid-cols-2 lg:grid-cols-4' : 'md:grid-cols-2'
       )}>
         <StatsCard
-          title="Active Projects"
-          value={activeProjects}
+          title="Active Shows"
+          value={activeShows}
           icon={FolderKanban}
         />
         {canSeeQuotes && (
@@ -171,10 +171,10 @@ export function ClientDashboard({ subRole = 'client_admin' }: ClientDashboardPro
         )}
       </div>
 
-      {/* My Projects - Two Column Layout */}
+      {/* My Shows - Two Column Layout */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-base font-semibold text-foreground">My Projects</h2>
+          <h2 className="text-base font-semibold text-foreground">My Shows</h2>
           <Link href="/projects">
             <Button variant="ghost" size="sm" className="gap-1 text-primary">
               View All
@@ -184,11 +184,11 @@ export function ClientDashboard({ subRole = 'client_admin' }: ClientDashboardPro
         </div>
         
         <div className="grid gap-6 lg:grid-cols-2">
-          {/* Left Column - NG Projects */}
+          {/* Left Column - NG Shows */}
           <div>
-            <h3 className="text-sm font-medium text-muted-foreground mb-3">NG Projects</h3>
+            <h3 className="text-sm font-medium text-muted-foreground mb-3">NG Shows</h3>
             <div className="space-y-4">
-              {ngProjects.map((project) => (
+              {ngShows.map((project) => (
                 <Link key={project.id} href={`/projects/${project.id}`}>
                   <Card className="hover:border-primary/50 transition-colors cursor-pointer">
                     <CardContent className="p-4">
@@ -242,7 +242,7 @@ export function ClientDashboard({ subRole = 'client_admin' }: ClientDashboardPro
           <div>
             <h3 className="text-sm font-medium text-muted-foreground mb-3">Self-Serve</h3>
             <div className="space-y-4">
-              {selfServeProjects.map((project) => (
+              {selfServeShows.map((project) => (
                 <Link key={project.id} href={`/projects/${project.id}`}>
                   <Card className="hover:border-primary/50 transition-colors cursor-pointer">
                     <CardContent className="p-4">
@@ -267,15 +267,15 @@ export function ClientDashboard({ subRole = 'client_admin' }: ClientDashboardPro
                 </Link>
               ))}
               
-              {selfServeProjects.length === 0 && (
+              {selfServeShows.length === 0 && (
                 <Card className="border-dashed">
                   <CardContent className="p-4 text-center">
-                    <p className="text-sm text-muted-foreground">No self-serve projects yet</p>
-                    {canSeeNewProject && (
+                    <p className="text-sm text-muted-foreground">No self-serve shows yet</p>
+                    {canSeeNewShow && (
                       <Link href="/projects/new" prefetch={true}>
                         <Button variant="outline" size="sm" className="mt-2 gap-1.5">
                           <Plus className="h-3.5 w-3.5" />
-                          Create Project
+                          Create Show
                         </Button>
                       </Link>
                     )}

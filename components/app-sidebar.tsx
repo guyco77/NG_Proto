@@ -50,7 +50,7 @@ interface AppSidebarProps {
 
 const roleLabels: Record<UserRole, string> = {
   admin: 'Administrator',
-  pm: 'Project Manager',
+  pm: 'Show Manager',
   client: 'Client',
   vendor: 'Vendor',
   finance: 'Finance',
@@ -107,7 +107,7 @@ function canSeeSettings(role: UserRole): boolean {
 
 const mainNavItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/projects', label: 'Projects', icon: FolderKanban },
+  { href: '/projects', label: 'Shows', icon: FolderKanban },
   { href: '/tasks', label: 'Tasks', icon: CheckSquare },
   { href: '/task-offers', label: 'Task Offers', icon: Mail, badge: 3 }, // TASK-009: Badge count for open offers
   { href: '/quotes', label: 'Quotes', icon: FileText },

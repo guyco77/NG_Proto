@@ -42,18 +42,18 @@ import { DashboardRefresh } from '@/components/dashboard-refresh'
 
 // Realistic client payment data with proper status differentiation
 const clientPayments = [
-  { id: 'cp1', clientName: 'Channel 12', invoiceNumber: 'INV-0041', projectName: 'Episodes 44–47 Translation', amount: 3200, dueDate: '2026-04-30', status: 'unpaid' as const },
-  { id: 'cp2', clientName: 'Keshet', invoiceNumber: 'INV-0038', projectName: 'Weekly News Transcription', amount: 1100, dueDate: '2026-04-22', status: 'overdue' as const },
-  { id: 'cp3', clientName: 'Reshet', invoiceNumber: 'INV-0035', projectName: 'Documentary QA', amount: 870, paidDate: '2026-04-18', status: 'paid' as const },
-  { id: 'cp4', clientName: 'Channel 12', invoiceNumber: 'INV-0032', projectName: 'Episodes 40–43 Translation', amount: 3200, paidDate: '2026-04-10', status: 'paid' as const },
-  { id: 'cp5', clientName: 'Kan 11', invoiceNumber: 'INV-0029', projectName: 'Monthly Transcription', amount: 1450, paidDate: '2026-03-28', status: 'paid' as const },
+  { id: 'cp1', clientName: 'Channel 12', invoiceNumber: 'INV-0041', showName: 'Episodes 44–47 Translation', amount: 3200, dueDate: '2026-04-30', status: 'unpaid' as const },
+  { id: 'cp2', clientName: 'Keshet', invoiceNumber: 'INV-0038', showName: 'Weekly News Transcription', amount: 1100, dueDate: '2026-04-22', status: 'overdue' as const },
+  { id: 'cp3', clientName: 'Reshet', invoiceNumber: 'INV-0035', showName: 'Documentary QA', amount: 870, paidDate: '2026-04-18', status: 'paid' as const },
+  { id: 'cp4', clientName: 'Channel 12', invoiceNumber: 'INV-0032', showName: 'Episodes 40–43 Translation', amount: 3200, paidDate: '2026-04-10', status: 'paid' as const },
+  { id: 'cp5', clientName: 'Kan 11', invoiceNumber: 'INV-0029', showName: 'Monthly Transcription', amount: 1450, paidDate: '2026-03-28', status: 'paid' as const },
 ]
 
 // Payment history entry type
 interface PaymentHistoryEntry {
   id: string
   vendorName: string
-  projectName: string
+  showName: string
   amount: number
   approvedDate: Date
 }
@@ -128,7 +128,7 @@ export function FinanceDashboard() {
       const historyEntry: PaymentHistoryEntry = {
         id: `history-${payable.id}`,
         vendorName: payable.vendorName,
-        projectName: payable.projectName,
+        showName: payable.projectName,
         amount: payable.amount,
         approvedDate: new Date(),
       }
@@ -327,7 +327,7 @@ export function FinanceDashboard() {
                       <span className="text-xs text-muted-foreground">·</span>
                       <p className="text-xs text-muted-foreground">{payment.invoiceNumber}</p>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate">{payment.projectName}</p>
+                    <p className="text-xs text-muted-foreground truncate">{payment.showName}</p>
                     <p className="text-xs text-muted-foreground">
                       {payment.status === 'paid' 
                         ? `Paid ${formatDate(payment.paidDate || '')}` 
@@ -388,7 +388,7 @@ export function FinanceDashboard() {
                 >
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{payable.vendorName}</p>
-                    <p className="text-xs text-muted-foreground">{payable.projectName}</p>
+                    <p className="text-xs text-muted-foreground">{payable.showName}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="rounded px-2 py-0.5 text-xs font-medium bg-amber-500 text-amber-950">
@@ -426,7 +426,7 @@ export function FinanceDashboard() {
                     >
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{entry.vendorName}</p>
-                        <p className="text-xs text-muted-foreground">{entry.projectName}</p>
+                        <p className="text-xs text-muted-foreground">{entry.showName}</p>
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="rounded px-2 py-0.5 text-xs font-medium bg-emerald-600 text-white">

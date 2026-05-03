@@ -65,7 +65,7 @@ const taskTypeIcons: Record<string, React.ElementType> = {
 interface NewlyAcceptedAssignment {
   id: string
   name: string
-  projectName: string
+  showName: string
   taskType: string
   languagePair: string
   dueDate: string
@@ -101,7 +101,7 @@ export function VendorDashboard() {
       const newAssignment: NewlyAcceptedAssignment = {
         id: `new-${offer.id}`,
         name: `${offer.type} — ${offer.languagePair}`,
-        projectName: offer.project,
+        showName: offer.project,
         taskType: offer.type,
         languagePair: offer.languagePair,
         dueDate: offer.deadline,
@@ -148,7 +148,7 @@ export function VendorDashboard() {
     { 
       id: 'extra1', 
       name: 'Episode 12 — The Final Chapter', 
-      projectName: 'Dark Matter S2', 
+      showName: 'Dark Matter S2', 
       service: 'Translation',
       sourceLanguage: 'EN',
       targetLanguage: 'ES',
@@ -158,7 +158,7 @@ export function VendorDashboard() {
     { 
       id: 'extra2', 
       name: 'Episode 5 — New Horizons', 
-      projectName: 'Space Explorers', 
+      showName: 'Space Explorers', 
       service: 'Review',
       sourceLanguage: 'EN',
       targetLanguage: 'FR',
@@ -168,7 +168,7 @@ export function VendorDashboard() {
     { 
       id: 'extra3', 
       name: 'Trailer — Summer Campaign', 
-      projectName: 'Brand Launch 2026', 
+      showName: 'Brand Launch 2026', 
       service: 'Transcription',
       sourceLanguage: 'EN',
       targetLanguage: null,
@@ -339,7 +339,7 @@ return (
                         </span>
                         <h4 className="font-medium text-foreground">{assignment.name}</h4>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">{assignment.projectName}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{assignment.showName}</p>
                     </div>
                     <span className="inline-flex items-center gap-1 rounded-full bg-primary px-2 py-0.5 text-xs font-medium text-primary-foreground">
                       <Sparkles className="h-3 w-3" />
@@ -379,7 +379,7 @@ return (
                         </span>
                         <h4 className="font-medium text-foreground">{task.name}</h4>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">{task.projectName}</p>
+                      <p className="text-sm text-muted-foreground mt-1">{task.showName}</p>
                     </div>
                     <StatusBadge status={task.status} />
                   </div>
@@ -513,7 +513,7 @@ return (
                         </span>
                         <div>
                           <p className="text-sm font-medium">{task.name}</p>
-                          <p className="text-xs opacity-70">{task.projectName}</p>
+                          <p className="text-xs opacity-70">{task.showName}</p>
                         </div>
                       </div>
                       <span className="text-xs font-medium whitespace-nowrap">

@@ -146,7 +146,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ id: st
   const [cancelReason, setCancelReason] = useState('')
   const [showArchiveDialog, setShowArchiveDialog] = useState(false)
   
-  // PROJ-012: Duplicate Project dialog
+  // PROJ-012: Duplicate Show dialog
   const [showDuplicateDialog, setShowDuplicateDialog] = useState(false)
   const [duplicateName, setDuplicateName] = useState(`${project.name} (Copy)`)
   const [isDuplicating, setIsDuplicating] = useState(false)
@@ -455,7 +455,7 @@ const handleCancelEdit = () => {
     setShowArchiveDialog(false)
   }
 
-  // PROJ-012: Duplicate Project handler
+  // PROJ-012: Duplicate Show handler
   const handleDuplicateProject = () => {
     if (!duplicateName.trim()) return
     
