@@ -1,6 +1,6 @@
 'use client'
 
-import { Building2, Server, Mail, User, CreditCard, Bell, ChevronRight, Settings2, FileStack } from 'lucide-react'
+import { Building2, Server, Mail, User, CreditCard, Bell, ChevronRight, FileText, FileStack, ListChecks } from 'lucide-react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { useRole } from '../layout'
@@ -37,17 +37,24 @@ const settingsLinks: SettingsLink[] = [
     roles: ['admin'],
   },
   {
-    href: '/settings/service-configuration',
-    icon: Settings2,
-    title: 'Service Configuration',
-    description: 'Manage services, task types, and pricing for the production catalog',
+    href: '/settings/services',
+    icon: FileText,
+    title: 'Services',
+    description: 'Manage service definitions, default workflows, and pricing rate cards',
+    roles: ['admin', 'pm'],
+  },
+  {
+    href: '/settings/task-types',
+    icon: ListChecks,
+    title: 'Task Types',
+    description: 'Define task types for Admin/PM and Client workflows',
     roles: ['admin', 'pm'],
   },
   {
     href: '/settings/templates',
     icon: FileStack,
     title: 'Templates',
-    description: 'Create and manage reusable project templates with workflow and vendor assignments',
+    description: 'Create reusable project templates with workflows and vendor assignments',
     roles: ['admin', 'pm'],
   },
   {

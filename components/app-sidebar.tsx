@@ -9,7 +9,6 @@ import {
   FileText,
   CheckSquare,
   Receipt,
-  
   Users,
   Briefcase,
   Settings,
@@ -23,6 +22,7 @@ import {
   Building2,
   CreditCard,
   History,
+  ListChecks,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { UserRole } from '@/lib/types'
@@ -74,8 +74,9 @@ const NAV_VISIBILITY: Record<string, UserRole[]> = {
   '/settings/profile': ['admin', 'pm', 'client', 'vendor', 'finance', 'it'], // SET-005: All roles
   '/settings/notifications': ['admin', 'pm', 'client', 'vendor', 'finance', 'it'], // SET-007: All roles
   '/settings/company': ['admin'], // SET-001: Admin only
-  '/settings/service-configuration': ['admin', 'pm'], // SET-002/SERV-001: Admin, PM
-  '/settings/templates': ['admin', 'pm'], // Update-005: Admin, PM
+  '/settings/services': ['admin', 'pm'], // SERV-001: Admin, PM
+  '/settings/task-types': ['admin', 'pm'], // Update-003: Admin, PM
+  '/settings/templates': ['admin', 'pm'], // Update-003: Admin, PM
   '/settings/billing': ['admin', 'finance'], // SET-006: Admin, Finance
   '/settings/editor-integration': ['admin', 'it'], // SET-003: Admin, IT
   '/settings/email-templates': ['admin'], // SET-004: Admin only
@@ -94,8 +95,9 @@ function canSeeSettings(role: UserRole): boolean {
     canSee('/settings/profile', role) ||
     canSee('/settings/notifications', role) ||
     canSee('/settings/company', role) ||
-    canSee('/settings/service-configuration', role) ||
-    canSee('/settings/templates', role) || // Update-005
+    canSee('/settings/services', role) || // SERV-001
+    canSee('/settings/task-types', role) || // Update-003
+    canSee('/settings/templates', role) || // Update-003
     canSee('/settings/billing', role) ||
     canSee('/settings/editor-integration', role) ||
     canSee('/settings/email-templates', role) ||
@@ -116,12 +118,14 @@ const mainNavItems = [
   { href: '/my-team', label: 'My Team', icon: Users }, // CLIENT-002: Client Admin team self-service
 ]
 
+// Update-003: Three separate pages in sidebar: Services · Task Types · Templates
 const settingsNavItems = [
   { href: '/settings/profile', label: 'My Profile', icon: User },
   { href: '/settings/notifications', label: 'Notifications', icon: Bell },
   { href: '/settings/company', label: 'Company', icon: Building2 },
-  { href: '/settings/service-configuration', label: 'Service Config', icon: FileText },
-  { href: '/settings/templates', label: 'Templates', icon: FileText }, // Update-005: Templates after Service Config
+  { href: '/settings/services', label: 'Services', icon: FileText }, // SERV-001
+  { href: '/settings/task-types', label: 'Task Types', icon: ListChecks }, // Update-003
+  { href: '/settings/templates', label: 'Templates', icon: FileText }, // Update-003
   { href: '/settings/billing', label: 'Billing', icon: CreditCard },
   { href: '/settings/editor-integration', label: 'Editor', icon: Plug },
   { href: '/settings/email-templates', label: 'Email Templates', icon: Mail },
