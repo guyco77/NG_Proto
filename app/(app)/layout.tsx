@@ -91,9 +91,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             onOpenSearch={() => setSearchOpen(true)}
             onOpenMobileMenu={() => setMobileMenuOpen(true)}
           />
-          <main id="main-content" className="flex-1 overflow-y-auto bg-[#f5f5f5]">
+          <main id="main-content" className="flex-1 overflow-y-auto bg-[#f0f0f0]">
             <ScrollToTop />
-            <div className="page-enter">{children}</div>
+            {children}
           </main>
         </div>
         
