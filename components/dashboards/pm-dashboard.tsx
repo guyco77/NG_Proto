@@ -5,7 +5,6 @@ import Link from 'next/link'
 import {
   AlertTriangle,
   ArrowRight,
-  Plus,
   Bell,
   Clock,
   Layers,
@@ -15,7 +14,6 @@ import {
   LayoutGrid,
   List,
   TrendingUp,
-  TrendingDown,
   Search,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -27,6 +25,12 @@ import { useToast } from '@/hooks/use-toast'
 import { mockVendors } from '@/lib/mock-data'
 import { DashboardRefresh } from '@/components/dashboard-refresh'
 import { Input } from '@/components/ui/input'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 
 // Newly assigned show awaiting vendor start
 interface NewlyAssignedShow {
@@ -233,25 +237,25 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
   }
 
   return (
-    <div className="min-h-full">
-      {/* Main curved content area - now with proper spacing from top */}
-      <div className="bg-white rounded-tl-[2.5rem] min-h-full shadow-sm">
+    <div className="min-h-full bg-[#f0f0f0]">
+      {/* Main curved content area */}
+      <div className="bg-white rounded-tl-[2.5rem] min-h-screen shadow-sm">
         <div className="p-6 lg:p-8">
-          {/* Header */}
+          {/* Header - Last update on LEFT, Search on RIGHT */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-6">
             <div>
               <h1 className="text-2xl font-semibold text-foreground">Show Monitoring</h1>
               <p className="text-sm text-muted-foreground mt-1">Track show health, SLAs, and vendor assignments.</p>
             </div>
             <div className="flex items-center gap-3">
+              <DashboardRefresh />
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
                   placeholder="Search shows..." 
-                  className="pl-9 w-[200px] h-9 bg-white border-border"
+                  className="pl-9 w-[200px] h-9 bg-muted/30 border-0"
                 />
               </div>
-              <DashboardRefresh />
             </div>
           </div>
 
@@ -332,21 +336,11 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border bg-muted/30">
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">
-                        Show
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">
-                        Task
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">
-                        Language
-                      </th>
-                      <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">
-                        Due Date
-                      </th>
-                      <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">
-                        Actions
-                      </th>
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Show</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Task</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Language</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Due Date</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -391,29 +385,29 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
 
           {/* Active Shows */}
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <h2 className="text-base font-semibold text-foreground">Active Shows</h2>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="h-8 gap-1.5">
-                  <Filter className="h-3.5 w-3.5" />
+                <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs">
+                  <Filter className="h-3 w-3" />
                   Filters
                 </Button>
                 <div className="flex border border-border rounded-md">
                   <Button 
                     variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
                     size="sm" 
-                    className="h-8 w-8 p-0 rounded-r-none"
+                    className="h-7 w-7 p-0 rounded-r-none"
                     onClick={() => setViewMode('list')}
                   >
-                    <List className="h-4 w-4" />
+                    <List className="h-3.5 w-3.5" />
                   </Button>
                   <Button 
                     variant={viewMode === 'grid' ? 'secondary' : 'ghost'} 
                     size="sm" 
-                    className="h-8 w-8 p-0 rounded-l-none"
+                    className="h-7 w-7 p-0 rounded-l-none"
                     onClick={() => setViewMode('grid')}
                   >
-                    <LayoutGrid className="h-4 w-4" />
+                    <LayoutGrid className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </div>
@@ -421,19 +415,19 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
 
             {/* Newly Assigned Shows - Awaiting Vendor Start */}
             {newlyAssignedShows.map((show) => (
-              <Link key={show.id} href={`/projects/${show.id.replace('new-uj', 'p')}`} className="block mb-3">
+              <Link key={show.id} href={`/projects/${show.id.replace('new-uj', 'p')}`} className="block mb-2">
                 <Card className="border border-amber-200 bg-amber-50/30 hover:border-amber-300 transition-all duration-300 animate-in slide-in-from-top-2 fade-in">
-                  <CardContent className="p-3">
+                  <CardContent className="py-2 px-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <span className="px-2 py-0.5 text-xs font-medium rounded bg-amber-100 text-amber-700">
+                        <span className="px-2 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-700">
                           Awaiting Start
                         </span>
                         <span className="font-medium text-sm">{show.name}</span>
                       </div>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span className="text-xs">{show.vendorName} assigned to {show.taskType}</span>
-                        <Clock className="h-4 w-4 text-amber-500" />
+                      <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span>{show.vendorName} assigned to {show.taskType}</span>
+                        <Clock className="h-3.5 w-3.5 text-amber-500" />
                       </div>
                     </div>
                   </CardContent>
@@ -441,148 +435,144 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
               </Link>
             ))}
             
-            {/* Active Shows Cards - Slimmer but with full progress */}
+            {/* Active Shows Cards - COMPACT version */}
             <div className={cn(
-              "grid gap-3",
-              viewMode === 'grid' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
+              "grid gap-2",
+              viewMode === 'grid' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4" : "grid-cols-1"
             )}>
               {activeShows.map((show, index) => (
-                <Link key={index} href={`/projects/p${index + 1}`}>
-                  <Card className="border border-border hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer h-full">
-                    <CardContent className="p-3">
-                      {/* Header row - slimmer */}
-                      <div className="flex items-start justify-between mb-2">
-                        <div>
-                          <span
-                            className={cn(
-                              'inline-block px-2 py-0.5 text-[10px] font-medium rounded mb-1',
-                              show.status === 'In Review'
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : show.status === 'At Risk'
-                                  ? 'bg-red-100 text-red-600'
-                                  : 'bg-muted text-foreground'
-                            )}
-                          >
-                            {show.status}
-                          </span>
-                          <h3 className="text-sm font-semibold text-foreground leading-tight">{show.name}</h3>
-                        </div>
-                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0 -mt-1 -mr-1">
-                          <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
-                        </Button>
-                      </div>
+                <Card key={index} className="border border-border hover:border-primary/30 hover:shadow-sm transition-all">
+                  <CardContent className="p-2.5">
+                    {/* Header row - very compact */}
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span
+                        className={cn(
+                          'px-1.5 py-0.5 text-[9px] font-medium rounded',
+                          show.status === 'In Review'
+                            ? 'bg-emerald-100 text-emerald-700'
+                            : show.status === 'At Risk'
+                              ? 'bg-red-100 text-red-600'
+                              : 'bg-muted text-foreground'
+                        )}
+                      >
+                        {show.status}
+                      </span>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-5 w-5 p-0">
+                            <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuItem asChild>
+                            <Link href={`/projects/p${index + 1}`}>View Details</Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem>Edit Show</DropdownMenuItem>
+                          <DropdownMenuItem>Assign Vendor</DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600">Archive</DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                    
+                    {/* Show name - clickable */}
+                    <Link href={`/projects/p${index + 1}`}>
+                      <h3 className="text-sm font-semibold text-foreground leading-tight hover:text-primary transition-colors mb-1.5 truncate">{show.name}</h3>
+                    </Link>
 
-                      {/* Info rows - compact */}
-                      <div className="grid grid-cols-3 gap-x-2 text-xs mb-3">
-                        <div>
-                          <span className="text-muted-foreground">Client</span>
-                          <p className="font-medium truncate">{show.client}</p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Due Date</span>
-                          <p className={cn(
-                            "font-medium",
-                            show.health.status === 'at_risk' && "text-red-500"
-                          )}>
-                            {new Date(show.due).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </p>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Langs</span>
-                          <p className="font-medium">{show.languages.join(', ')}</p>
-                        </div>
-                      </div>
+                    {/* Info row - single line */}
+                    <div className="flex items-center gap-3 text-[10px] text-muted-foreground mb-2">
+                      <span>{show.client}</span>
+                      <span className="text-muted-foreground/50">•</span>
+                      <span className={cn(show.health.status === 'at_risk' && "text-red-500 font-medium")}>
+                        {new Date(show.due).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      </span>
+                      <span className="text-muted-foreground/50">•</span>
+                      <span>{show.languages.join(', ')}</span>
+                    </div>
 
-                      {/* Workflow Progress - with initials and names */}
-                      <div>
-                        <div className="flex items-center justify-between mb-1.5">
-                          <span className="text-[10px] text-muted-foreground uppercase tracking-wide">Workflow Progress</span>
-                          <span className={cn(
-                            "text-xs font-semibold",
-                            show.health.status === 'on_track' ? "text-emerald-600" : "text-red-500"
-                          )}>
-                            {show.health.percentage}%
-                          </span>
-                        </div>
-                        
-                        {/* Pipeline visualization with initials */}
-                        <div className="flex items-center">
-                          {show.pipeline.map((step, stepIndex) => (
-                            <div key={stepIndex} className="flex items-center flex-1">
-                              {/* Step circle with initials or checkmark */}
-                              <div className="relative group">
-                                {step.status === 'completed' ? (
-                                  step.assignee ? (
-                                    <Avatar className="h-5 w-5 border-2 border-foreground">
-                                      <AvatarFallback className="text-[8px] bg-foreground text-background font-medium">
-                                        {step.assignee.initials}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                  ) : (
-                                    <div className="h-5 w-5 rounded-full bg-foreground flex items-center justify-center">
-                                      <CheckCircle2 className="h-3 w-3 text-background" />
-                                    </div>
-                                  )
-                                ) : step.status === 'in_progress' ? (
-                                  step.assignee ? (
-                                    <Avatar className="h-5 w-5 border-2 border-foreground">
-                                      <AvatarFallback className="text-[8px] bg-white text-foreground font-medium">
-                                        {step.assignee.initials}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                  ) : (
-                                    <div className="h-5 w-5 rounded-full border-2 border-foreground bg-white" />
-                                  )
-                                ) : step.status === 'at_risk' ? (
-                                  <div className="h-5 w-5 rounded-full border-2 border-red-500 bg-red-50" />
-                                ) : (
-                                  <div className="h-5 w-5 rounded-full border-2 border-muted-foreground/30 bg-white" />
-                                )}
-                                {/* Tooltip with step name */}
-                                <div className="absolute -top-7 left-1/2 -translate-x-1/2 bg-foreground text-background text-[9px] px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
-                                  {step.name}
+                    {/* Workflow Progress - compact with initials */}
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[9px] text-muted-foreground uppercase tracking-wide">Progress</span>
+                      <span className={cn(
+                        "text-[10px] font-semibold",
+                        show.health.status === 'on_track' ? "text-emerald-600" : "text-red-500"
+                      )}>
+                        {show.health.percentage}%
+                      </span>
+                    </div>
+                    
+                    {/* Pipeline visualization - compact */}
+                    <div className="flex items-center">
+                      {show.pipeline.map((step, stepIndex) => (
+                        <div key={stepIndex} className="flex items-center flex-1">
+                          {/* Step circle with initials */}
+                          <div className="relative group">
+                            {step.status === 'completed' ? (
+                              step.assignee ? (
+                                <Avatar className="h-4 w-4 border border-foreground">
+                                  <AvatarFallback className="text-[6px] bg-foreground text-background font-medium">
+                                    {step.assignee.initials}
+                                  </AvatarFallback>
+                                </Avatar>
+                              ) : (
+                                <div className="h-4 w-4 rounded-full bg-foreground flex items-center justify-center">
+                                  <CheckCircle2 className="h-2.5 w-2.5 text-background" />
                                 </div>
-                              </div>
-                              {/* Connecting line */}
-                              {stepIndex < show.pipeline.length - 1 && (
-                                <div
-                                  className={cn(
-                                    'h-0.5 flex-1 mx-0.5',
-                                    step.status === 'completed' ? 'bg-foreground' : 
-                                    step.status === 'at_risk' ? 'bg-red-300' : 'bg-muted'
-                                  )}
-                                />
-                              )}
+                              )
+                            ) : step.status === 'in_progress' ? (
+                              step.assignee ? (
+                                <Avatar className="h-4 w-4 border border-foreground">
+                                  <AvatarFallback className="text-[6px] bg-white text-foreground font-medium">
+                                    {step.assignee.initials}
+                                  </AvatarFallback>
+                                </Avatar>
+                              ) : (
+                                <div className="h-4 w-4 rounded-full border border-foreground bg-white" />
+                              )
+                            ) : step.status === 'at_risk' ? (
+                              <div className="h-4 w-4 rounded-full border border-red-500 bg-red-50" />
+                            ) : (
+                              <div className="h-4 w-4 rounded-full border border-muted-foreground/30 bg-white" />
+                            )}
+                            {/* Tooltip with step name and assignee */}
+                            <div className="absolute -top-6 left-1/2 -translate-x-1/2 bg-foreground text-background text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                              {step.name}{step.assignee ? ` (${step.assignee.name})` : ''}
                             </div>
-                          ))}
+                          </div>
+                          {/* Connecting line */}
+                          {stepIndex < show.pipeline.length - 1 && (
+                            <div
+                              className={cn(
+                                'h-[2px] flex-1 mx-0.5',
+                                step.status === 'completed' ? 'bg-foreground' : 
+                                step.status === 'at_risk' ? 'bg-red-300' : 'bg-muted'
+                              )}
+                            />
+                          )}
                         </div>
-                        {/* Step labels */}
-                        <div className="flex justify-between mt-1">
-                          <span className="text-[9px] text-muted-foreground">Start</span>
-                          <span className={cn(
-                            "text-[9px] font-medium",
-                            show.pipeline.some(s => s.status === 'at_risk') ? "text-red-500" : 
-                            show.pipeline.some(s => s.status === 'in_progress') ? "text-foreground" : "text-muted-foreground"
-                          )}>
-                            {show.pipeline.find(s => s.status === 'at_risk')?.name || 
-                             show.pipeline.find(s => s.status === 'in_progress')?.name || 
-                             show.pipeline[show.pipeline.length - 1].name}
-                          </span>
-                          <span className="text-[9px] text-muted-foreground">
-                            {show.pipeline[show.pipeline.length - 1].name}
-                          </span>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </Link>
+                      ))}
+                    </div>
+                    {/* Current step label */}
+                    <div className="flex justify-between mt-0.5">
+                      <span className="text-[8px] text-muted-foreground">Start</span>
+                      <span className={cn(
+                        "text-[8px] font-medium",
+                        show.pipeline.some(s => s.status === 'at_risk') ? "text-red-500" : "text-muted-foreground"
+                      )}>
+                        {show.pipeline.find(s => s.status === 'at_risk')?.name || 
+                         show.pipeline.find(s => s.status === 'in_progress')?.name || ''}
+                      </span>
+                      <span className="text-[8px] text-muted-foreground">{show.pipeline[show.pipeline.length - 1].name}</span>
+                    </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
 
             {activeShows.length === 0 && (
               <Card className="border border-dashed">
-                <CardContent className="py-8 text-center">
-                  <p className="text-muted-foreground">No active shows yet.</p>
+                <CardContent className="py-6 text-center">
+                  <p className="text-sm text-muted-foreground">No active shows yet.</p>
                 </CardContent>
               </Card>
             )}
@@ -590,13 +580,13 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
 
           {/* Completed Today */}
           <div className="mb-6">
-            <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                 <h2 className="text-base font-semibold text-foreground">Completed Today</h2>
               </div>
               <Link href="/projects?status=completed">
-                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground text-xs">
+                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground text-xs h-7">
                   View History
                 </Button>
               </Link>
@@ -604,16 +594,16 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
             <Card className="border border-border">
               <CardContent className="p-0 divide-y divide-border">
                 {completedToday.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between px-4 py-2.5">
-                    <div className="flex items-center gap-3">
-                      <div className="w-0.5 h-6 bg-emerald-500 rounded-full" />
+                  <div key={item.id} className="flex items-center justify-between px-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-0.5 h-5 bg-emerald-500 rounded-full" />
                       <div>
                         <p className="text-sm font-medium">{item.name} – {item.task} ({item.lang})</p>
-                        <p className="text-xs text-muted-foreground">Vendor: {item.vendor} · Completed at {item.time}</p>
+                        <p className="text-[10px] text-muted-foreground">Vendor: {item.vendor} · Completed at {item.time}</p>
                       </div>
                     </div>
                     {item.slaMet && (
-                      <span className="px-2 py-0.5 text-[10px] font-medium rounded bg-emerald-100 text-emerald-700">
+                      <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-emerald-100 text-emerald-700">
                         SLA Met
                       </span>
                     )}
@@ -624,45 +614,45 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
           </div>
 
           {/* Pending Quotes & New Notes - Side by side */}
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-3 lg:grid-cols-2">
             {/* Pending Quotes */}
             <Card className="border border-border">
-              <CardHeader className="flex flex-row items-center justify-between p-4 pb-2">
+              <CardHeader className="flex flex-row items-center justify-between p-3 pb-2">
                 <CardTitle className="text-sm font-semibold">Pending Quotes</CardTitle>
                 <Link href="/quotes">
-                  <Button variant="ghost" size="sm" className="gap-1 text-primary text-xs h-7">
+                  <Button variant="ghost" size="sm" className="gap-1 text-primary text-xs h-6">
                     View All
-                    <ArrowRight className="h-3.5 w-3.5" />
+                    <ArrowRight className="h-3 w-3" />
                   </Button>
                 </Link>
               </CardHeader>
-              <CardContent className="p-4 pt-2">
+              <CardContent className="p-3 pt-0">
                 <div className="flex flex-col gap-2">
                   {pendingQuotes.map((quote) => (
                     <Link key={quote.id} href={`/quotes/${quote.id}`}>
-                      <div className="flex items-center justify-between rounded-lg border border-border p-2.5 hover:border-primary/50 transition-colors cursor-pointer">
+                      <div className="flex items-center justify-between rounded-lg border border-border p-2 hover:border-primary/50 transition-colors cursor-pointer">
                         <div>
                           <div className="flex items-center gap-2">
                             <p className="font-medium text-sm">{quote.projectName}</p>
                             {quote.status === 'unsent' && (
-                              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[9px] font-medium text-amber-700">
                                 Unsent
                               </span>
                             )}
                             {quote.status === 'pending_approval' && (
-                              <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">
+                              <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-medium text-blue-700">
                                 Pending
                               </span>
                             )}
                           </div>
-                          <p className="text-[10px] text-muted-foreground">Expires: {quote.expiresAt}</p>
+                          <p className="text-[9px] text-muted-foreground">Expires: {quote.expiresAt}</p>
                         </div>
                         <p className="font-semibold text-sm">₪{quote.amount.toLocaleString()}</p>
                       </div>
                     </Link>
                   ))}
                   {pendingQuotes.length === 0 && (
-                    <p className="py-4 text-center text-sm text-muted-foreground">No pending quotes.</p>
+                    <p className="py-3 text-center text-sm text-muted-foreground">No pending quotes.</p>
                   )}
                 </div>
               </CardContent>
@@ -670,35 +660,35 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
 
             {/* New Notes */}
             <Card className="border border-border">
-              <CardHeader className="flex flex-row items-center justify-between p-4 pb-2">
+              <CardHeader className="flex flex-row items-center justify-between p-3 pb-2">
                 <CardTitle className="flex items-center gap-2 text-sm font-semibold">
-                  <Bell className="h-4 w-4" />
+                  <Bell className="h-3.5 w-3.5" />
                   New Notes
                 </CardTitle>
                 <Link href="/projects?tab=notes">
-                  <Button variant="ghost" size="sm" className="gap-1 text-primary text-xs h-7">
+                  <Button variant="ghost" size="sm" className="gap-1 text-primary text-xs h-6">
                     View All
-                    <ArrowRight className="h-3.5 w-3.5" />
+                    <ArrowRight className="h-3 w-3" />
                   </Button>
                 </Link>
               </CardHeader>
-              <CardContent className="p-4 pt-2">
+              <CardContent className="p-3 pt-0">
                 <div className="flex flex-col gap-2">
                   {newNotes.map((note) => (
                     <Link key={note.id} href={`/projects/${note.projectId}?tab=notes`}>
-                      <div className="rounded-lg border border-border p-2.5 hover:border-primary/30 hover:bg-muted/30 transition-colors cursor-pointer">
+                      <div className="rounded-lg border border-border p-2 hover:border-primary/30 hover:bg-muted/30 transition-colors cursor-pointer">
                         <div className="flex items-center justify-between mb-0.5">
                           <p className="text-sm font-medium">{note.project}</p>
-                          <span className="text-[10px] text-muted-foreground">{note.time}</span>
+                          <span className="text-[9px] text-muted-foreground">{note.time}</span>
                         </div>
-                        <p className="text-xs text-muted-foreground line-clamp-1">
+                        <p className="text-[10px] text-muted-foreground line-clamp-1">
                           <span className="font-medium text-foreground">{note.from}:</span> {note.message}
                         </p>
                       </div>
                     </Link>
                   ))}
                   {newNotes.length === 0 && (
-                    <p className="py-4 text-center text-sm text-muted-foreground">No unread notes.</p>
+                    <p className="py-3 text-center text-sm text-muted-foreground">No unread notes.</p>
                   )}
                 </div>
               </CardContent>
