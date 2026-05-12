@@ -11,6 +11,16 @@ import {
   Bell,
   Clock,
   User,
+  Layers,
+  CheckCircle2,
+  MoreHorizontal,
+  Filter,
+  LayoutGrid,
+  List,
+  TrendingUp,
+  TrendingDown,
+  FolderOpen,
+  Search,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -20,6 +30,8 @@ import { AssignVendorDialog } from '@/components/assign-vendor-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { mockVendors } from '@/lib/mock-data'
 import { DashboardRefresh } from '@/components/dashboard-refresh'
+import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 
 // Newly assigned show awaiting vendor start
 interface NewlyAssignedShow {
@@ -34,12 +46,12 @@ interface NewlyAssignedShow {
   dueDate: string
 }
 
-
-
 const unassignedJobs = [
-  { id: 'uj1', projectId: 'p1', project: 'Product Launch Campaign', client: 'Acme Corp', task: 'Transcription', language: 'Spanish', due: '2026-02-10' },
-  { id: 'uj2', projectId: 'p2', project: 'Breaking News Coverage', client: 'Global News Ltd', task: 'Timing', language: 'Arabic', due: '2026-02-08' },
-  { id: 'uj3', projectId: 'p2', project: 'Breaking News Coverage', client: 'Global News Ltd', task: 'Translation', language: 'Japanese', due: '2026-02-08' },
+  { id: 'uj1', projectId: 'p1', project: 'Product Launch Campaign', client: 'Acme Corp', task: 'Transcription', sourceLang: 'EN', targetLang: 'ES', due: 'Tomorrow' },
+  { id: 'uj2', projectId: 'p1', project: 'Product Launch Campaign', client: 'Acme Corp', task: 'Transcription', sourceLang: 'EN', targetLang: 'ES', due: 'Today' },
+  { id: 'uj3', projectId: 'p1', project: 'Product Launch Campaign', client: 'Acme Corp', task: 'Transcription', sourceLang: 'EN', targetLang: 'ES', due: '2026-02-10' },
+  { id: 'uj4', projectId: 'p2', project: 'Breaking News Coverage', client: 'Global News Ltd', task: 'Timing', sourceLang: 'EN', targetLang: 'ES', due: '2026-02-08' },
+  { id: 'uj5', projectId: 'p2', project: 'Breaking News Coverage', client: 'Global News Ltd', task: 'Translation', sourceLang: 'EN', targetLang: 'ES', due: 'Overdue' },
 ]
 
 const pendingQuotes = [
@@ -61,7 +73,7 @@ interface PipelineStep {
 
 interface ActiveShow {
   name: string
-  status: 'IN PROGRESS' | 'IN REVIEW'
+  status: 'In Progress' | 'In Review' | 'At Risk'
   client: string
   due: string
   languages: string[]
@@ -72,52 +84,54 @@ interface ActiveShow {
 const activeShows: ActiveShow[] = [
   {
     name: 'Product Launch Campaign',
-    status: 'IN PROGRESS',
+    status: 'In Progress',
     client: 'Acme Corp',
     due: '2026-02-15',
     languages: ['ES', 'FR', 'DE'],
     health: { label: 'On track', percentage: 65, status: 'on_track' },
     pipeline: [
-      { name: 'Transcription', assignee: { initials: 'MG', color: 'bg-[#18181b]' }, status: 'completed' },
-      { name: 'Timing', assignee: { initials: 'MG', color: 'bg-[#18181b]' }, status: 'completed' },
-      { name: 'Translation', assignee: { initials: 'JM', color: 'bg-[#18181b]' }, status: 'in_progress' },
-      { name: 'QA', status: 'pending', count: 4 },
-      { name: 'Review', status: 'pending', count: 5 },
+      { name: 'Start', status: 'completed' },
+      { name: 'Transcription', assignee: { initials: 'MG', color: 'bg-foreground' }, status: 'completed' },
+      { name: 'Translating', assignee: { initials: 'JM', color: 'bg-foreground' }, status: 'in_progress' },
+      { name: 'Review', status: 'pending' },
     ],
   },
   {
     name: 'Breaking News Coverage',
-    status: 'IN PROGRESS',
-    client: 'Global News Ltd',
+    status: 'At Risk',
+    client: 'Global News',
     due: '2026-02-08',
     languages: ['AR', 'JA'],
-    health: { label: 'At risk', percentage: 30, status: 'at_risk' },
+    health: { label: 'At risk', percentage: 25, status: 'at_risk' },
     pipeline: [
-      { name: 'Transcription', assignee: { initials: 'AH', color: 'bg-[#18181b]' }, status: 'completed' },
-      { name: 'Timing', assignee: { initials: 'AH', color: 'bg-[#f43f5e]' }, status: 'at_risk' },
-      { name: 'Translation', status: 'pending', count: 4 },
-      { name: 'QA', status: 'pending', count: 4 },
-      { name: 'Review', status: 'pending', count: 5 },
+      { name: 'Start', status: 'completed' },
+      { name: 'Transcription', assignee: { initials: 'AH', color: 'bg-foreground' }, status: 'completed' },
+      { name: 'Timing Delay', status: 'at_risk' },
+      { name: 'Review', status: 'pending' },
     ],
   },
   {
     name: 'Training Series Vol. 2',
-    status: 'IN REVIEW',
+    status: 'In Review',
     client: 'EduTech Inc',
     due: '2026-02-10',
     languages: ['PT'],
     health: { label: 'On track', percentage: 90, status: 'on_track' },
     pipeline: [
-      { name: 'Transcription', assignee: { initials: 'AI', color: 'bg-[#18181b]' }, status: 'completed' },
-      { name: 'Timing', assignee: { initials: 'AI', color: 'bg-[#18181b]' }, status: 'completed' },
-      { name: 'Translation', assignee: { initials: 'CR', color: 'bg-[#18181b]' }, status: 'completed' },
-      { name: 'CR', assignee: { initials: 'CR', color: 'bg-[#18181b]' }, status: 'completed' },
-      { name: 'Review', status: 'in_progress', count: 5 },
+      { name: 'Start', status: 'completed' },
+      { name: 'Transcription', assignee: { initials: 'AI', color: 'bg-foreground' }, status: 'completed' },
+      { name: 'Translation', assignee: { initials: 'CR', color: 'bg-foreground' }, status: 'completed' },
+      { name: 'QC', assignee: { initials: 'CR', color: 'bg-foreground' }, status: 'completed' },
+      { name: 'Client Review', status: 'in_progress' },
     ],
   },
 ]
 
-
+// Completed today items
+const completedToday = [
+  { id: 'ct1', name: 'Training Series Vol. 2', task: 'Translation', lang: 'PT', vendor: 'Carlos R.', time: '14:32', slaMet: true },
+  { id: 'ct2', name: 'Product Launch', task: 'Transcription', lang: 'ES', vendor: 'Maria Garcia', time: '09:15', slaMet: true },
+]
 
 interface AssignTask {
   id: string
@@ -129,12 +143,34 @@ interface AssignTask {
   dueDate: string
 }
 
+// Helper to format due date with colors
+function formatDueDate(due: string) {
+  if (due === 'Today') {
+    return <span className="text-red-500 font-medium">Today</span>
+  }
+  if (due === 'Tomorrow') {
+    return <span className="text-amber-500 font-medium">Tomorrow</span>
+  }
+  if (due === 'Overdue') {
+    return (
+      <span className="text-red-500 font-medium flex items-center gap-1">
+        <AlertTriangle className="h-3.5 w-3.5" />
+        Overdue
+      </span>
+    )
+  }
+  // Format date as "Feb 10, 2026"
+  const date = new Date(due)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
   const [assignDialogOpen, setAssignDialogOpen] = useState(false)
   const [selectedTask, setSelectedTask] = useState<AssignTask | null>(null)
   const [assignedJobIds, setAssignedJobIds] = useState<string[]>([])
   const [newlyAssignedShows, setNewlyAssignedShows] = useState<NewlyAssignedShow[]>([])
   const [animatingOutId, setAnimatingOutId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid')
   const { toast } = useToast()
 
   const handleAssignClick = (job: typeof unassignedJobs[0]) => {
@@ -144,7 +180,7 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
       project: job.project,
       client: job.client,
       taskType: job.task,
-      language: job.language,
+      language: `${job.sourceLang} → ${job.targetLang}`,
       dueDate: job.due,
     })
     setAssignDialogOpen(true)
@@ -163,7 +199,7 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
         setAssignedJobIds(prev => [...prev, selectedTask.id])
         
         // Add to newly assigned projects at top
-        const newProject: NewlyAssignedProject = {
+        const newProject: NewlyAssignedShow = {
           id: `new-${selectedTask.id}`,
           name: selectedTask.project,
           client: selectedTask.client,
@@ -174,14 +210,14 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
           assignedAt: new Date(),
           dueDate: selectedTask.dueDate,
         }
-        setNewlyAssignedProjects(prev => [newProject, ...prev])
+        setNewlyAssignedShows(prev => [newProject, ...prev])
         setAnimatingOutId(null)
         
         toast({
           title: 'Vendor Assigned',
-          description: `${vendor?.name || 'Vendor'} assigned to ${selectedTask.taskType} (${selectedTask.language}). Awaiting start.`,
+          description: `${vendor?.name || 'Vendor'} assigned to ${selectedTask.taskType}. Awaiting start.`,
         })
-      }, 300) // Match animation duration
+      }, 300)
     }
   }
 
@@ -190,219 +226,236 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
     job => !assignedJobIds.includes(job.id)
   )
 
+  // KPI stats
+  const stats = {
+    activeProjects: 3,
+    activeProjectsTrend: 1,
+    unassignedJobs: visibleUnassignedJobs.length,
+    unassignedJobsTrend: 2,
+    atRisk: 1,
+    atRiskTrend: 0,
+    completedToday: 2,
+    completedTodayTrend: 2,
+  }
+
   return (
-    <div className="p-6 lg:p-8 space-y-8">
-      {/* Header with CTAs */}
-<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-  <div>
-<h1 className="text-2xl font-semibold text-foreground">Dashboard</h1>
-  <p className="text-sm text-muted-foreground mt-1">Track project health, SLAs, and vendor assignments.</p>
-  </div>
-  <div className="flex items-center gap-3">
-  <DashboardRefresh />
-  <Link href="/projects/new" prefetch={true}>
-  <Button className="gap-2">
-  <Plus className="h-4 w-4" />
-  New Show
-  </Button>
-          </Link>
-          <Link href="/quotes/new" prefetch={true}>
-            <Button variant="outline" className="gap-2">
-              <FileText className="h-4 w-4" />
-              New Quote
-            </Button>
-          </Link>
+    <div className="min-h-full bg-[#f5f5f5]">
+      {/* Main curved content area */}
+      <div className="bg-white rounded-tl-[2rem] min-h-full p-6 lg:p-8">
+        {/* Header */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-semibold text-foreground">Project Monitoring</h1>
+            <p className="text-sm text-muted-foreground mt-1">Track project health, SLAs, and vendor assignments.</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search projects..." 
+                className="pl-9 w-[200px] h-9 bg-white border-border"
+              />
+            </div>
+            <DashboardRefresh />
+          </div>
         </div>
-      </div>
 
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <Card className="border border-border bg-white">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Active Projects</span>
+                <Layers className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-semibold">{stats.activeProjects}</span>
+                {stats.activeProjectsTrend !== 0 && (
+                  <span className={cn(
+                    "text-xs font-medium flex items-center",
+                    stats.activeProjectsTrend > 0 ? "text-emerald-600" : "text-red-500"
+                  )}>
+                    {stats.activeProjectsTrend > 0 ? <TrendingUp className="h-3 w-3 mr-0.5" /> : <TrendingDown className="h-3 w-3 mr-0.5" />}
+                    {stats.activeProjectsTrend > 0 ? '+' : ''}{stats.activeProjectsTrend}
+                  </span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
+          <Card className="border border-border bg-white">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Unassigned Jobs</span>
+                <AlertTriangle className="h-4 w-4 text-amber-500" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-semibold">{stats.unassignedJobs}</span>
+                {stats.unassignedJobsTrend !== 0 && (
+                  <span className="text-xs font-medium flex items-center text-red-500">
+                    <TrendingUp className="h-3 w-3 mr-0.5" />
+                    +{stats.unassignedJobsTrend}
+                  </span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
 
-      {/* Unassigned Jobs */}
-      <div>
-        <div className="mb-3 flex items-center gap-2">
-          <AlertTriangle className="h-4 w-4 text-muted-foreground" />
-          <h2 className="text-base font-semibold text-foreground">Pending Vendor Assignments</h2>
-          {visibleUnassignedJobs.length > 0 && (
-            <span className="rounded-full bg-[#f43f5e] px-2 py-0.5 text-xs font-medium text-white">
-              {visibleUnassignedJobs.length} pending
-            </span>
-          )}
+          <Card className="border border-border bg-white">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">At-Risk</span>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-semibold">{stats.atRisk}</span>
+                <span className="text-xs text-muted-foreground">– {stats.atRiskTrend}</span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border border-border bg-white">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Completed Today</span>
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-semibold">{stats.completedToday}</span>
+                {stats.completedTodayTrend !== 0 && (
+                  <span className="text-xs font-medium flex items-center text-emerald-600">
+                    +{stats.completedTodayTrend}
+                  </span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
-        <Card className="border border-border">
-          <CardContent className="p-0">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Project
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Task
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Language
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Due
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {visibleUnassignedJobs.map((job) => (
-                  <tr 
-                    key={job.id}
-                    className={cn(
-                      'transition-all duration-300',
-                      animatingOutId === job.id && 'opacity-0 -translate-x-4'
-                    )}
-                  >
-                    <td className="px-6 py-4 text-sm font-medium text-foreground">
-                      <Link href={`/projects/${job.projectId}`} className="hover:text-primary hover:underline transition-colors">
-                        {job.project}
-                      </Link>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground">{job.task}</td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground">{job.language}</td>
-                    <td className="px-6 py-4 text-sm text-muted-foreground">{job.due}</td>
-                    <td className="px-6 py-4 text-right">
-                      <Button 
-                        size="sm" 
-                        className="h-7 gap-1.5 bg-[#18181b] text-white hover:bg-[#18181b]/90"
-                        onClick={() => handleAssignClick(job)}
-                      >
-                        <UserPlus className="h-3.5 w-3.5" />
-                        Assign Vendor
-                      </Button>
-                    </td>
+
+        {/* Action Required - Pending Assignments Table */}
+        <div className="mb-8">
+          <div className="mb-3 flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 text-amber-500" />
+            <h2 className="text-base font-semibold text-foreground">Action Required</h2>
+            {visibleUnassignedJobs.length > 0 && (
+              <span className="rounded-full bg-red-100 text-red-600 px-2 py-0.5 text-xs font-medium">
+                {visibleUnassignedJobs.length} pending assignments
+              </span>
+            )}
+          </div>
+          <Card className="border border-border overflow-hidden">
+            <CardContent className="p-0">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border bg-muted/30">
+                    <th className="w-10 px-4 py-3">
+                      <Checkbox />
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                      Project
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                      Task
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                      Language
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground">
+                      Due Date
+                    </th>
+                    <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground">
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        </Card>
-      </div>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {visibleUnassignedJobs.map((job) => (
+                    <tr 
+                      key={job.id}
+                      className={cn(
+                        'transition-all duration-300 hover:bg-muted/20',
+                        animatingOutId === job.id && 'opacity-0 -translate-x-4'
+                      )}
+                    >
+                      <td className="w-10 px-4 py-3">
+                        <Checkbox />
+                      </td>
+                      <td className="px-4 py-3">
+                        <Link href={`/projects/${job.projectId}`} className="text-sm font-medium text-foreground hover:text-primary hover:underline transition-colors">
+                          {job.project}
+                        </Link>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-muted-foreground">{job.task}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-1.5 py-0.5 text-xs font-medium bg-muted rounded">{job.sourceLang}</span>
+                          <span className="text-muted-foreground">→</span>
+                          <span className="px-1.5 py-0.5 text-xs font-medium bg-muted rounded">{job.targetLang}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-sm">{formatDueDate(job.due)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <Button 
+                          size="sm" 
+                          className="h-8 bg-foreground text-background hover:bg-foreground/90"
+                          onClick={() => handleAssignClick(job)}
+                        >
+                          Assign
+                        </Button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Pending Quotes & New Notes */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Pending Quotes */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-base font-semibold">Pending Quotes</CardTitle>
-            <Link href="/quotes">
-              <Button variant="ghost" size="sm" className="gap-1 text-primary">
-                View All
-                <ArrowRight className="h-4 w-4" />
+        {/* Active Projects */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-base font-semibold text-foreground">Active Projects</h2>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="h-8 gap-1.5">
+                <Filter className="h-3.5 w-3.5" />
+                Filters
               </Button>
-            </Link>
-          </CardHeader>
-          <CardContent className="p-4 pt-2">
-            <div className="flex flex-col gap-3">
-              {pendingQuotes.map((quote) => (
-                <Link key={quote.id} href={`/quotes/${quote.id}`}>
-                  <div className="flex items-center justify-between rounded-lg border border-border p-3 hover:border-primary/50 transition-colors cursor-pointer">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm">{quote.projectName}</p>
-                        {quote.status === 'unsent' && (
-                          <span className="rounded bg-[#fef3c7] px-1.5 py-0.5 text-xs font-medium text-[#92400e]">
-                            Unsent
-                          </span>
-                        )}
-                        {quote.status === 'pending_approval' && (
-                          <span className="rounded bg-[#dbeafe] px-1.5 py-0.5 text-xs font-medium text-[#1e40af]">
-                            Pending
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-xs text-muted-foreground">Expires: {quote.expiresAt}</p>
-                    </div>
-                    <p className="font-semibold">₪{quote.amount.toLocaleString()}</p>
-                  </div>
-                </Link>
-              ))}
-              {pendingQuotes.length === 0 && (
-                <p className="py-4 text-center text-sm text-muted-foreground">No pending quotes.</p>
-              )}
+              <div className="flex border border-border rounded-md">
+                <Button 
+                  variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
+                  size="sm" 
+                  className="h-8 w-8 p-0 rounded-r-none"
+                  onClick={() => setViewMode('list')}
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+                <Button 
+                  variant={viewMode === 'grid' ? 'secondary' : 'ghost'} 
+                  size="sm" 
+                  className="h-8 w-8 p-0 rounded-l-none"
+                  onClick={() => setViewMode('grid')}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* New Notes */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="flex items-center gap-2 text-base font-semibold">
-              <Bell className="h-4 w-4" />
-              New Notes
-            </CardTitle>
-            <Link href="/projects?tab=notes">
-              <Button variant="ghost" size="sm" className="gap-1 text-primary">
-                View All
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </Link>
-          </CardHeader>
-          <CardContent className="px-6 pb-6 pt-2">
-            <div className="flex flex-col gap-3">
-              {newNotes.map((note) => (
-                <Link key={note.id} href={`/projects/${note.projectId}?tab=notes`}>
-                  <div className="rounded-lg border border-border p-3 hover:border-primary/30 hover:bg-muted/30 transition-colors cursor-pointer">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-medium">{note.project}</p>
-                      <span className="text-xs text-muted-foreground">{note.time}</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      <span className="font-medium text-foreground">{note.from}:</span> {note.message}
-                    </p>
-                  </div>
-                </Link>
-              ))}
-              {newNotes.length === 0 && (
-                <p className="py-4 text-center text-sm text-muted-foreground">No unread notes.</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Active Shows */}
-      <div>
-        <h2 className="mb-4 text-base font-semibold text-foreground">Active Shows</h2>
-        <div className="flex flex-col gap-5">
           {/* Newly Assigned Shows - Awaiting Vendor Start */}
           {newlyAssignedShows.map((project) => (
-            <Link key={project.id} href={`/projects/${project.id.replace('new-uj', 'p')}`}>
-              <Card className="border border-amber-200 bg-amber-50/30 dark:border-amber-900/50 dark:bg-amber-950/20 hover:border-amber-300 transition-all duration-300 animate-in slide-in-from-top-2 fade-in cursor-pointer">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-base font-semibold text-foreground">{project.name}</h3>
-                        <span className="rounded px-2 py-0.5 text-xs font-medium bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400">
-                          Awaiting Start
-                        </span>
-                      </div>
-                      <p className="text-sm text-muted-foreground">
-                        Client: {project.client} · Due {project.dueDate} · {project.language}
-                      </p>
-                      <div className="mt-3 flex items-center gap-4">
-                        <div className="flex items-center gap-2 text-sm">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <span className="font-medium">{project.vendorName}</span>
-                          <span className="text-muted-foreground">assigned to {project.taskType}</span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400">
-                        <Clock className="h-4 w-4" />
-                        <span className="text-sm font-medium">Pending</span>
-                      </div>
-                      <span className="text-xs text-muted-foreground">
-                        Assigned just now
+            <Link key={project.id} href={`/projects/${project.id.replace('new-uj', 'p')}`} className="block mb-4">
+              <Card className="border border-amber-200 bg-amber-50/30 hover:border-amber-300 transition-all duration-300 animate-in slide-in-from-top-2 fade-in">
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="px-2 py-0.5 text-xs font-medium rounded bg-amber-100 text-amber-700">
+                        Awaiting Start
                       </span>
+                      <span className="font-medium">{project.name}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                      <span>{project.vendorName} assigned to {project.taskType}</span>
+                      <Clock className="h-4 w-4 text-amber-500" />
                     </div>
                   </div>
                 </CardContent>
@@ -410,92 +463,120 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
             </Link>
           ))}
           
-          {/* Existing Active Projects */}
-          {activeShows.map((project, index) => (
-            <Link key={index} href={`/projects/p${index + 1}`}>
-              <Card className="border border-border hover:border-primary/30 hover:bg-muted/20 transition-colors cursor-pointer">
-                <CardContent className="p-6">
-                  <div className="mb-4 flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base font-semibold text-foreground">{project.name}</h3>
+          {/* Active Projects Cards - Condensed Grid */}
+          <div className={cn(
+            "grid gap-4",
+            viewMode === 'grid' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
+          )}>
+            {activeShows.map((project, index) => (
+              <Link key={index} href={`/projects/p${index + 1}`}>
+                <Card className="border border-border hover:border-primary/30 hover:shadow-sm transition-all cursor-pointer h-full">
+                  <CardContent className="p-4">
+                    {/* Header row */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
                         <span
                           className={cn(
-                            'rounded px-2 py-0.5 text-xs font-medium',
-                            project.status === 'IN REVIEW'
-                              ? 'bg-[#d1fae5] text-[#047857]'
-                              : 'bg-secondary text-foreground'
+                            'inline-block px-2 py-0.5 text-xs font-medium rounded mb-1.5',
+                            project.status === 'In Review'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : project.status === 'At Risk'
+                                ? 'bg-red-100 text-red-600'
+                                : 'bg-muted text-foreground'
                           )}
                         >
                           {project.status}
                         </span>
+                        <h3 className="text-sm font-semibold text-foreground">{project.name}</h3>
                       </div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        Client: {project.client} · Due {project.due} · {project.languages.join(', ')}
-                      </p>
+                      <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                        <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+                      </Button>
                     </div>
-                    <div
-                      className={cn(
-                        'flex items-center gap-1 text-sm font-medium',
-                        project.health.status === 'on_track' ? 'text-[#10b981]' : 'text-[#f43f5e]'
-                      )}
-                    >
-                      <span
-                        className={cn(
-                          'h-2 w-2 rounded-full',
-                          project.health.status === 'on_track' ? 'bg-[#10b981]' : 'bg-[#f43f5e]'
-                        )}
-                      />
-                      {project.health.label} ({project.health.percentage}%)
-                    </div>
-                  </div>
 
-                  {/* Pipeline */}
-                  <div className="flex items-start">
-                    {project.pipeline.map((step, stepIndex) => (
-                      <div key={stepIndex} className="flex flex-1 items-center">
-                        {/* Step column with avatar and label */}
-                        <div className="flex flex-col items-center">
-                          {step.assignee ? (
-                            <Avatar className="h-8 w-8 shrink-0 border-2 border-white">
-                              <AvatarFallback className={cn('text-xs font-medium text-white', step.assignee.color)}>
-                                {step.assignee.initials}
-                              </AvatarFallback>
-                            </Avatar>
-                          ) : (
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 border-border bg-secondary text-xs font-medium text-muted-foreground">
-                              {step.count}
-                            </div>
-                          )}
-                          <span
-                            className={cn(
-                              'mt-2 text-xs whitespace-nowrap',
-                              step.status === 'at_risk'
-                                ? 'font-medium text-destructive'
-                                : step.status === 'completed' || step.status === 'in_progress'
-                                  ? 'text-foreground'
-                                  : 'text-muted-foreground'
-                            )}
-                          >
-                            {step.name}
-                          </span>
-                        </div>
-                        {/* Connecting line */}
-                        {stepIndex < project.pipeline.length - 1 && (
-                          <div
-                            className={cn(
-                              'h-0.5 flex-1 -translate-y-3',
-                              step.status === 'completed' ? 'bg-foreground' : 'bg-border'
-                            )}
-                          />
-                        )}
+                    {/* Info rows */}
+                    <div className="space-y-1.5 text-xs mb-4">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Client</span>
+                        <span className="font-medium text-right">{project.client}</span>
                       </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Due Date</span>
+                        <span className={cn(
+                          "font-medium",
+                          project.health.status === 'at_risk' && "text-red-500"
+                        )}>
+                          {new Date(project.due).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Langs</span>
+                        <span className="font-medium">{project.languages.join(', ')}</span>
+                      </div>
+                    </div>
+
+                    {/* Workflow Progress */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-muted-foreground">Workflow Progress</span>
+                        <span className={cn(
+                          "text-xs font-medium",
+                          project.health.status === 'on_track' ? "text-emerald-600" : "text-red-500"
+                        )}>
+                          {project.health.percentage}%
+                        </span>
+                      </div>
+                      
+                      {/* Pipeline visualization */}
+                      <div className="flex items-center gap-1">
+                        {project.pipeline.map((step, stepIndex) => (
+                          <div key={stepIndex} className="flex items-center flex-1">
+                            {/* Step dot/circle */}
+                            <div className="flex flex-col items-center">
+                              {step.status === 'completed' ? (
+                                <div className="h-4 w-4 rounded-full bg-foreground flex items-center justify-center">
+                                  <CheckCircle2 className="h-3 w-3 text-background" />
+                                </div>
+                              ) : step.status === 'in_progress' ? (
+                                <div className="h-4 w-4 rounded-full border-2 border-foreground bg-white" />
+                              ) : step.status === 'at_risk' ? (
+                                <div className="h-4 w-4 rounded-full border-2 border-red-500 bg-red-50" />
+                              ) : (
+                                <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30 bg-white" />
+                              )}
+                            </div>
+                            {/* Connecting line */}
+                            {stepIndex < project.pipeline.length - 1 && (
+                              <div
+                                className={cn(
+                                  'h-0.5 flex-1 mx-0.5',
+                                  step.status === 'completed' ? 'bg-foreground' : 'bg-muted'
+                                )}
+                              />
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      {/* Labels */}
+                      <div className="flex justify-between mt-1">
+                        <span className="text-[10px] text-muted-foreground">Start</span>
+                        <span className={cn(
+                          "text-[10px]",
+                          project.pipeline.some(s => s.status === 'at_risk') ? "text-red-500 font-medium" : "text-muted-foreground"
+                        )}>
+                          {project.pipeline.find(s => s.status === 'at_risk')?.name || 
+                           project.pipeline.find(s => s.status === 'in_progress')?.name || 
+                           project.pipeline[project.pipeline.length - 1].name}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">Review</span>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            ))}
+          </div>
+
           {activeShows.length === 0 && (
             <Card className="border border-dashed">
               <CardContent className="py-8 text-center">
@@ -504,9 +585,124 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
             </Card>
           )}
         </div>
+
+        {/* Completed Today */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+              <h2 className="text-base font-semibold text-foreground">Completed Today</h2>
+            </div>
+            <Link href="/projects?status=completed">
+              <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                View History
+              </Button>
+            </Link>
+          </div>
+          <Card className="border border-border">
+            <CardContent className="p-0 divide-y divide-border">
+              {completedToday.map((item) => (
+                <div key={item.id} className="flex items-center justify-between px-4 py-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-1 h-8 bg-emerald-500 rounded-full" />
+                    <div>
+                      <p className="text-sm font-medium">{item.name} – {item.task} ({item.lang})</p>
+                      <p className="text-xs text-muted-foreground">Vendor: {item.vendor} · Completed at {item.time}</p>
+                    </div>
+                  </div>
+                  {item.slaMet && (
+                    <span className="px-2 py-0.5 text-xs font-medium rounded bg-emerald-100 text-emerald-700">
+                      SLA Met
+                    </span>
+                  )}
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Pending Quotes & New Notes - Side by side */}
+        <div className="grid gap-6 lg:grid-cols-2">
+          {/* Pending Quotes */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-base font-semibold">Pending Quotes</CardTitle>
+              <Link href="/quotes">
+                <Button variant="ghost" size="sm" className="gap-1 text-primary">
+                  View All
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="p-4 pt-2">
+              <div className="flex flex-col gap-3">
+                {pendingQuotes.map((quote) => (
+                  <Link key={quote.id} href={`/quotes/${quote.id}`}>
+                    <div className="flex items-center justify-between rounded-lg border border-border p-3 hover:border-primary/50 transition-colors cursor-pointer">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-sm">{quote.projectName}</p>
+                          {quote.status === 'unsent' && (
+                            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700">
+                              Unsent
+                            </span>
+                          )}
+                          {quote.status === 'pending_approval' && (
+                            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-xs font-medium text-blue-700">
+                              Pending
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">Expires: {quote.expiresAt}</p>
+                      </div>
+                      <p className="font-semibold">₪{quote.amount.toLocaleString()}</p>
+                    </div>
+                  </Link>
+                ))}
+                {pendingQuotes.length === 0 && (
+                  <p className="py-4 text-center text-sm text-muted-foreground">No pending quotes.</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* New Notes */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <Bell className="h-4 w-4" />
+                New Notes
+              </CardTitle>
+              <Link href="/projects?tab=notes">
+                <Button variant="ghost" size="sm" className="gap-1 text-primary">
+                  View All
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="px-4 pb-4 pt-2">
+              <div className="flex flex-col gap-3">
+                {newNotes.map((note) => (
+                  <Link key={note.id} href={`/projects/${note.projectId}?tab=notes`}>
+                    <div className="rounded-lg border border-border p-3 hover:border-primary/30 hover:bg-muted/30 transition-colors cursor-pointer">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-sm font-medium">{note.project}</p>
+                        <span className="text-xs text-muted-foreground">{note.time}</span>
+                      </div>
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        <span className="font-medium text-foreground">{note.from}:</span> {note.message}
+                      </p>
+                    </div>
+                  </Link>
+                ))}
+                {newNotes.length === 0 && (
+                  <p className="py-4 text-center text-sm text-muted-foreground">No unread notes.</p>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
-
-
 
       {/* Assign Vendor Dialog */}
       <AssignVendorDialog
