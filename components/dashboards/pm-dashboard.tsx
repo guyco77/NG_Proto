@@ -487,7 +487,7 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
             {newlyAssignedShows.map((show) => (
               <Link key={show.id} href={`/projects/${show.id.replace('new-uj', 'p')}`} className="block mb-2">
                 <Card className="border border-amber-200 bg-amber-50/30 hover:border-amber-300 transition-all animate-in slide-in-from-top-2 fade-in">
-                  <CardContent className="py-2 px-3">
+                  <CardContent className="py-1.5 px-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-sm">{show.name}</span>
@@ -510,9 +510,9 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
             )}>
               {activeShows.map((show) => (
                 <Card key={show.id} className="border border-border hover:border-primary/30 hover:shadow-sm transition-all">
-                  <CardContent className="px-3 py-2.5">
+                  <CardContent className="px-4 py-1.5">
                     {/* Line 1: Name, Badge, then metadata on right */}
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2 mb-1.5">
                       <Link href={`/projects/${show.id}`} className="truncate min-w-0">
                         <span className="text-sm font-semibold text-foreground hover:text-primary transition-colors">
                           {show.name}
