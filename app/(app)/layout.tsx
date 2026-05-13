@@ -1,7 +1,6 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
-import { usePathname } from 'next/navigation'
 import { AppSidebar } from '@/components/app-sidebar'
 import { AppHeader } from '@/components/app-header'
 import { CommandPalette } from '@/components/command-palette'
@@ -40,10 +39,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [currentRole, setCurrentRole] = useState<UserRole>('pm')
   const [searchOpen, setSearchOpen] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const pathname = usePathname()
-  
-  // Hide header on dashboard to allow curved layout
-  const hideHeader = pathname === '/dashboard'
 
   // NAV-004: Cmd+K / Ctrl+K keyboard shortcut
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -90,15 +85,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </Sheet>
         
         <div className="flex flex-1 flex-col overflow-hidden">
-          {!hideHeader && (
-            <AppHeader
-              userName={userNames[currentRole]}
-              userRole={currentRole}
-              onOpenSearch={() => setSearchOpen(true)}
-              onOpenMobileMenu={() => setMobileMenuOpen(true)}
-            />
-          )}
-          <main id="main-content" className="flex-1 overflow-y-auto bg-[#e8e8e8]">
+          <AppHeader
+            userName={userNames[currentRole]}
+            userRole={currentRole}
+            onOpenSearch={() => setSearchOpen(true)}
+            onOpenMobileMenu={() => setMobileMenuOpen(true)}
+          />
+          <main id="main-content" className="flex-1 overflow-y-auto bg-background">
             <ScrollToTop />
             {children}
           </main>

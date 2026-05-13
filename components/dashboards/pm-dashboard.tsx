@@ -14,7 +14,6 @@ import {
   LayoutGrid,
   List,
   TrendingUp,
-  Search,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -24,7 +23,6 @@ import { AssignVendorDialog } from '@/components/assign-vendor-dialog'
 import { useToast } from '@/hooks/use-toast'
 import { mockVendors } from '@/lib/mock-data'
 import { DashboardRefresh } from '@/components/dashboard-refresh'
-import { Input } from '@/components/ui/input'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -328,21 +326,7 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
               <h1 className="text-xl font-semibold text-foreground">Show Monitoring</h1>
               <p className="text-sm text-muted-foreground mt-0.5">Track show health, SLAs, and vendor assignments.</p>
             </div>
-            <div className="flex items-center gap-3">
-              <DashboardRefresh />
-              <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input 
-                  placeholder="Search shows..." 
-                  className="pl-9 w-[200px] h-9 text-sm bg-muted/30 border-0"
-                />
-              </div>
-              <Avatar className="h-8 w-8 border border-border">
-                <AvatarFallback className="text-xs bg-primary/10 text-primary font-medium">
-                  {userName.split(' ').map(n => n[0]).join('')}
-                </AvatarFallback>
-              </Avatar>
-            </div>
+            <DashboardRefresh />
           </div>
 
           {/* KPI Cards - matching reference design */}
