@@ -215,9 +215,9 @@ function InlinePipeline({ pipeline, health }: { pipeline: PipelineStep[], health
                     )}
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="top" className="px-3 py-2">
-                  <p className="font-medium text-sm">{step.name}</p>
-                  {step.assignee && <p className="text-xs text-muted-foreground">{step.assignee.name}</p>}
+                <TooltipContent side="top" className="px-3 py-2 text-sm">
+                  <p className="font-semibold">{step.name}</p>
+                  {step.assignee && <p className="text-muted-foreground text-xs mt-0.5">{step.assignee.name}</p>}
                 </TooltipContent>
               </Tooltip>
               {idx < pipeline.length - 1 && (
@@ -318,82 +318,87 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
   }
 
   return (
-    <div className="min-h-full">
+    <div className="min-h-full flex flex-col">
       {/* Main curved content area */}
-      <div className="bg-white rounded-tl-[2.5rem] min-h-full shadow-sm border-l border-t border-border/30">
-        <div className="p-5 lg:p-6">
-          {/* Header */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-5">
+      <div className="bg-white rounded-tl-[2.5rem] flex-1 shadow-[inset_0_1px_0_0_rgba(0,0,0,0.03)] border-l border-t border-border/40">
+        <div className="px-6 py-5 lg:px-8 lg:py-6">
+          {/* Header with title on left, search + avatar on right */}
+          <div className="flex items-start justify-between mb-6">
             <div>
               <h1 className="text-xl font-semibold text-foreground">Show Monitoring</h1>
-              <p className="text-xs text-muted-foreground mt-0.5">Track show health, SLAs, and vendor assignments.</p>
+              <p className="text-sm text-muted-foreground mt-0.5">Track show health, SLAs, and vendor assignments.</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <DashboardRefresh />
               <div className="relative">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input 
                   placeholder="Search shows..." 
-                  className="pl-8 w-[180px] h-8 text-sm bg-muted/30 border-0"
+                  className="pl-9 w-[200px] h-9 text-sm bg-muted/30 border-0"
                 />
               </div>
+              <Avatar className="h-8 w-8 border border-border">
+                <AvatarFallback className="text-xs bg-primary/10 text-primary font-medium">
+                  {userName.split(' ').map(n => n[0]).join('')}
+                </AvatarFallback>
+              </Avatar>
             </div>
           </div>
 
           {/* KPI Cards - matching reference design */}
-          <Card className="mb-5 border border-border shadow-sm">
+          <Card className="mb-6 border border-border shadow-sm">
             <CardContent className="p-0">
               <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-border">
-                <div className="p-3">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Active Shows</span>
-                    <Layers className="h-3.5 w-3.5 text-muted-foreground/50" />
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Active Shows</span>
+                    <Layers className="h-4 w-4 text-muted-foreground/50" />
                   </div>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-2xl font-bold tabular-nums">{stats.activeShows}</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-bold tabular-nums">{stats.activeShows}</span>
                     {stats.activeShowsTrend !== 0 && (
-                      <span className="text-[10px] font-medium text-emerald-600 flex items-center">
-                        <TrendingUp className="h-2.5 w-2.5 mr-0.5" />+{stats.activeShowsTrend}
+                      <span className="text-xs font-medium text-emerald-600 flex items-center">
+                        <TrendingUp className="h-3 w-3 mr-0.5" />+{stats.activeShowsTrend}
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="p-3">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Unassigned Jobs</span>
-                    <AlertTriangle className="h-3.5 w-3.5 text-amber-500" />
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Unassigned Jobs</span>
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
                   </div>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-2xl font-bold tabular-nums">{stats.unassignedJobs}</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-bold tabular-nums">{stats.unassignedJobs}</span>
                     {stats.unassignedJobsTrend !== 0 && (
-                      <span className="text-[10px] font-medium text-red-500 flex items-center">
-                        <TrendingUp className="h-2.5 w-2.5 mr-0.5" />+{stats.unassignedJobsTrend}
+                      <span className="text-xs font-medium text-red-500 flex items-center">
+                        <TrendingUp className="h-3 w-3 mr-0.5" />+{stats.unassignedJobsTrend}
                       </span>
                     )}
                   </div>
                 </div>
 
-                <div className="p-3">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">At-Risk</span>
-                    <Clock className="h-3.5 w-3.5 text-muted-foreground/50" />
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">At-Risk</span>
+                    <Clock className="h-4 w-4 text-muted-foreground/50" />
                   </div>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-2xl font-bold tabular-nums">{stats.atRisk}</span>
-                    <span className="text-[10px] text-muted-foreground">– {stats.atRiskTrend}</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-bold tabular-nums">{stats.atRisk}</span>
+                    <span className="text-xs text-muted-foreground">– {stats.atRiskTrend}</span>
                   </div>
                 </div>
 
-                <div className="p-3">
-                  <div className="flex items-center justify-between mb-0.5">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Completed Today</span>
-                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Completed Today</span>
+                    <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                   </div>
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-2xl font-bold tabular-nums">{stats.completedToday}</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-bold tabular-nums">{stats.completedToday}</span>
                     {stats.completedTodayTrend !== 0 && (
-                      <span className="text-[10px] font-medium text-emerald-600">+{stats.completedTodayTrend}</span>
+                      <span className="text-xs font-medium text-emerald-600">+{stats.completedTodayTrend}</span>
                     )}
                   </div>
                 </div>
@@ -402,12 +407,12 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
           </Card>
 
           {/* Action Required */}
-          <div className="mb-5">
-            <div className="mb-2 flex items-center gap-2">
+          <div className="mb-6">
+            <div className="mb-3 flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-amber-500" />
               <h2 className="text-sm font-semibold text-foreground">Action Required</h2>
               {visibleUnassignedJobs.length > 0 && (
-                <span className="rounded-full bg-red-100 text-red-600 px-2 py-0.5 text-[10px] font-medium">
+                <span className="rounded-full bg-red-100 text-red-600 px-2 py-0.5 text-xs font-medium">
                   {visibleUnassignedJobs.length} pending assignments
                 </span>
               )}
@@ -417,11 +422,11 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b border-border bg-muted/30">
-                      <th className="px-3 py-2 text-left text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Show</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Task</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Language</th>
-                      <th className="px-3 py-2 text-left text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Due Date</th>
-                      <th className="px-3 py-2 text-right text-[10px] font-medium text-muted-foreground uppercase tracking-wide">Actions</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Show</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Task</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Language</th>
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground uppercase tracking-wide">Due Date</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground uppercase tracking-wide">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -433,24 +438,24 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
                           animatingOutId === job.id && 'opacity-0 -translate-x-4'
                         )}
                       >
-                        <td className="px-3 py-2">
-                          <Link href={`/projects/${job.projectId}`} className="text-xs font-medium text-foreground hover:text-primary hover:underline transition-colors">
+                        <td className="px-4 py-2.5">
+                          <Link href={`/projects/${job.projectId}`} className="text-sm font-medium text-foreground hover:text-primary hover:underline transition-colors">
                             {job.project}
                           </Link>
                         </td>
-                        <td className="px-3 py-2 text-xs text-muted-foreground">{job.task}</td>
-                        <td className="px-3 py-2">
+                        <td className="px-4 py-2.5 text-sm text-muted-foreground">{job.task}</td>
+                        <td className="px-4 py-2.5">
                           <div className="flex items-center gap-1">
-                            <span className="text-xs font-medium">{job.sourceLang}</span>
-                            <span className="text-muted-foreground text-[10px]">→</span>
-                            <span className="text-xs font-medium">{job.targetLang}</span>
+                            <span className="text-sm font-medium">{job.sourceLang}</span>
+                            <span className="text-muted-foreground text-xs">→</span>
+                            <span className="text-sm font-medium">{job.targetLang}</span>
                           </div>
                         </td>
-                        <td className="px-3 py-2 text-xs">{formatDueDate(job.due)}</td>
-                        <td className="px-3 py-2 text-right">
+                        <td className="px-4 py-2.5 text-sm">{formatDueDate(job.due)}</td>
+                        <td className="px-4 py-2.5 text-right">
                           <Button 
                             size="sm" 
-                            className="h-6 px-2.5 text-[10px] bg-foreground text-background hover:bg-foreground/90"
+                            className="h-7 px-3 text-xs bg-foreground text-background hover:bg-foreground/90"
                             onClick={() => handleAssignClick(job)}
                           >
                             Assign
@@ -464,31 +469,31 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
             </Card>
           </div>
 
-          {/* Active Shows - 2-LINE ULTRA COMPACT FORMAT */}
-          <div className="mb-5">
-            <div className="flex items-center justify-between mb-2">
+          {/* Active Shows - 2-LINE COMPACT FORMAT */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
               <h2 className="text-sm font-semibold text-foreground">Active Shows</h2>
-              <div className="flex items-center gap-1.5">
-                <Button variant="outline" size="sm" className="h-6 gap-1 text-[10px] px-2">
-                  <Filter className="h-3 w-3" />
+              <div className="flex items-center gap-2">
+                <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs px-2.5">
+                  <Filter className="h-3.5 w-3.5" />
                   Filters
                 </Button>
                 <div className="flex border border-border rounded">
                   <Button 
                     variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
                     size="sm" 
-                    className="h-6 w-6 p-0 rounded-r-none"
+                    className="h-7 w-7 p-0 rounded-r-none"
                     onClick={() => setViewMode('list')}
                   >
-                    <List className="h-3 w-3" />
+                    <List className="h-3.5 w-3.5" />
                   </Button>
                   <Button 
                     variant={viewMode === 'grid' ? 'secondary' : 'ghost'} 
                     size="sm" 
-                    className="h-6 w-6 p-0 rounded-l-none"
+                    className="h-7 w-7 p-0 rounded-l-none"
                     onClick={() => setViewMode('grid')}
                   >
-                    <LayoutGrid className="h-3 w-3" />
+                    <LayoutGrid className="h-3.5 w-3.5" />
                   </Button>
                 </div>
               </div>
@@ -496,17 +501,17 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
 
             {/* Newly Assigned Shows */}
             {newlyAssignedShows.map((show) => (
-              <Link key={show.id} href={`/projects/${show.id.replace('new-uj', 'p')}`} className="block mb-1.5">
+              <Link key={show.id} href={`/projects/${show.id.replace('new-uj', 'p')}`} className="block mb-2">
                 <Card className="border border-amber-200 bg-amber-50/30 hover:border-amber-300 transition-all animate-in slide-in-from-top-2 fade-in">
-                  <CardContent className="py-1.5 px-2.5">
+                  <CardContent className="py-2 px-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="px-1.5 py-0.5 text-[9px] font-medium rounded bg-amber-100 text-amber-700">Awaiting Start</span>
-                        <span className="font-medium text-xs">{show.name}</span>
+                        <span className="font-medium text-sm">{show.name}</span>
+                        <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-amber-100 text-amber-700">Awaiting Start</span>
                       </div>
-                      <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span>{show.vendorName} assigned to {show.taskType}</span>
-                        <Clock className="h-3 w-3 text-amber-500" />
+                        <Clock className="h-3.5 w-3.5 text-amber-500" />
                       </div>
                     </div>
                   </CardContent>
@@ -514,45 +519,45 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
               </Link>
             ))}
             
-            {/* Shows Cards - 2-LINE FORMAT */}
+            {/* Shows Cards - 2-LINE FORMAT with badge RIGHT of title */}
             <div className={cn(
-              "grid gap-1.5",
+              "grid gap-2",
               viewMode === 'grid' ? "grid-cols-1 md:grid-cols-2 xl:grid-cols-3" : "grid-cols-1"
             )}>
               {activeShows.map((show) => (
                 <Card key={show.id} className="border border-border hover:border-primary/30 hover:shadow-sm transition-all">
-                  <CardContent className="p-2">
-                    {/* Line 1: Status, Name, Client, Due, Langs, Menu */}
-                    <div className="flex items-center gap-2 mb-1.5">
+                  <CardContent className="px-3 py-2.5">
+                    {/* Line 1: Name, Badge, then metadata on right */}
+                    <div className="flex items-center gap-2 mb-2">
+                      <Link href={`/projects/${show.id}`} className="truncate min-w-0">
+                        <span className="text-sm font-semibold text-foreground hover:text-primary transition-colors">
+                          {show.name}
+                        </span>
+                      </Link>
                       <span className={cn(
-                        'px-1.5 py-0.5 text-[9px] font-medium rounded shrink-0',
+                        'px-1.5 py-0.5 text-[10px] font-medium rounded shrink-0',
                         show.status === 'In Review' ? 'bg-emerald-100 text-emerald-700' :
                         show.status === 'At Risk' ? 'bg-red-100 text-red-600' :
                         'bg-muted text-foreground'
                       )}>
                         {show.status}
                       </span>
-                      <Link href={`/projects/${show.id}`} className="truncate flex-1 min-w-0">
-                        <span className="text-xs font-semibold text-foreground hover:text-primary transition-colors">
-                          {show.name}
-                        </span>
-                      </Link>
-                      <div className="flex items-center gap-2 text-[10px] text-muted-foreground shrink-0">
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground ml-auto shrink-0">
                         <span>{show.client}</span>
-                        <span className="text-muted-foreground/50">|</span>
+                        <span className="text-muted-foreground/40">|</span>
                         <span className={cn(show.health.status === 'at_risk' && "text-red-500 font-medium")}>
                           {new Date(show.due).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                         </span>
-                        <span className="text-muted-foreground/50">|</span>
+                        <span className="text-muted-foreground/40">|</span>
                         <span className="font-medium">{show.languages.join(', ')}</span>
                       </div>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm" className="h-5 w-5 p-0 shrink-0">
-                            <MoreHorizontal className="h-3.5 w-3.5 text-muted-foreground" />
+                          <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0">
+                            <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-36">
+                        <DropdownMenuContent align="end" className="w-40">
                           <DropdownMenuItem asChild>
                             <Link href={`/projects/${show.id}`}>View Details</Link>
                           </DropdownMenuItem>
@@ -572,22 +577,22 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
 
             {activeShows.length === 0 && (
               <Card className="border border-dashed">
-                <CardContent className="py-4 text-center">
-                  <p className="text-xs text-muted-foreground">No active shows yet.</p>
+                <CardContent className="py-6 text-center">
+                  <p className="text-sm text-muted-foreground">No active shows yet.</p>
                 </CardContent>
               </Card>
             )}
           </div>
 
           {/* Completed Today */}
-          <div className="mb-5">
-            <div className="flex items-center justify-between mb-2">
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
                 <h2 className="text-sm font-semibold text-foreground">Completed Today</h2>
               </div>
               <Link href="/projects?status=completed">
-                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground text-[10px] h-6">
+                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground text-xs h-7">
                   View History
                 </Button>
               </Link>
@@ -595,16 +600,16 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
             <Card className="border border-border shadow-sm">
               <CardContent className="p-0 divide-y divide-border">
                 {completedToday.map((item) => (
-                  <div key={item.id} className="flex items-center justify-between px-2.5 py-1.5">
-                    <div className="flex items-center gap-2">
-                      <div className="w-0.5 h-4 bg-emerald-500 rounded-full" />
+                  <div key={item.id} className="flex items-center justify-between px-4 py-2.5">
+                    <div className="flex items-center gap-3">
+                      <div className="w-0.5 h-5 bg-emerald-500 rounded-full" />
                       <div>
-                        <p className="text-xs font-medium">{item.name} – {item.task} ({item.lang})</p>
-                        <p className="text-[9px] text-muted-foreground">Vendor: {item.vendor} · Completed at {item.time}</p>
+                        <p className="text-sm font-medium">{item.name} – {item.task} ({item.lang})</p>
+                        <p className="text-xs text-muted-foreground">Vendor: {item.vendor} · Completed at {item.time}</p>
                       </div>
                     </div>
                     {item.slaMet && (
-                      <span className="px-1.5 py-0.5 text-[8px] font-medium rounded bg-emerald-100 text-emerald-700">SLA Met</span>
+                      <span className="px-2 py-0.5 text-[10px] font-medium rounded bg-emerald-100 text-emerald-700">SLA Met</span>
                     )}
                   </div>
                 ))}
@@ -613,34 +618,34 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
           </div>
 
           {/* Pending Quotes & New Notes */}
-          <div className="grid gap-2 lg:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             <Card className="border border-border shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between p-2.5 pb-1.5">
-                <CardTitle className="text-xs font-semibold">Pending Quotes</CardTitle>
+              <CardHeader className="flex flex-row items-center justify-between p-4 pb-2">
+                <CardTitle className="text-sm font-semibold">Pending Quotes</CardTitle>
                 <Link href="/quotes">
-                  <Button variant="ghost" size="sm" className="gap-1 text-primary text-[10px] h-5">
-                    View All <ArrowRight className="h-2.5 w-2.5" />
+                  <Button variant="ghost" size="sm" className="gap-1 text-primary text-xs h-6">
+                    View All <ArrowRight className="h-3 w-3" />
                   </Button>
                 </Link>
               </CardHeader>
-              <CardContent className="p-2.5 pt-0">
-                <div className="flex flex-col gap-1.5">
+              <CardContent className="p-4 pt-0">
+                <div className="flex flex-col gap-2">
                   {pendingQuotes.map((quote) => (
                     <Link key={quote.id} href={`/quotes/${quote.id}`}>
-                      <div className="flex items-center justify-between rounded border border-border p-2 hover:border-primary/50 transition-colors">
+                      <div className="flex items-center justify-between rounded border border-border p-3 hover:border-primary/50 transition-colors">
                         <div>
-                          <div className="flex items-center gap-1.5">
-                            <p className="font-medium text-xs">{quote.projectName}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-sm">{quote.projectName}</p>
                             {quote.status === 'unsent' && (
-                              <span className="rounded bg-amber-100 px-1 py-0.5 text-[8px] font-medium text-amber-700">Unsent</span>
+                              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">Unsent</span>
                             )}
                             {quote.status === 'pending_approval' && (
-                              <span className="rounded bg-blue-100 px-1 py-0.5 text-[8px] font-medium text-blue-700">Pending</span>
+                              <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-medium text-blue-700">Pending</span>
                             )}
                           </div>
-                          <p className="text-[9px] text-muted-foreground">Expires: {quote.expiresAt}</p>
+                          <p className="text-xs text-muted-foreground">Expires: {quote.expiresAt}</p>
                         </div>
-                        <p className="font-semibold text-xs">₪{quote.amount.toLocaleString()}</p>
+                        <p className="font-semibold text-sm">₪{quote.amount.toLocaleString()}</p>
                       </div>
                     </Link>
                   ))}
@@ -649,27 +654,27 @@ export function PMDashboard({ userName = 'Noa' }: { userName?: string }) {
             </Card>
 
             <Card className="border border-border shadow-sm">
-              <CardHeader className="flex flex-row items-center justify-between p-2.5 pb-1.5">
-                <CardTitle className="flex items-center gap-1.5 text-xs font-semibold">
-                  <Bell className="h-3 w-3" />
+              <CardHeader className="flex flex-row items-center justify-between p-4 pb-2">
+                <CardTitle className="flex items-center gap-2 text-sm font-semibold">
+                  <Bell className="h-4 w-4" />
                   New Notes
                 </CardTitle>
                 <Link href="/projects?tab=notes">
-                  <Button variant="ghost" size="sm" className="gap-1 text-primary text-[10px] h-5">
-                    View All <ArrowRight className="h-2.5 w-2.5" />
+                  <Button variant="ghost" size="sm" className="gap-1 text-primary text-xs h-6">
+                    View All <ArrowRight className="h-3 w-3" />
                   </Button>
                 </Link>
               </CardHeader>
-              <CardContent className="p-2.5 pt-0">
-                <div className="flex flex-col gap-1.5">
+              <CardContent className="p-4 pt-0">
+                <div className="flex flex-col gap-2">
                   {newNotes.map((note) => (
                     <Link key={note.id} href={`/projects/${note.projectId}?tab=notes`}>
-                      <div className="rounded border border-border p-2 hover:border-primary/30 hover:bg-muted/30 transition-colors">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <p className="text-xs font-medium">{note.project}</p>
-                          <span className="text-[9px] text-muted-foreground">{note.time}</span>
+                      <div className="rounded border border-border p-3 hover:border-primary/30 hover:bg-muted/30 transition-colors">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm font-medium">{note.project}</p>
+                          <span className="text-xs text-muted-foreground">{note.time}</span>
                         </div>
-                        <p className="text-[9px] text-muted-foreground line-clamp-1">
+                        <p className="text-xs text-muted-foreground line-clamp-1">
                           <span className="font-medium text-foreground">{note.from}:</span> {note.message}
                         </p>
                       </div>
